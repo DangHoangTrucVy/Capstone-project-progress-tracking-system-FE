@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { login } from "../services/authService";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [role, setRole] = useState("student"); // 'student' hoặc 'lecturer'
@@ -7,6 +8,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // 2. Khởi tạo hook navigate
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,14 +22,24 @@ const Login = () => {
 
       console.log("Login success:", result);
 
-      // Lưu token và thông tin người dùng
+      // Lấy thông tin user và role từ kết quả trả về
+      const userRole = result.user?.role || result.role; // Tùy cấu hình BE trả về (VD: 'STUDENT', 'LECTURER')
+
+      // Lưu token, user và role vào LocalStorage
       localStorage.setItem("accessToken", result.accessToken);
       localStorage.setItem("user", JSON.stringify(result.user));
+      localStorage.setItem("role", userRole);
 
       alert("Đăng nhập thành công!");
-      
-      console.log("User:", result.user);
-      console.log("Role:", result.user?.role);
+
+      // 3. Tự động chuyển hướng dựa trên Role
+      if (userRole === "STUDENT") {
+        navigate("/student-dashboard");
+      } else if (userRole === "LECTURER" || userRole === "TEACHER") {
+        navigate("/lecturer/dashboard"); // Đổi thành path của Giảng viên nếu có
+      } else {
+        navigate("/"); // Mặc định về trang chủ nếu không xác định được role
+      }
     } catch (error) {
       console.error("Login failed:", error);
       const message = error.response?.data?.message || "Đăng nhập thất bại";
@@ -55,7 +67,8 @@ const Login = () => {
             Theo dõi từng mốc đồ án, đúng hẹn mỗi lần.
           </h1>
           <p className="text-sm text-orange-100/80">
-            Đặt lịch với giảng viên hướng dẫn, cập nhật tiến độ và nộp tài liệu — tất cả trong một nơi.
+            Đặt lịch với giảng viên hướng dẫn, cập nhật tiến độ và nộp tài liệu
+            — tất cả trong một nơi.
           </p>
         </div>
 
@@ -170,7 +183,10 @@ const Login = () => {
             <p>hoặc</p>
             <p>
               Chưa có tài khoản?{" "}
-              <a href="/register" className="font-medium text-orange-600 hover:underline">
+              <a
+                href="/register"
+                className="font-medium text-orange-600 hover:underline"
+              >
                 Đăng ký ngay
               </a>
             </p>
