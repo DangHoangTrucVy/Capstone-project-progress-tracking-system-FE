@@ -5,9 +5,7 @@ const MainLayout = ({ children, user, onLogout }) => {
         <div className="min-h-screen bg-[#F8F6F0] text-[#2C2825] flex flex-col font-sans selection:bg-[#E65100] selection:text-white relative overflow-hidden">
             
             {/* ================= HIỆU ỨNG NỀN AMBIENT GLOW ================= */}
-            {/* Khối sáng màu cam mờ ở góc trên bên trái */}
             <div className="absolute top-0 left-1/4 w-125 h-125 bg-orange-300/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
-            {/* Khối sáng màu vàng ấm ở góc dưới bên phải */}
             <div className="absolute bottom-10 right-10 w-112.5 h-112.5 bg-amber-200/25 rounded-full blur-[140px] pointer-events-none -z-10"></div>
             {/* ============================================================ */}
 
@@ -31,6 +29,22 @@ const MainLayout = ({ children, user, onLogout }) => {
                     </div>
 
                     <div className="flex items-center space-x-4">
+                        {/* 🐶 CHÚ CÚN VẪY TAY CHÀO (Hiển thị ngay cạnh tên người dùng) */}
+                        <div className="hidden lg:flex items-center mr-1 relative group">
+                            <div className="w-12 h-12 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center text-xl shadow-inner relative select-none right-5">
+                                🐶
+                                {/* Bàn tay vẫy hiệu ứng động */}
+                                <span className="absolute -top-1 -right-1 text-sm animate-wave origin-bottom-right ">
+                                    👋
+                                </span>
+                            </div>
+                            
+                            {/* Khung chat nhỏ xuất hiện khi hover vào cún */}
+                            <div className="absolute right-0 top-12 hidden group-hover:block bg-white text-xs px-3 py-1.5 rounded-xl shadow-lg border border-orange-100 whitespace-nowrap text-[#E65100] font-semibold animate-fade-in z-50">
+                                Chúc bạn một ngày code vui vẻ! ✨
+                            </div>
+                        </div>
+
                         <div className="text-right hidden sm:block">
                             <p className="text-xs font-bold text-[#2C2825]">{user?.fullName || "Đặng Hoàng Trúc Vy"}</p>
                             <p className="text-[10px] text-[#E65100] font-bold uppercase">Sinh viên • FPT University</p>
@@ -61,6 +75,21 @@ const MainLayout = ({ children, user, onLogout }) => {
                     </div>
                 </div>
             </footer>
+
+            {/* Định nghĩa Keyframes animation vẫy tay cho Tailwind */}
+            <style>{`
+                @keyframes wave {
+                    0% { transform: rotate(0deg); }
+                    20% { transform: rotate(14deg); }
+                    40% { transform: rotate(-8deg); }
+                    60% { transform: rotate(14deg); }
+                    80% { transform: rotate(-4deg); }
+                    100% { transform: rotate(0deg); }
+                }
+                .animate-wave {
+                    animation: wave 1.8s infinite ease-in-out;
+                }
+            `}</style>
         </div>
     );
 };
