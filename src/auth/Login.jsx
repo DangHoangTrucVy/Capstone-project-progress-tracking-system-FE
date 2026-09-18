@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { login } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 
@@ -8,7 +8,31 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate(); // 2. Khởi tạo hook navigate
+  
+  // State quản lý thông báo tùy chỉnh (Toast Notification)
+  const [notification, setNotification] = useState({
+    show: false,
+    message: "",
+    type: "success", // 'success' hoặc 'error'
+  });
+
+  const navigate = useNavigate();
+
+  // Tự động ẩn thông báo sau 3 giây
+  useEffect(() => {
+    let timer;
+    if (notification.show) {
+      timer = setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }));
+      }, 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [notification.show]);
+
+  // Hàm hiển thị thông báo
+  const showToast = (message, type = "success") => {
+    setNotification({ show: true, message, type });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,37 +47,57 @@ const Login = () => {
       console.log("Login success:", result);
 
       // Lấy thông tin user và role từ kết quả trả về
-      const userRole = result.user?.role || result.role; // Tùy cấu hình BE trả về (VD: 'STUDENT', 'LECTURER')
+      const userRole = result.user?.role || result.role; 
 
       // Lưu token, user và role vào LocalStorage
       localStorage.setItem("accessToken", result.accessToken);
       localStorage.setItem("user", JSON.stringify(result.user));
       localStorage.setItem("role", userRole);
 
-      alert("Đăng nhập thành công!");
+      // Thông báo thành công và chuyển hướng sau 1.5s
+      showToast("Đăng nhập thành công! Đang chuyển hướng...", "success");
 
-      // 3. Tự động chuyển hướng dựa trên Role
-      if (userRole === "STUDENT") {
-        navigate("/student-dashboard");
-      } else if (userRole === "LECTURER" || userRole === "TEACHER") {
-        navigate("/lecturer/dashboard"); // Đổi thành path của Giảng viên nếu có
-      } else {
-        navigate("/"); // Mặc định về trang chủ nếu không xác định được role
-      }
+      setTimeout(() => {
+        if (userRole === "STUDENT") {
+          navigate("/student-dashboard");
+        } else if (userRole === "LECTURER" || userRole === "TEACHER") {
+          navigate("/lecturer/dashboard");
+        } else {
+          navigate("/");
+        }
+      }, 1500);
+
     } catch (error) {
       console.error("Login failed:", error);
-      const message = error.response?.data?.message || "Đăng nhập thất bại";
-      alert(message);
+      const message = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!";
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-[#FAFAFA]">
+    <div className="relative flex min-h-screen w-full bg-[#FAFAFA] overflow-hidden">
+      
+      {/* Toast Notification Custom (Hiển thị góc trên bên phải, tự động tắt) */}
+      {notification.show && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-xl bg-white px-5 py-4 shadow-2xl border border-gray-100 transition-all duration-300">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-white font-bold shrink-0 ${
+            notification.type === "success" ? "bg-green-500" : "bg-red-500"
+          }`}>
+            {notification.type === "success" ? "✓" : "✕"}
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-800">
+              {notification.type === "success" ? "Thành công" : "Lỗi"}
+            </p>
+            <p className="text-xs text-gray-500">{notification.message}</p>
+          </div>
+        </div>
+      )}
+
       {/* Cột trái - Branding cam FPT */}
       <div className="hidden w-1/2 flex-col justify-between bg-[#E65100] p-12 text-white lg:flex">
-        {/* Logo / Header */}
         <div className="flex items-center gap-2 font-medium">
           <div className="flex h-7 w-7 items-center justify-center rounded border border-white/40">
             <span className="text-xs">📅</span>
@@ -61,7 +105,6 @@ const Login = () => {
           <span>Lịch Đồ Án</span>
         </div>
 
-        {/* Banner Content */}
         <div className="max-w-md space-y-4">
           <h1 className="text-4xl font-bold leading-tight">
             Theo dõi từng mốc đồ án, đúng hẹn mỗi lần.
@@ -72,7 +115,6 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Progress Timeline Indicator */}
         <div className="flex items-center gap-2 text-xs text-orange-100/70">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-white"></span>
@@ -88,7 +130,6 @@ const Login = () => {
       {/* Cột phải - Form đăng nhập */}
       <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
         <div className="w-full max-w-sm space-y-6">
-          {/* Title */}
           <div className="space-y-1">
             <p className="text-xs text-gray-400">Chào mừng trở lại</p>
             <h2 className="text-2xl font-semibold text-gray-800">
@@ -168,11 +209,11 @@ const Login = () => {
               </a>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Button (Đã đổi thành type="submit" để kích hoạt form) */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#E65100] py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-[#E65100] py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-700 disabled:opacity-50 cursor-pointer"
             >
               {loading ? "Đang xử lý..." : "Đăng nhập"}
             </button>

@@ -73,7 +73,7 @@ const StudentDashboard = () => {
                             <span>Chuyên ngành Kỹ thuật phần mềm</span>
                         </div>
                         <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-                            Xin chào, {user?.fullName || "Trúc Vy"}! 👋
+                            Xin chào, {user?.fullName || "Trúc Vy"}! 
                         </h1>
                         <p className="text-xs text-gray-300 max-w-xl leading-relaxed">
                             Chào mừng bạn đến với hệ thống quản lý đồ án tốt nghiệp. Theo dõi tiến độ, quản lý thành viên nhóm và đăng ký đề tài ngay tại không gian làm việc cá nhân của bạn.
