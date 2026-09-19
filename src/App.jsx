@@ -24,7 +24,7 @@ const App = () => {
         <Route path="/register" element={<Register />} />
 
         {/* Routes dành riêng cho STUDENT */}
-        <Route element={<ProtectedRoute allowedRoles={["STUDENT"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["STUDENT", "GROUP_LEADER"]} />}>
           <Route path="/student-dashboard" element={<StudentDashboard />} />
         </Route>
 
