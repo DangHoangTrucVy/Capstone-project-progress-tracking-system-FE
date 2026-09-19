@@ -1,30 +1,45 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import Overview from "./Overview";
+import CreateGroup from "./CreateGroup";
+import MemberGroup from "./MemberGroup";
+import ScheduleGroup from "./ScheduleGroup";
+import ProgressGroup from "./ProgressGroup";
+import DocumentGroup from "./DocumentGroup";
+import { getAllGroups, getGroupById } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
-import { createGroup } from "../../services/groupService";
-import MainLayout from "../../components/MainLayout";
 
-const StudentDashboard = () => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    // Modal state
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [groupCode, setGroupCode] = useState("");
-    const [semester, setSemester] = useState("");
-    const [submitting, setSubmitting] = useState(false);
+export default function StudentDashboard() {
+    const [hasGroup, setHasGroup] = useState(null); // null khi đang load
+    const [activeTab, setActiveTab] = useState("overview");
+    const [groupData, setGroupData] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
 
     useEffect(() => {
-        const fetchUserData = async () => {
+        const fetchUserDataAndGroup = async () => {
             try {
-                const userData = await getCurrentUser();
-                setUser(userData);
-            } catch (error) {
-                console.error("Lỗi tải thông tin:", error);
-            } finally {
-                setLoading(false);
+                // 1. Lấy thông tin user hiện tại
+                const userRes = await getCurrentUser();
+                setCurrentUser(userRes);
+
+                // 2. Lấy danh sách nhóm từ backend để kiểm tra xem sinh viên đã có nhóm chưa
+                const groupsRes = await getAllGroups();
+                const groupList = groupsRes?.content || groupsRes || [];
+
+                if (groupList.length > 0) {
+                    // Lấy nhóm đầu tiên mà user tham gia
+                    const currentGroupId = groupList[0].id;
+                    const detailedGroup = await getGroupById(currentGroupId);
+                    setGroupData(detailedGroup);
+                    setHasGroup(true);
+                } else {
+                    setHasGroup(false);
+                }
+            } catch (err) {
+                console.warn("Chưa có nhóm hoặc chưa gọi được API nhóm, hiển thị form tạo nhóm.", err);
+                setHasGroup(false);
             }
         };
-        fetchUserData();
+        fetchUserDataAndGroup();
     }, []);
 
     const handleLogout = () => {
@@ -32,189 +47,85 @@ const StudentDashboard = () => {
         window.location.href = "/login";
     };
 
-    const handleCreateGroupSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            await createGroup({ groupCode, semester });
-            alert("Tạo nhóm thành công!");
-            setIsCreateModalOpen(false);
-            window.location.reload();
-        } catch (error) {
-            console.error("Lỗi tạo nhóm:", error);
-            alert("Tạo nhóm thất bại! Vui lòng kiểm tra lại.");
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-[#F8F6F0] flex items-center justify-center">
-                <div className="flex items-center space-x-3 text-[#6B635B] font-medium text-xs animate-pulse">
-                    <div className="w-2.5 h-2.5 bg-[#E65100] rounded-full animate-bounce"></div>
-                    <span>Đang tải không gian làm việc của bạn...</span>
-                </div>
-            </div>
-        );
+    if (hasGroup === null) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#FBF9F5] text-xs font-bold">Đang đồng bộ dữ liệu với server...</div>;
     }
 
+    if (!hasGroup) {
+        return <CreateGroup onGroupCreated={() => window.location.reload()} />;
+    }
+
+    const getInitials = (name) => {
+        if (!name) return "SV";
+        const words = name.trim().split(" ");
+        return words.length > 1 ? words[words.length - 2][0] + words[words.length - 1][0] : words[0].slice(0, 2).toUpperCase();
+    };
+
     return (
-        <MainLayout user={user} onLogout={handleLogout}>
-            <div className="space-y-8 animate-fadeIn">
-                
-                {/* 1. WELCOME BANNER (Gọn gàng, chuyên nghiệp, không bị trống trải) */}
-                <div className="bg-linear-to-r from-[#2C2825] to-[#4A433E] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
-                    <div className="space-y-2 z-10">
-                        <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[11px] font-semibold text-orange-200">
-                            <span>✨ Học kỳ Spring 2026</span>
-                            <span>•</span>
-                            <span>Chuyên ngành Kỹ thuật phần mềm</span>
-                        </div>
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-                            Xin chào, {user?.fullName || "Trúc Vy"}! 
-                        </h1>
-                        <p className="text-xs text-gray-300 max-w-xl leading-relaxed">
-                            Chào mừng bạn đến với hệ thống quản lý đồ án tốt nghiệp. Theo dõi tiến độ, quản lý thành viên nhóm và đăng ký đề tài ngay tại không gian làm việc cá nhân của bạn.
-                        </p>
-                    </div>
-
-                    <div className="z-10 bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex items-center space-x-4 min-w-55">
-                        <div className="w-12 h-12 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black text-lg shadow-inner">
-                            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "V"}
-                        </div>
+        <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans">
+            {/* SIDEBAR BÊN TRÁI */}
+            <aside className="w-72 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0">
+                <div className="space-y-8">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black shadow-md">📦</div>
                         <div>
-                            <p className="text-[10px] text-gray-300 uppercase tracking-wider font-bold">Trạng thái nhóm</p>
-                            <p className="text-xs font-bold text-orange-300 mt-0.5">
-                                {user?.group ? "Đã có nhóm" : "Chưa có nhóm"}
-                            </p>
+                            <h2 className="font-extrabold text-sm tracking-tight text-[#2C2825]">Lịch Đồ Án</h2>
+                            <p className="text-[10px] text-[#6B635B]">Khoa Công nghệ thông tin</p>
                         </div>
                     </div>
-                </div>
 
-                {/* 2. MAIN WORKSPACE CONTENT */}
-                <div>
-                    {user?.group ? (
-                        /* NẾU ĐÃ CÓ NHÓM */
-                        <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
-                            {/* Nội dung khi có nhóm */}
+                    <div className="bg-[#F8F6F0] p-4 rounded-2xl border border-[#E8E2D9] space-y-2">
+                        <h3 className="text-xs font-black text-[#2C2825]">{groupData?.topicTitle || "Đề tài đồ án nhóm"}</h3>
+                        <p className="text-[11px] text-[#6B635B]">{groupData?.groupCode}</p>
+                        <div className="inline-block px-2.5 py-0.5 bg-orange-100 text-[#E65100] text-[10px] font-bold rounded-md">
+                            {groupData?.members?.find(m => m.isLeader)?.userFullName ? "Thành viên" : "Trưởng nhóm"}
                         </div>
-                    ) : (
-                        /* NẾU CHƯA CÓ NHÓM (Cân đối không gian, không bị trống thô) */
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Card chính hành động */}
-                            <div className="md:col-span-2 bg-white p-10 rounded-3xl border border-[#E8E2D9] shadow-sm flex flex-col justify-between space-y-6">
-                                <div className="space-y-4">
-                                    <div className="w-14 h-14 bg-orange-50 text-[#E65100] rounded-2xl flex items-center justify-center text-2xl">
-                                        🚀
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h2 className="text-xl font-black text-[#2C2825]">Bắt đầu hành trình Đồ án tốt nghiệp</h2>
-                                        <p className="text-xs text-[#6B635B] leading-relaxed">
-                                            Bạn chưa tham gia vào nhóm đồ án nào trong học kỳ này. Bạn có thể tự tạo nhóm mới làm nhóm trưởng hoặc chờ liên kết từ các thành viên khác.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <button 
-                                        onClick={() => setIsCreateModalOpen(true)}
-                                        className="px-6 py-3.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-2xl shadow-md shadow-orange-500/20 transition duration-200"
-                                    >
-                                        + Tạo nhóm đồ án ngay
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Card phụ hướng dẫn nhanh */}
-                            <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4 flex flex-col justify-between">
-                                <div className="space-y-3">
-                                    <h3 className="text-xs font-extrabold text-[#2C2825] uppercase tracking-wider">Lưu ý quan trọng</h3>
-                                    <ul className="space-y-2.5 text-xs text-[#6B635B] list-disc pl-4">
-                                        <li>Mỗi nhóm tối đa từ 3 - 5 thành viên.</li>
-                                        <li>Mã nhóm cần tuân thủ quy định của khoa (VD: SE17-G01).</li>
-                                        <li>Sau khi tạo nhóm, bạn có thể thêm các thành viên khác vào.</li>
-                                    </ul>
-                                </div>
-                                <div className="p-3 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] text-[11px] text-[#6B635B]">
-                                    💡 Cần trợ giúp? Liên hệ ban chủ nhiệm khoa phần mềm.
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* ================= MODAL TẠO NHÓM (HIỆN ĐẠI, CAO CẤP) ================= */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
-                    <div className="bg-white w-full max-w-lg rounded-3xl p-8 border border-[#E8E2D9] shadow-2xl space-y-6">
-                        
-                        <div className="flex justify-between items-center pb-4 border-b border-[#F0EBE1]">
-                            <div>
-                                <h3 className="font-black text-lg text-[#2C2825]">Khởi tạo Nhóm Đồ Án Mới</h3>
-                                <p className="text-xs text-[#6B635B] mt-0.5">Điền thông tin định danh nhóm của bạn cho học kỳ này</p>
-                            </div>
-                            <button 
-                                onClick={() => setIsCreateModalOpen(false)}
-                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-[#6B635B] font-bold text-xs transition"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleCreateGroupSubmit} className="space-y-5">
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-[#6B635B]">Mã nhóm định danh <span className="text-red-500">*</span></label>
-                                <input 
-                                    type="text" 
-                                    value={groupCode}
-                                    onChange={(e) => setGroupCode(e.target.value)}
-                                    placeholder="Ví dụ: SE1701-G01" 
-                                    required
-                                    className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E65100]/20 focus:border-[#E65100] transition"
-                                />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-[#6B635B]">Học kỳ thực hiện <span className="text-red-500">*</span></label>
-                                <input 
-                                    type="text" 
-                                    value={semester}
-                                    onChange={(e) => setSemester(e.target.value)}
-                                    placeholder="Ví dụ: Spring2026" 
-                                    required
-                                    className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E65100]/20 focus:border-[#E65100] transition"
-                                />
-                            </div>
-
-                            <div className="bg-[#FFF3EE] p-4 rounded-2xl border border-orange-200 text-xs text-[#E65100] font-medium">
-                                📌 Lưu ý: Bạn sẽ tự động trở thành **Nhóm trưởng** sau khi tạo nhóm thành công.
-                            </div>
-
-                            <div className="flex items-center justify-end space-x-3 pt-2">
-                                <button 
-                                    type="button"
-                                    onClick={() => setIsCreateModalOpen(false)}
-                                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-[#6B635B] text-xs font-bold rounded-xl transition"
-                                >
-                                    Hủy bỏ
-                                </button>
-                                <button 
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md shadow-orange-500/20 transition disabled:opacity-50"
-                                >
-                                    {submitting ? "Đang xử lý..." : "Xác nhận tạo nhóm"}
-                                </button>
-                            </div>
-                        </form>
-
                     </div>
+
+                    <nav className="space-y-1.5 text-xs font-bold text-[#6B635B]">
+                        <button onClick={() => setActiveTab("overview")} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === "overview" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"}`}><span>📊</span><span>Tổng quan</span></button>
+                        <button onClick={() => setActiveTab("members")} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === "members" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"}`}><span>👥</span><span>Thành viên nhóm</span></button>
+                        <button onClick={() => setActiveTab("schedule")} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === "schedule" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"}`}><span>📅</span><span>Lịch hẹn</span></button>
+                        <button onClick={() => setActiveTab("progress")} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === "progress" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"}`}><span>📈</span><span>Tiến độ đồ án</span></button>
+                        <button onClick={() => setActiveTab("documents")} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === "documents" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"}`}><span>📂</span><span>Tài liệu</span></button>
+                    </nav>
                 </div>
-            )}
-        </MainLayout>
+
+                <div className="pt-6 border-t border-[#E8E2D9] space-y-4">
+                    <div className="flex items-center space-x-3">
+                        {currentUser?.avatarUrl ? (
+                            <img src={currentUser.avatarUrl} alt="Avatar" className="w-10 h-10 rounded-xl object-cover" />
+                        ) : (
+                            <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs">
+                                {getInitials(currentUser?.fullName)}
+                            </div>
+                        )}
+                        <div className="overflow-hidden">
+                            <h4 className="text-xs font-black truncate">{currentUser?.fullName || "Đang tải..."}</h4>
+                            <p className="text-[10px] text-[#6B635B] truncate">{currentUser?.email}</p>
+                        </div>
+                    </div>
+                    <button onClick={handleLogout} className="w-full flex items-center space-x-2 text-xs font-bold text-red-500 hover:underline">
+                        <span>🚪</span><span>Đăng xuất</span>
+                    </button>
+                </div>
+            </aside>
+
+            {/* MAIN CONTENT */}
+            <main className="flex-1 flex flex-col h-screen overflow-y-auto">
+                <header className="h-16 bg-white border-b border-[#E8E2D9] px-8 flex justify-between items-center text-xs font-semibold text-[#6B635B]">
+                    <span>Lịch Đồ Án — {activeTab.toUpperCase()}</span>
+                    <span className="text-orange-600 font-bold">Xin chào, {currentUser?.fullName}</span>
+                </header>
+
+                <div className="p-8 max-w-7xl mx-auto w-full">
+                    {activeTab === "overview" && <Overview groupData={groupData} />}
+                    {activeTab === "members" && <MemberGroup groupId={groupData?.id} />}
+                    {activeTab === "schedule" && <ScheduleGroup groupId={groupData?.id} />}
+                    {activeTab === "progress" && <ProgressGroup groupId={groupData?.id} />}
+                    {activeTab === "documents" && <DocumentGroup groupId={groupData?.id} />}
+                </div>
+            </main>
+        </div>
     );
-};
-
-export default StudentDashboard;
+}
