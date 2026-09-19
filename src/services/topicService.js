@@ -1,35 +1,40 @@
 import api from "./api";
 
-// Lấy danh sách đề tài (GET /api/v1/topics)
-export const getTopics = async (params = { page: 0, size: 10 }) => {
-    try {
-        const response = await api.get("/topics", { params });
-        return response.data;
-    } catch (error) {
-        console.warn("API /topics đang lỗi 500, dùng dữ liệu giả lập (fallback).");
-        return {
-            content: [
-                { id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", topicCode: "T014", title: "Hệ thống hỗ trợ nông nghiệp bằng UAV phun thuốc tự động", category: "Agriculture" },
-                { id: "4fa85f64-5717-4562-b3fc-2c963f66afa6", topicCode: "T015", title: "Quản lý kho hàng thông minh sử dụng AI và IoT", category: "IoT" }
-            ]
-        };
-    }
+// Lấy danh sách đề tài (có thể lọc theo status)
+export const getTopics = async (params) => {
+    const response = await api.get("/topics", { params });
+    return response.data;
 };
 
-// Tạo / Đề xuất đề tài mới (POST /api/v1/topics)
+// Tạo đề tài mới
 export const createTopic = async (topicData) => {
+    // topicData: { topicCode, title, description, category }
     const response = await api.post("/topics", topicData);
     return response.data;
 };
 
-// Lấy chi tiết đề tài theo ID (GET /api/v1/topics/{id})[cite: 50]
-export const getTopicById = async (id) => {
-    const response = await api.get(`/topics/${id}`);
+// Cập nhật đề tài
+export const updateTopic = async (id, topicData) => {
+    // topicData: { title, description, category, status }
+    const response = await api.put(`/topics/${id}`, topicData);
     return response.data;
 };
 
-// Cập nhật đề tài (PUT /api/v1/topics/{id})[cite: 51]
-export const updateTopic = async (id, topicData) => {
-    const response = await api.put(`/topics/${id}`, topicData);
+export const updateTopicStatus = async (id, statusData) => {
+    // statusData: { status: "PUBLISHED" } hoặc đầy đủ thông tin đề tài theo yêu cầu Swagger
+    const response = await api.put(`/topics/${id}`, statusData);
+    return response.data;
+};
+
+// Lấy danh sách câu hỏi theo topicId
+export const getTopicQuestions = async (topicId, params) => {
+    const response = await api.get(`/topics/${topicId}/questions`, { params });
+    return response.data;
+};
+
+// Thêm câu hỏi mới vào đề tài
+export const createTopicQuestion = async (topicId, questionData) => {
+    // questionData mẫu: { category, questionText, guidanceNotes }
+    const response = await api.post(`/topics/${topicId}/questions`, questionData);
     return response.data;
 };
