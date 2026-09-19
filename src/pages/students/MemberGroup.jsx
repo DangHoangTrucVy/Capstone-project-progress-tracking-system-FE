@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getGroupById, addGroupMember, removeGroupMember } from "../../services/groupService";
 
-export default function MemberGroup({ groupId }) {
+export default function MemberGroup({ groupId, isLeader }) {
     const [groupData, setGroupData] = useState(null);
     const [memberInput, setMemberInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -23,15 +23,21 @@ export default function MemberGroup({ groupId }) {
     const handleAddMember = async (e) => {
         e.preventDefault();
         if (!memberInput.trim()) return;
+
+        if (groupData?.members && groupData.members.length >= 5) {
+            alert("Nhóm đã đạt số lượng tối đa (5 thành viên). Không thể thêm mới!");
+            return;
+        }
+
         setLoading(true);
         try {
             const payload = {
-                userId: memberInput.trim(), // ID hoặc mã sinh viên theo API yêu cầu
+                userId: memberInput.trim(),
                 isLeader: false
             };
             await addGroupMember(groupId, payload);
             setMemberInput("");
-            await fetchGroupDetails(); // Load lại danh sách thật từ server
+            await fetchGroupDetails();
             alert("Thêm thành viên thành công!");
         } catch (err) {
             console.error("Lỗi thêm thành viên:", err);
@@ -45,7 +51,7 @@ export default function MemberGroup({ groupId }) {
         if (!window.confirm("Bạn có chắc muốn xóa thành viên này khỏi nhóm?")) return;
         try {
             await removeGroupMember(groupId, memberId);
-            await fetchGroupDetails(); // Load lại danh sách thật từ server
+            await fetchGroupDetails();
             alert("Đã xóa thành viên thành công!");
         } catch (err) {
             console.error("Lỗi xóa thành viên:", err);
@@ -55,7 +61,7 @@ export default function MemberGroup({ groupId }) {
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <h2 className="text-lg font-black">Thành viên nhóm</h2>
+            <h2 className="text-lg font-black">Thành viên nhóm ({groupData?.members?.length || 0}/5 người)</h2>
             <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] space-y-6">
                 
                 <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200 flex justify-between items-center">
@@ -78,7 +84,7 @@ export default function MemberGroup({ groupId }) {
                                     <span className={`px-3 py-1 text-[10px] font-bold rounded-full ${m.isLeader ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-600"}`}>
                                         {m.isLeader ? "Trưởng nhóm" : "Thành viên"}
                                     </span>
-                                    {!m.isLeader && (
+                                    {isLeader && !m.isLeader && (
                                         <button type="button" onClick={() => handleRemoveMember(m.id || m.userId)} className="text-red-500 font-bold text-xs hover:underline">Xóa</button>
                                     )}
                                 </div>
@@ -89,22 +95,30 @@ export default function MemberGroup({ groupId }) {
                     )}
                 </div>
 
-                <form onSubmit={handleAddMember} className="pt-4 border-t border-[#E8E2D9] space-y-3">
-                    <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên bằng ID / MSSV</label>
-                    <div className="flex space-x-2">
-                        <input 
-                            type="text" 
-                            value={memberInput}
-                            onChange={(e) => setMemberInput(e.target.value)}
-                            placeholder="Nhập User ID hoặc MSSV..." 
-                            required
-                            className="flex-1 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]" 
-                        />
-                        <button type="submit" disabled={loading} className="px-5 py-2.5 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50">
-                            {loading ? "Đang thêm..." : "Thêm"}
-                        </button>
-                    </div>
-                </form>
+                {isLeader ? (
+                    groupData?.members?.length < 5 ? (
+                        <form onSubmit={handleAddMember} className="pt-4 border-t border-[#E8E2D9] space-y-3">
+                            <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên bằng ID / MSSV</label>
+                            <div className="flex space-x-2">
+                                <input 
+                                    type="text" 
+                                    value={memberInput}
+                                    onChange={(e) => setMemberInput(e.target.value)}
+                                    placeholder="Nhập User ID hoặc MSSV..." 
+                                    required
+                                    className="flex-1 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]" 
+                                />
+                                <button type="submit" disabled={loading} className="px-5 py-2.5 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50">
+                                    {loading ? "Đang thêm..." : "Thêm"}
+                                </button>
+                            </div>
+                        </form>
+                    ) : (
+                        <p className="text-xs text-amber-600 font-bold text-center pt-2">Nhóm đã đạt tối đa 5 thành viên.</p>
+                    )
+                ) : (
+                    <p className="text-[11px] text-[#6B635B] italic text-center pt-2">Chỉ có Trưởng nhóm mới có quyền thêm hoặc xóa thành viên.</p>
+                )}
 
             </div>
         </div>

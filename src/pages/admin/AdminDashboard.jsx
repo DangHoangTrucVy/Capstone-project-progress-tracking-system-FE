@@ -216,7 +216,7 @@ const AdminDashboard = () => {
                 <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-[#E8E2D9] shadow-sm">
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-bold text-[#6B635B] mr-2">Lọc vai trò:</span>
-                    {["", "ADMIN", "INSTRUCTOR", "STUDENT"].map((roleOption) => (
+                    {["", "ADMIN", "INSTRUCTOR", "STUDENT", "GROUP_LEADER"].map((roleOption) => (
                       <button
                         key={roleOption}
                         onClick={() => setSelectedRole(roleOption)}
