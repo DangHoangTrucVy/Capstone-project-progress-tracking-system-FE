@@ -26,3 +26,9 @@ export const updateUser = async (id, userData) => {
     const response = await api.put(`/users/${id}`, userData);
     return response.data;
 };
+
+//BE chưa cập nhật cho Admin
+// export const deleteUser = async (id) => {
+//     const response = await api.delete(`/users/${id}`);
+//     return response.data;
+// };
