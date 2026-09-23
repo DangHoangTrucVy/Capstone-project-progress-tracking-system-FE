@@ -4,6 +4,7 @@ import {
   getAllGroups,
   getGroupById,
   addGroupMember,
+  joinGroup,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import api from "../../services/api";
@@ -107,20 +108,16 @@ export default function CreateGroup({ onGroupCreated }) {
     }
   };
 
-  const handleJoinGroup = async (groupId) => {
+ const handleJoinGroup = async (groupId) => {
     if (!window.confirm("Bạn có chắc chắn muốn tham gia nhóm này không?"))
       return;
     setJoiningId(groupId);
     try {
-      const isUserLeader = currentUser?.role === "GROUP_LEADER";
-      await addGroupMember(groupId, {
-        userId: currentUser.id,
-        isLeader: isUserLeader,
-      });
+      // Gọi đúng endpoint POST /api/v1/groups/{id}/join dành cho student tự join
+      await joinGroup(groupId);
 
       alert("Tham gia nhóm thành công!");
       localStorage.setItem("groupId", groupId);
-      // Cập nhật lại UI ngay lập tức thông qua callback thay vì reload trang
       if (onGroupCreated) onGroupCreated();
     } catch (err) {
       console.error("Lỗi tham gia nhóm:", err);
@@ -431,7 +428,9 @@ export default function CreateGroup({ onGroupCreated }) {
                           disabled={joiningId === g.id}
                           className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50"
                         >
-                          {joiningId === g.id ? "Đang xử lý..." : "Tham gia ngay"}
+                          {joiningId === g.id
+                            ? "Đang xử lý..."
+                            : "Tham gia ngay"}
                         </button>
                       </div>
                     );

@@ -19,28 +19,41 @@ export default function StudentDashboard() {
       const userRes = await getCurrentUser();
       setCurrentUser(userRes);
 
+      // 1. Kiểm tra trong localStorage nhưng PHẢI xác thực xem user hiện tại có thực sự là thành viên của nhóm đó không
       const savedGroupId = localStorage.getItem("groupId");
       if (savedGroupId) {
         try {
           const detailedGroup = await getGroupById(savedGroupId);
-          if (detailedGroup) {
+          // Kiểm tra user hiện tại có nằm trong mảng members của nhóm đã lưu không
+          const isMember = detailedGroup?.members?.some(
+            (m) => m.userId === userRes.id || m.userEmail === userRes.email || m.id === userRes.id
+          );
+
+          if (detailedGroup && isMember) {
             setGroupData(detailedGroup);
             setHasGroup(true);
             return;
+          } else {
+            // Nếu không thuộc nhóm này, xóa ngay localStorage rác cũ để tránh kẹt tài khoản
+            localStorage.removeItem("groupId");
           }
         } catch (e) {
           localStorage.removeItem("groupId");
         }
       }
 
+      // 2. Kiểm tra trong object user (nếu API /auth/me trả về sẵn groupId)
       if (userRes?.groupId) {
-        localStorage.setItem("groupId", userRes.groupId);
-        const detailedGroup = await getGroupById(userRes.groupId);
-        setGroupData(detailedGroup);
-        setHasGroup(true);
-        return;
+        const detailedGroup = await getGroupById(userRes.groupId).catch(() => null);
+        if (detailedGroup) {
+          localStorage.setItem("groupId", userRes.groupId);
+          setGroupData(detailedGroup);
+          setHasGroup(true);
+          return;
+        }
       }
 
+      // 3. Quét toàn bộ danh sách nhóm xem user có thuộc nhóm nào không
       const groupsRes = await getAllGroups();
       const groupList = groupsRes?.content || groupsRes || [];
 
@@ -51,7 +64,7 @@ export default function StudentDashboard() {
           detail &&
           detail.members &&
           detail.members.some(
-            (m) => m.userId === userRes.id || m.userEmail === userRes.email,
+            (m) => m.userId === userRes.id || m.userEmail === userRes.email || m.id === userRes.id,
           )
         ) {
           foundGroup = detail;
@@ -64,6 +77,8 @@ export default function StudentDashboard() {
         setGroupData(foundGroup);
         setHasGroup(true);
       } else {
+        // Nếu không thuộc bất kỳ nhóm nào -> Đặt trạng thái về false để hiển thị màn hình Tạo nhóm / Tham gia nhóm
+        localStorage.removeItem("groupId");
         setHasGroup(false);
       }
     } catch (err) {
@@ -90,7 +105,7 @@ export default function StudentDashboard() {
   }
 
   const currentMemberInfo = groupData?.members?.find(
-    (m) => m.userId === currentUser?.id || m.userEmail === currentUser?.email,
+    (m) => m.userId === currentUser?.id || m.userEmail === currentUser?.email || m.id === currentUser?.id,
   );
 
   const isLeader =
