@@ -36,7 +36,7 @@ export default function MemberGroup({ groupId, isLeader }) {
         setLoading(true);
         try {
             const payload = {
-                userId: memberInput.trim(),
+                identifier: memberInput.trim(),
                 isLeader: false
             };
             await addGroupMember(groupId, payload);
@@ -45,7 +45,7 @@ export default function MemberGroup({ groupId, isLeader }) {
             alert("Thêm thành viên thành công!");
         } catch (err) {
             console.error("Lỗi thêm thành viên:", err);
-            alert(err.response?.data?.message || "Thêm thành viên thất bại. Vui lòng kiểm tra lại ID/MSSV.");
+            alert(err.response?.data?.message || "Thêm thành viên thất bại. Vui lòng kiểm tra lại Email/MSSV.");
         } finally {
             setLoading(false);
         }
@@ -126,13 +126,13 @@ export default function MemberGroup({ groupId, isLeader }) {
                 {isLeader ? (
                     groupData?.members?.length < 5 ? (
                         <form onSubmit={handleAddMember} className="pt-4 border-t border-[#E8E2D9] space-y-3">
-                            <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên bằng ID / MSSV</label>
+                            <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên bằng Email / MSSV</label>
                             <div className="flex space-x-2">
                                 <input 
                                     type="text" 
                                     value={memberInput}
                                     onChange={(e) => setMemberInput(e.target.value)}
-                                    placeholder="Nhập User ID hoặc MSSV..." 
+                                    placeholder="Nhập Email hoặc MSSV (VD: SE180002 hoặc student@fpt.edu.vn)..." 
                                     required
                                     className="flex-1 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]" 
                                 />
