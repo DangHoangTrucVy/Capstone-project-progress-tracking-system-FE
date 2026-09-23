@@ -25,6 +25,10 @@ export const addGroupMember = async (id, memberData) => {
     return response.data;
 };
 
+export const joinGroup = async (id) => {
+    const response = await api.post(`/groups/${id}/join`);
+    return response.data;
+};
 export const removeGroupMember = async (id, memberId) => {
     const response = await api.delete(`/groups/${id}/members/${memberId}`);
     return response.data;
