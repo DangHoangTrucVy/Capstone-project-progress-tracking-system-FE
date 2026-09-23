@@ -96,7 +96,6 @@ export default function CreateGroup({ onGroupCreated }) {
       }
       alert("Tạo nhóm thành công! Bạn đã trở thành Trưởng nhóm.");
       if (onGroupCreated) onGroupCreated();
-      window.location.reload();
     } catch (error) {
       console.error("Lỗi tạo nhóm:", error);
       alert(
@@ -121,8 +120,8 @@ export default function CreateGroup({ onGroupCreated }) {
 
       alert("Tham gia nhóm thành công!");
       localStorage.setItem("groupId", groupId);
+      // Cập nhật lại UI ngay lập tức thông qua callback thay vì reload trang
       if (onGroupCreated) onGroupCreated();
-      window.location.reload();
     } catch (err) {
       console.error("Lỗi tham gia nhóm:", err);
       alert(err.response?.data?.message || "Không thể tham gia nhóm này.");
@@ -134,7 +133,6 @@ export default function CreateGroup({ onGroupCreated }) {
   const handleJoinByCode = (e) => {
     e.preventDefault();
     if (!inviteCode.trim()) return;
-    // Tìm nhóm khớp với groupCode hoặc mã mời
     const found = validGroups.find(
       (g) => g.groupCode.toLowerCase() === inviteCode.trim().toLowerCase(),
     );
@@ -314,7 +312,7 @@ export default function CreateGroup({ onGroupCreated }) {
           </div>
         )
       ) : (
-        /* GIAO DIỆN THAM GIA NHÓM XỊN SÒ MỚI */
+        /* GIAO DIỆN THAM GIA NHÓM */
         <div className="space-y-8">
           {/* Hộp nhập mã mời nhanh */}
           <div className="bg-white p-8 rounded-4xl border border-[#E8E2D9] shadow-sm max-w-4xl mx-auto space-y-4">
@@ -324,10 +322,10 @@ export default function CreateGroup({ onGroupCreated }) {
               </div>
               <div>
                 <h3 className="text-sm font-black text-[#2C2825]">
-                  Tham gia bằng Mã mời bí mật (Invite Code)
+                  Tham gia bằng Mã nhóm / Mã mời
                 </h3>
                 <p className="text-xs text-[#6B635B]">
-                  Nhập mã nhóm / mã mời từ Trưởng nhóm để gia nhập ngay.
+                  Nhập mã nhóm từ Trưởng nhóm để gia nhập ngay lập tức.
                 </p>
               </div>
             </div>
@@ -344,7 +342,7 @@ export default function CreateGroup({ onGroupCreated }) {
                 type="submit"
                 className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition"
               >
-                Gia nhập nhóm ngay →
+                Tham gia ngay →
               </button>
             </form>
           </div>
@@ -354,11 +352,10 @@ export default function CreateGroup({ onGroupCreated }) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h3 className="text-base font-black text-[#2C2825]">
-                  Các nhóm đang tìm kiếm thành viên ({filteredGroups.length}{" "}
-                  nhóm)
+                  Danh sách nhóm trống ({filteredGroups.length} nhóm)
                 </h3>
                 <p className="text-xs text-[#6B635B]">
-                  Tìm kiếm đề tài phù hợp và gửi yêu cầu gia nhập nhóm.
+                  Chọn nhóm phù hợp và bấm tham gia để vào nhóm ngay.
                 </p>
               </div>
               <div className="w-full md:w-72">
@@ -389,7 +386,7 @@ export default function CreateGroup({ onGroupCreated }) {
               ))}
             </div>
 
-            {/* Khung chứa Grid Card Nhóm có giới hạn chiều cao & thanh cuộn mượt mà */}
+            {/* Khung chứa Grid Card Nhóm */}
             {filteredGroups.length > 0 ? (
               <div className="max-h-130 overflow-y-auto pr-2 custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -432,11 +429,9 @@ export default function CreateGroup({ onGroupCreated }) {
                         <button
                           onClick={() => handleJoinGroup(g.id)}
                           disabled={joiningId === g.id}
-                          className="w-full py-3 bg-[#2C2825] hover:bg-black text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50"
+                          className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50"
                         >
-                          {joiningId === g.id
-                            ? "Đang xử lý..."
-                            : "Gửi yêu cầu tham gia →"}
+                          {joiningId === g.id ? "Đang xử lý..." : "Tham gia ngay"}
                         </button>
                       </div>
                     );
