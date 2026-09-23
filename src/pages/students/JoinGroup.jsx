@@ -13,7 +13,6 @@ export default function JoinGroup({ onJoined }) {
                 const res = await getAllGroups();
                 const groupList = res?.content || res || [];
                 
-                // Gọi chi tiết từng nhóm để lấy mảng members đầy đủ và chuẩn xác số lượng
                 const detailedGroupsPromises = groupList.map(async (g) => {
                     try {
                         const detail = await getGroupById(g.id);
@@ -25,7 +24,6 @@ export default function JoinGroup({ onJoined }) {
 
                 const detailedGroups = await Promise.all(detailedGroupsPromises);
 
-                // Lọc nhóm: chỉ lấy nhóm có số lượng thành viên < 5
                 const validGroups = detailedGroups.filter(g => {
                     const memberCount = g.members ? g.members.length : 0;
                     return memberCount < 5;
@@ -46,11 +44,11 @@ export default function JoinGroup({ onJoined }) {
         setJoiningId(groupId);
         try {
             const currentUser = await getCurrentUser();
-            const isUserLeader = currentUser.role === "GROUP_LEADER";
-
+            
+            // Gọi trực tiếp API /groups/{id}/members để thêm sinh viên vào nhóm
             await addGroupMember(groupId, {
-                userId: currentUser.id, 
-                isLeader: isUserLeader 
+                userId: currentUser.id,
+                isLeader: false
             });
 
             alert("Tham gia nhóm thành công!");
@@ -65,7 +63,8 @@ export default function JoinGroup({ onJoined }) {
                 window.location.reload();
             } else {
                 console.error("Lỗi tham gia nhóm:", err);
-                alert(err.response?.data?.message || "Không thể tham gia nhóm.");
+                const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại quyền hoặc API Backend.";
+                alert(errorMsg);
             }
         } finally {
             setJoiningId(null);

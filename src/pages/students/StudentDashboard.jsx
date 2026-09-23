@@ -106,9 +106,8 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans ">
-      {/* Sidebar luôn hiển thị cho sinh viên */}
-      <aside className="w-72  bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0">
+    <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans">
+      <aside className="w-72 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0">
         <div className="space-y-8">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black shadow-md">
@@ -245,10 +244,8 @@ export default function StudentDashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
         <header className="h-20 bg-white border-b border-[#E8E2D9] px-10 md:px-12 flex justify-between items-center text-xs">
-          {/* Phần bên trái: Tiêu đề trang rộng rãi hơn */}
           <div className="flex items-center space-x-4">
             <div className="w-3 h-3 bg-[#E65100] rounded-full animate-pulse shrink-0"></div>
             <div className="space-y-0.5">
@@ -263,7 +260,6 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Phần bên phải: Thông tin user & Badge Role */}
           <div className="flex items-center space-x-5">
             <div className="text-right hidden sm:block">
               <p className="font-extrabold text-[#2C2825] text-sm">
@@ -272,7 +268,6 @@ export default function StudentDashboard() {
               <p className="text-[11px] text-[#6B635B]">{currentUser?.email}</p>
             </div>
 
-            {/* Huy hiệu hiển thị Role */}
             <span
               className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider shadow-xs ${
                 !hasGroup
@@ -309,7 +304,6 @@ export default function StudentDashboard() {
               )}
             </>
           ) : (
-            // Nếu chưa có nhóm, hiển thị giao diện Tạo nhóm / Join nhóm ngay trong khung Dashboard
             <CreateGroup onGroupCreated={() => checkUserGroup()} />
           )}
         </div>
