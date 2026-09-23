@@ -32,3 +32,8 @@ export const updateUser = async (id, userData) => {
 //     const response = await api.delete(`/users/${id}`);
 //     return response.data;
 // };
+
+export const getUsersByRole = async (role) => {
+  const response = await api.get(`/api/v1/users`, { params: { role } });
+  return response.data;
+};

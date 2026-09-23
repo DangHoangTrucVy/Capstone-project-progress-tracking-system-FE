@@ -19,14 +19,15 @@ export default function StudentDashboard() {
       const userRes = await getCurrentUser();
       setCurrentUser(userRes);
 
-      // 1. Kiểm tra trong localStorage nhưng PHẢI xác thực xem user hiện tại có thực sự là thành viên của nhóm đó không
       const savedGroupId = localStorage.getItem("groupId");
       if (savedGroupId) {
         try {
           const detailedGroup = await getGroupById(savedGroupId);
-          // Kiểm tra user hiện tại có nằm trong mảng members của nhóm đã lưu không
           const isMember = detailedGroup?.members?.some(
-            (m) => m.userId === userRes.id || m.userEmail === userRes.email || m.id === userRes.id
+            (m) =>
+              m.userId === userRes.id ||
+              m.userEmail === userRes.email ||
+              m.id === userRes.id,
           );
 
           if (detailedGroup && isMember) {
@@ -34,7 +35,6 @@ export default function StudentDashboard() {
             setHasGroup(true);
             return;
           } else {
-            // Nếu không thuộc nhóm này, xóa ngay localStorage rác cũ để tránh kẹt tài khoản
             localStorage.removeItem("groupId");
           }
         } catch (e) {
@@ -42,9 +42,10 @@ export default function StudentDashboard() {
         }
       }
 
-      // 2. Kiểm tra trong object user (nếu API /auth/me trả về sẵn groupId)
       if (userRes?.groupId) {
-        const detailedGroup = await getGroupById(userRes.groupId).catch(() => null);
+        const detailedGroup = await getGroupById(userRes.groupId).catch(
+          () => null,
+        );
         if (detailedGroup) {
           localStorage.setItem("groupId", userRes.groupId);
           setGroupData(detailedGroup);
@@ -53,7 +54,6 @@ export default function StudentDashboard() {
         }
       }
 
-      // 3. Quét toàn bộ danh sách nhóm xem user có thuộc nhóm nào không
       const groupsRes = await getAllGroups();
       const groupList = groupsRes?.content || groupsRes || [];
 
@@ -64,7 +64,10 @@ export default function StudentDashboard() {
           detail &&
           detail.members &&
           detail.members.some(
-            (m) => m.userId === userRes.id || m.userEmail === userRes.email || m.id === userRes.id,
+            (m) =>
+              m.userId === userRes.id ||
+              m.userEmail === userRes.email ||
+              m.id === userRes.id,
           )
         ) {
           foundGroup = detail;
@@ -77,7 +80,6 @@ export default function StudentDashboard() {
         setGroupData(foundGroup);
         setHasGroup(true);
       } else {
-        // Nếu không thuộc bất kỳ nhóm nào -> Đặt trạng thái về false để hiển thị màn hình Tạo nhóm / Tham gia nhóm
         localStorage.removeItem("groupId");
         setHasGroup(false);
       }
@@ -98,14 +100,17 @@ export default function StudentDashboard() {
 
   if (hasGroup === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FBF9F5] text-xs font-bold">
+      <div className="min-h-screen flex items-center justify-center bg-[#FBF9F5] text-xs font-bold text-[#6B635B]">
         Đang kiểm tra thông tin nhóm...
       </div>
     );
   }
 
   const currentMemberInfo = groupData?.members?.find(
-    (m) => m.userId === currentUser?.id || m.userEmail === currentUser?.email || m.id === currentUser?.id,
+    (m) =>
+      m.userId === currentUser?.id ||
+      m.userEmail === currentUser?.email ||
+      m.id === currentUser?.id,
   );
 
   const isLeader =
@@ -122,11 +127,15 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans">
+      {/* SIDEBAR BÊN TRÁI - ĐỒNG BỘ LOGO & TÊN MỚI */}
       <aside className="w-72 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0">
-        <div className="space-y-8">
+        <div className="space-y-6">
+          {/* Logo chuẩn "Lịch Đồ Án" */}
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black shadow-md">
-              📦
+            <div className="w-9 h-9 bg-[#E65100] rounded-2xl flex items-center justify-center text-white font-bold shadow-md">
+              <div className="w-4 h-4 border-2 border-white rounded-lg flex items-center justify-center text-[9px]">
+                ✓
+              </div>
             </div>
             <div>
               <h2 className="font-extrabold text-sm tracking-tight text-[#2C2825]">
@@ -138,39 +147,50 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="bg-[#F8F6F0] p-4 rounded-2xl border border-[#E8E2D9] space-y-2">
-            <h3 className="text-xs font-black text-[#2C2825]">
-              {hasGroup
-                ? groupData?.topicTitle || "Đề tài đồ án nhóm"
-                : "Chưa tham gia nhóm"}
-            </h3>
-            <p className="text-[11px] text-[#6B635B]">
-              {hasGroup
-                ? `${groupData?.groupCode} • ${groupData?.members?.length || 0}/5 thành viên`
-                : "Vui lòng tạo hoặc tham gia nhóm"}
-            </p>
-            <div
-              className={`inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-md ${
-                !hasGroup
-                  ? "bg-amber-100 text-amber-700"
+          {/* Card thông tin nhóm tinh chỉnh đẹp mắt */}
+          <div className="bg-[#F8F6F0] p-4 rounded-2xl border border-[#E8E2D9] space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-[#6B635B]">Mã nhóm:</span>
+              <span className="font-black text-[#E65100]">
+                {hasGroup ? groupData?.groupCode || "SE192635" : "Chưa có"}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-[#6B635B]">Thành viên:</span>
+              <span className="font-bold text-[#2C2825]">
+                {hasGroup
+                  ? `${groupData?.members?.length || 1}/5 người`
+                  : "0/5"}
+              </span>
+            </div>
+
+            <div className="pt-2 border-t border-[#E8E2D9] flex justify-between items-center text-xs">
+              <span className="font-bold text-[#6B635B]">Chức vụ:</span>
+              <span
+                className={`px-2.5 py-1 text-[10px] font-black rounded-lg ${
+                  !hasGroup
+                    ? "bg-amber-100 text-amber-700"
+                    : isLeader
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-orange-100 text-[#E65100]"
+                }`}
+              >
+                {!hasGroup
+                  ? "Chưa tham gia"
                   : isLeader
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-orange-100 text-[#E65100]"
-              }`}
-            >
-              {!hasGroup
-                ? "Chưa có nhóm"
-                : isLeader
-                  ? "Trưởng nhóm (Leader)"
-                  : "Thành viên"}
+                    ? "👑 Leader"
+                    : "👤 Member"}
+              </span>
             </div>
           </div>
 
+          {/* Menu Điều Hướng chuẩn FPT Capstone Manager */}
           {hasGroup && (
-            <nav className="space-y-1.5 text-xs font-bold text-[#6B635B]">
+            <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
               <button
                 onClick={() => setActiveTab("overview")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
                   activeTab === "overview"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -179,9 +199,10 @@ export default function StudentDashboard() {
                 <span>📊</span>
                 <span>Tổng quan</span>
               </button>
+
               <button
                 onClick={() => setActiveTab("members")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
                   activeTab === "members"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -190,58 +211,74 @@ export default function StudentDashboard() {
                 <span>👥</span>
                 <span>Thành viên nhóm</span>
               </button>
+
               <button
                 onClick={() => setActiveTab("schedule")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
                   activeTab === "schedule"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
                 }`}
               >
                 <span>📅</span>
-                <span>Lịch hẹn</span>
+                <span>Lịch hẹn GVHD</span>
               </button>
+
               <button
                 onClick={() => setActiveTab("progress")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
                   activeTab === "progress"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
                 }`}
               >
                 <span>📈</span>
-                <span>Tiến độ đồ án</span>
+                <span>Tiến độ & Milestones</span>
               </button>
+
               <button
                 onClick={() => setActiveTab("documents")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
                   activeTab === "documents"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
                 }`}
               >
                 <span>📂</span>
-                <span>Tài liệu</span>
+                <span>Tài liệu & Báo cáo</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("settings")}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                  activeTab === "settings"
+                    ? "bg-[#E65100] text-white shadow-md"
+                    : "hover:bg-[#F8F6F0]"
+                }`}
+              >
+                <span>⚙️</span>
+                <span>Cài đặt & Thông báo</span>
               </button>
             </nav>
           )}
         </div>
 
-        <div className="pt-6 border-t border-[#E8E2D9] space-y-4">
+        {/* Footer Profile & Đăng xuất (Nút đỏ pastel, không icon) */}
+        <div className="pt-4 border-t border-[#E8E2D9] space-y-3">
           <div className="flex items-center space-x-3">
             {currentUser?.avatarUrl ? (
               <img
                 src={currentUser.avatarUrl}
                 alt="Avatar"
-                className="w-10 h-10 rounded-xl object-cover"
+                className="w-9 h-9 rounded-xl object-cover"
               />
             ) : (
-              <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs">
+              <div className="w-9 h-9 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs shadow-2xs">
                 {getInitials(currentUser?.fullName)}
               </div>
             )}
             <div className="overflow-hidden">
-              <h4 className="text-xs font-black truncate">
+              <h4 className="text-xs font-black truncate text-[#2C2825]">
                 {currentUser?.fullName || "Đang tải..."}
               </h4>
               <p className="text-[10px] text-[#6B635B] truncate">
@@ -249,42 +286,42 @@ export default function StudentDashboard() {
               </p>
             </div>
           </div>
+
           <button
             onClick={handleLogout}
-            className="w-full flex items-center space-x-2 text-xs font-bold text-red-500 hover:underline"
+            className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-all duration-200 text-center shadow-2xs cursor-pointer"
           >
-            <span>🚪</span>
-            <span>Đăng xuất</span>
+            Đăng xuất
           </button>
         </div>
       </aside>
 
+      {/* NỘI DUNG CHÍNH BÊN PHẢI */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
-        <header className="h-20 bg-white border-b border-[#E8E2D9] px-10 md:px-12 flex justify-between items-center text-xs">
+        <header className="h-20 bg-white border-b border-[#E8E2D9] px-10 flex justify-between items-center text-xs shrink-0">
           <div className="flex items-center space-x-4">
-            <div className="w-3 h-3 bg-[#E65100] rounded-full animate-pulse shrink-0"></div>
-            <div className="space-y-0.5">
-              <h2 className="text-sm md:text-base font-black text-[#2C2825] uppercase tracking-wider">
-                {hasGroup ? activeTab : "Quản lý nhóm đồ án"}
-              </h2>
-              <p className="text-[11px] text-[#6B635B]">
-                {hasGroup
-                  ? `Hệ thống quản lý tiến độ đồ án • Học kỳ ${groupData?.semester || "Spring2026"}`
-                  : "Vui lòng tạo nhóm mới hoặc tham gia nhóm có sẵn để bắt đầu thực hiện đồ án"}
-              </p>
-            </div>
+            <span className="font-extrabold text-[#E65100] bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100">
+              Spring 2026
+            </span>
+            <span className="text-gray-300">/</span>
+            <span className="font-bold text-[#2C2825]">Khoa K19 CNTT</span>
           </div>
 
-          <div className="flex items-center space-x-5">
-            <div className="text-right hidden sm:block">
-              <p className="font-extrabold text-[#2C2825] text-sm">
+          <div className="flex items-center space-x-4">
+            <button className="px-4 py-2 bg-[#FBF9F5] border border-[#E8E2D9] hover:bg-gray-100 text-[#2C2825] font-bold rounded-xl transition flex items-center gap-1.5">
+              <span>📖</span>
+              <span>Hướng dẫn đồ án</span>
+            </button>
+
+            <div className="text-right hidden sm:block pl-2 border-l border-[#E8E2D9]">
+              <p className="font-extrabold text-[#2C2825] text-xs">
                 {currentUser?.fullName || "Đang tải..."}
               </p>
-              <p className="text-[11px] text-[#6B635B]">{currentUser?.email}</p>
+              <p className="text-[10px] text-[#6B635B]">{currentUser?.email}</p>
             </div>
 
             <span
-              className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider shadow-xs ${
+              className={`px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-2xs ${
                 !hasGroup
                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                   : isLeader
@@ -293,10 +330,10 @@ export default function StudentDashboard() {
               }`}
             >
               {!hasGroup
-                ? "🎓 Student"
+                ? "🎓 STUDENT"
                 : isLeader
-                  ? "👑 Group Leader"
-                  : "👤 Member"}
+                  ? "👑 GROUP LEADER"
+                  : "👤 MEMBER"}
             </span>
           </div>
         </header>
@@ -305,6 +342,7 @@ export default function StudentDashboard() {
           {hasGroup ? (
             <>
               {activeTab === "overview" && <Overview groupData={groupData} />}
+              {activeTab === "topics" && <Overview groupData={groupData} />}
               {activeTab === "members" && (
                 <MemberGroup groupId={groupData?.id} isLeader={isLeader} />
               )}
@@ -316,6 +354,16 @@ export default function StudentDashboard() {
               )}
               {activeTab === "documents" && (
                 <DocumentGroup groupId={groupData?.id} />
+              )}
+              {activeTab === "settings" && (
+                <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9]">
+                  <h3 className="font-black text-base text-[#2C2825]">
+                    Cài đặt & Thông báo nhóm
+                  </h3>
+                  <p className="text-xs text-[#6B635B] mt-1">
+                    Quản lý tùy chỉnh thông báo email và cấu hình nhóm đồ án.
+                  </p>
+                </div>
               )}
             </>
           ) : (
