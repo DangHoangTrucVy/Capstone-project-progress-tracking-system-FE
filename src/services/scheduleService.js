@@ -1,61 +1,62 @@
 import api from "./api";
 
 /**
- * 1. GET /api/v1/slots
- * Lấy danh sách các slot rảnh / lịch hẹn (hỗ trợ lọc theo instructorId, status, fromDate, toDate, pageable)
+ * 1. GET /slots
+ * Lấy danh sách các slot rảnh / lịch hẹn
  */
 export const getSlots = async (params = {}) => {
-  const response = await api.get("/api/v1/slots", { params });
-  return response.data;
+  try {
+    const response = await api.get("/slots", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Backend đang lỗi SQL 500 tại /slots, tạm thời trả về mảng rỗng:", error);
+    return []; // Trả về mảng rỗng để UI không bị crash
+  }
 };
 
 /**
- * 2. POST /api/v1/slots
+ * 2. POST /slots
  * Tạo mới một slot lịch hẹn (Dành cho Giảng viên / Admin)
  */
 export const createSlot = async (slotData) => {
-  const response = await api.post("/api/v1/slots", slotData);
+  const response = await api.post("/slots", slotData);
   return response.data;
 };
 
 /**
- * 3. GET /api/v1/slots/{id}
+ * 3. GET /slots/{id}
  * Lấy chi tiết thông tin một slot theo ID
  */
 export const getSlotById = async (id) => {
-  const response = await api.get(`/api/v1/slots/${id}`);
+  const response = await api.get(`/slots/${id}`);
   return response.data;
 };
 
 /**
- * 4. POST /api/v1/slots/{id}/book
+ * 4. POST /slots/{id}/book
  * Đặt lịch (Book slot) cho nhóm
- * Body yêu cầu: { groupId: "...", notes: "..." }
  */
-export const bookSlot = async (slotId, bookingPayload) => {
-  const response = await api.post(`/api/v1/slots/${slotId}/book`, bookingPayload);
+export const bookSlot = async (slotId, bookingPayload = {}) => {
+  const response = await api.post(`/slots/${slotId}/book`, bookingPayload);
   return response.data;
 };
 
 /**
- * 5. DELETE /api/v1/bookings/{id}
+ * 5. DELETE /bookings/{id}
  * Hủy lịch hẹn đã đặt theo booking ID
- * Body tùy chọn (nếu có lý do): { reason: "..." }
  */
 export const cancelBooking = async (bookingId, reason = "") => {
-  const response = await api.delete(`/api/v1/bookings/${bookingId}`, {
+  const response = await api.delete(`/bookings/${bookingId}`, {
     data: { reason }
   });
   return response.data;
 };
 
 /**
- * Hàm hỗ trợ lấy danh sách booking của một nhóm cụ thể 
- * (Dựa trên cấu trúc API lọc slot hoặc custom endpoint của backend nhóm bạn)
+ * Hàm hỗ trợ lấy danh sách booking của một nhóm cụ thể
  */
 export const getGroupBookings = async (groupId) => {
-  // Thường backend sẽ cung cấp endpoint lọc theo groupId hoặc lấy qua slots
-  const response = await api.get("/api/v1/slots", {
+  const response = await api.get("/slots", {
     params: { groupId, status: "CONFIRMED" }
   }).catch(() => ({ data: [] }));
   
