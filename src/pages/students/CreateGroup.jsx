@@ -3,7 +3,7 @@ import {
   createGroup,
   getAllGroups,
   getGroupById,
-  addGroupMember,
+  joinGroup,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import api from "../../services/api";
@@ -112,11 +112,7 @@ export default function CreateGroup({ onGroupCreated }) {
       return;
     setJoiningId(groupId);
     try {
-      const isUserLeader = currentUser?.role === "GROUP_LEADER";
-      await addGroupMember(groupId, {
-        userId: currentUser.id,
-        isLeader: isUserLeader,
-      });
+      await joinGroup(groupId);
 
       alert("Tham gia nhóm thành công!");
       localStorage.setItem("groupId", groupId);

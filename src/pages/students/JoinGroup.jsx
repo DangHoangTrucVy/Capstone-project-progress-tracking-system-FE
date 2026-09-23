@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAllGroups, getGroupById, addGroupMember } from "../../services/groupService";
-import { getCurrentUser } from "../../services/authService";
+import { getAllGroups, getGroupById, joinGroup } from "../../services/groupService";
 
 export default function JoinGroup({ onJoined }) {
     const [groups, setGroups] = useState([]);
@@ -43,29 +42,16 @@ export default function JoinGroup({ onJoined }) {
         if (!window.confirm("Bạn có chắc chắn muốn tham gia nhóm này không?")) return;
         setJoiningId(groupId);
         try {
-            const currentUser = await getCurrentUser();
-            
-            // Gọi trực tiếp API /groups/{id}/members để thêm sinh viên vào nhóm
-            await addGroupMember(groupId, {
-                userId: currentUser.id,
-                isLeader: false
-            });
+            await joinGroup(groupId);
 
             alert("Tham gia nhóm thành công!");
             localStorage.setItem("groupId", groupId);
             if (onJoined) onJoined();
             window.location.reload();
         } catch (err) {
-            if (err.response?.status === 409) {
-                alert("Bạn đã là thành viên của nhóm này rồi!");
-                localStorage.setItem("groupId", groupId);
-                if (onJoined) onJoined();
-                window.location.reload();
-            } else {
-                console.error("Lỗi tham gia nhóm:", err);
-                const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại quyền hoặc API Backend.";
-                alert(errorMsg);
-            }
+            console.error("Lỗi tham gia nhóm:", err);
+            const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại quyền hoặc API Backend.";
+            alert(errorMsg);
         } finally {
             setJoiningId(null);
         }
