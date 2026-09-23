@@ -5,10 +5,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
 import Home from "./components/Home";
-
 import StudentDashboard from "./pages/students/StudentDashboard";
-
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import InstructorDashboard from "./pages/instructor/InstructorDashboard"; // Import trang giảng viên
 
 const App = () => {
   return (
@@ -18,21 +17,17 @@ const App = () => {
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Route>
 
-        {/* Public Routes - Ai cũng truy cập được */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Routes dành riêng cho STUDENT */}
         <Route element={<ProtectedRoute allowedRoles={["STUDENT", "GROUP_LEADER"]} />}>
           <Route path="/student-dashboard" element={<StudentDashboard />} />
         </Route>
 
-        {/* Routes dành riêng cho GIẢNG VIÊN (LECTURER) */}
-        <Route
-          element={<ProtectedRoute allowedRoles={["LECTURER", "TEACHER"]} />}
-        >
-          {/* <Route path="/lecturer/dashboard" element={<LecturerDashboard />} /> */}
+        {/* Routes dành riêng cho GIẢNG VIÊN (INSTRUCTOR / LECTURER / TEACHER) */}
+        <Route element={<ProtectedRoute allowedRoles={["INSTRUCTOR", "LECTURER", "TEACHER"]} />}>
+          <Route path="/lecturer/dashboard" element={<InstructorDashboard />} />
         </Route>
       </Routes>
     </BrowserRouter>
