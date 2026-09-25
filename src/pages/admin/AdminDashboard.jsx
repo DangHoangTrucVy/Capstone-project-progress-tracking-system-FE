@@ -11,7 +11,7 @@ import TopicQuestions from "./TopicQuestions";
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
-  const [activeMenu, setActiveMenu] = useState("topics"); // Mặc định mở tab topics để dễ kiểm tra
+  const [activeMenu, setActiveMenu] = useState("topics");
   const [loading, setLoading] = useState(true);
 
   const [groups, setGroups] = useState([]);
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
       (g.groupCode &&
         g.groupCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (g.topicTitle &&
-        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase())),
+        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const filteredUsers = users.filter((u) => {
@@ -184,37 +184,14 @@ export default function AdminDashboard() {
     );
   }
 
-  const timeSlots = [
-    "08:00 AM",
-    "09:30 AM",
-    "11:00 AM",
-    "01:30 PM",
-    "03:00 PM",
-    "04:30 PM",
-  ];
-  const weekDays = [
-    { name: "MON 06.07", key: 0 },
-    { name: "TUE 07.07", key: 1 },
-    { name: "WED 08.07", key: 2 },
-    { name: "THU 09.07", key: 3 },
-    { name: "FRI 10.07", key: 4 },
-    { name: "SAT 11.07", key: 5 },
-  ];
-
-  const cardColors = [
-    "bg-sky-50 border-l-4 border-sky-400 text-sky-950",
-    "bg-teal-50 border-l-4 border-teal-400 text-teal-950",
-    "bg-purple-50 border-l-4 border-purple-400 text-purple-950",
-    "bg-pink-50 border-l-4 border-pink-400 text-pink-950",
-    "bg-amber-50 border-l-4 border-amber-400 text-amber-950",
-  ];
-
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case "ADMIN":
         return "bg-red-50 text-red-600 border border-red-200";
       case "INSTRUCTOR":
         return "bg-blue-50 text-blue-600 border border-blue-200";
+      case "REVIEWER":
+        return "bg-purple-50 text-purple-600 border border-purple-200";
       case "GROUP_LEADER":
         return "bg-emerald-50 text-emerald-600 border border-emerald-200";
       default:
@@ -286,21 +263,6 @@ export default function AdminDashboard() {
               <span>👥</span>
               <span>Theo dõi Nhóm ({groups.length})</span>
             </button>
-            <button
-              onClick={() => {
-                setActiveMenu("schedule");
-                setSelectedTopicForQuestions(null);
-                setSearchQuery("");
-              }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
-                activeMenu === "schedule"
-                  ? "bg-[#E65100] text-white shadow-md"
-                  : "hover:bg-[#F8F6F0]"
-              }`}
-            >
-              <span>📅</span>
-              <span>Lịch hội đồng chấm thi</span>
-            </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
               Quản lý danh mục
@@ -363,15 +325,15 @@ export default function AdminDashboard() {
       </aside>
 
       {/* KHUNG NỘI DUNG CHÍNH */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto m-0 p-0">
-        <header className="h-16 bg-white border-b border-[#E8E2D9] px-6 flex justify-between items-center text-xs font-semibold text-[#6B635B] shrink-0 m-0">
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto">
+        <header className="h-16 bg-white border-b border-[#E8E2D9] px-6 flex justify-between items-center text-xs font-semibold text-[#6B635B] shrink-0">
           <span>Quản Trị Hệ Thống — {activeMenu.toUpperCase()}</span>
           <span className="text-[#E65100] font-bold">
             Xin chào, {user?.fullName || "Admin"}
           </span>
         </header>
 
-        <div className="w-full m-0 p-0 flex-1 flex flex-col">
+        <div className="w-full flex-1 flex flex-col">
           {/* --- OVERVIEW --- */}
           {activeMenu === "overview" && (
             <div className="p-8 space-y-6">
@@ -383,8 +345,8 @@ export default function AdminDashboard() {
                   Bảng điều khiển quản trị đồ án
                 </h1>
                 <p className="text-xs text-[#6B635B]">
-                  Theo dõi lịch trình, số lượng nhóm sinh viên và kiểm duyệt
-                  thông tin thời gian thực.
+                  Theo dõi số lượng nhóm sinh viên, tài khoản và kiểm duyệt thông
+                  tin thời gian thực.
                 </p>
               </div>
 
@@ -435,7 +397,8 @@ export default function AdminDashboard() {
                     Theo dõi danh sách nhóm
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Tra cứu thông tin nhóm, thành viên và giảng viên hướng dẫn.
+                    Tra cứu thông tin nhóm, thành viên (4-6 SV) và giảng viên
+                    hướng dẫn.
                   </p>
                 </div>
               </div>
@@ -456,9 +419,6 @@ export default function AdminDashboard() {
                       <th className="p-4 font-black uppercase">Đề tài đồ án</th>
                       <th className="p-4 font-black uppercase">Thành viên</th>
                       <th className="p-4 font-black uppercase">GV Hướng dẫn</th>
-                      <th className="p-4 font-black uppercase">
-                        Hội đồng chấm thi
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E8E2D9]">
@@ -476,21 +436,18 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-4">
                             <span className="px-3 py-1 bg-orange-50 text-[#E65100] font-bold">
-                              {g.members?.length || 1}/5 người
+                              {g.members?.length || 4}/6 người
                             </span>
                           </td>
                           <td className="p-4 font-medium text-[#6B635B]">
                             {g.supervisorName || "Chưa phân công"}
-                          </td>
-                          <td className="p-4 font-medium text-emerald-600">
-                            {g.evaluatorName || "Chưa xếp lịch hội đồng"}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan="5"
+                          colSpan="4"
                           className="p-8 text-center text-[#6B635B]"
                         >
                           Không tìm thấy nhóm đồ án nào.
@@ -503,134 +460,31 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- SCHEDULE --- */}
-          {activeMenu === "schedule" && (
-            <div className="w-full m-0 p-0 flex-1 flex flex-col">
-              <div className="bg-white px-6 py-4 border-b border-[#E8E2D9] flex justify-between items-center shrink-0">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-[#E65100]">
-                    Lịch trình hội đồng
-                  </span>
-                  <h2 className="text-xl font-black text-[#2C2825] mt-0.5">
-                    Lịch chấm bảo vệ đồ án (Tuần này)
-                  </h2>
-                </div>
-                <div className="flex space-x-2">
-                  <button className="px-3 py-1.5 bg-[#FBF9F5] border border-[#E8E2D9] text-xs font-bold hover:bg-gray-100">
-                    ⟨ Tuần trước
-                  </button>
-                  <button className="px-3 py-1.5 bg-[#E65100] text-white text-xs font-bold">
-                    This week
-                  </button>
-                  <button className="px-3 py-1.5 bg-[#FBF9F5] border border-[#E8E2D9] text-xs font-bold hover:bg-gray-100">
-                    Tuần sau ⟩
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white border-b border-[#E8E2D9] w-full flex-1 flex flex-col">
-                <div className="grid grid-cols-[90px_repeat(6,minmax(0,1fr))] bg-[#FBF9F5] border-b border-[#E8E2D9] text-center text-xs font-black text-[#2C2825] shrink-0">
-                  <div className="p-3 border-r border-[#E8E2D9] text-[#6B635B]">
-                    Time
-                  </div>
-                  {weekDays.map((day, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 border-r border-[#E8E2D9] last:border-r-0"
-                    >
-                      {day.name}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="divide-y divide-[#E8E2D9] flex-1 flex flex-col">
-                  {timeSlots.map((time, timeIdx) => (
-                    <div
-                      key={timeIdx}
-                      className="grid grid-cols-[90px_repeat(6,minmax(0,1fr))] flex-1 items-stretch min-h-27.5"
-                    >
-                      <div className="p-2 border-r border-[#E8E2D9] text-[10px] font-bold text-[#6B635B] bg-[#FBF9F5]/30 flex items-start justify-center pt-4">
-                        {time}
-                      </div>
-
-                      {weekDays.map((day, dayIdx) => {
-                        const matchedGroup =
-                          groups[(timeIdx * 6 + dayIdx) % (groups.length || 1)];
-                        const cardColorStyle =
-                          cardColors[(timeIdx + dayIdx) % cardColors.length];
-
-                        return (
-                          <div
-                            key={dayIdx}
-                            className="p-0 border-r border-[#E8E2D9] last:border-r-0 relative hover:bg-[#FBF9F5]/30 transition"
-                          >
-                            {matchedGroup && (timeIdx + dayIdx) % 2 === 0 && (
-                              <div
-                                className={`p-2.5 border-0 border-l-4 space-y-1 h-full w-full ${cardColorStyle}`}
-                              >
-                                <div className="flex justify-between items-center text-[9px] font-bold opacity-75">
-                                  <span>{matchedGroup.groupCode}</span>
-                                  <span>{time}</span>
-                                </div>
-                                <p className="text-[11px] font-black leading-tight line-clamp-2">
-                                  {matchedGroup.topicTitle ||
-                                    "Đề tài tốt nghiệp"}
-                                </p>
-                                <div className="text-[9px] opacity-80 pt-1 border-t border-black/5 space-y-0.5">
-                                  <p>
-                                    GVHD:{" "}
-                                    <strong>
-                                      {matchedGroup.supervisorName ||
-                                        "Chưa phân công"}
-                                    </strong>
-                                  </p>
-                                  <p>
-                                    Hội đồng:{" "}
-                                    <strong>
-                                      {matchedGroup.evaluatorName ||
-                                        "Hội đồng CNTT"}
-                                    </strong>
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* --- USERS --- */}
           {activeMenu === "users" && (
             <div className="p-8 space-y-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border border-[#E8E2D9] shadow-xs gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border border-[#E8E2D9] gap-4">
                 <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2.5 py-0.5 bg-orange-100 text-[#E65100] text-[10px] font-black uppercase">
-                      Hệ thống RBAC
-                    </span>
-                  </div>
+                  <span className="px-2.5 py-0.5 bg-orange-100 text-[#E65100] text-[10px] font-black uppercase">
+                    Hệ thống RBAC
+                  </span>
                   <h2 className="text-xl font-black text-[#2C2825]">
                     Quản lý tài khoản hệ thống
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Danh sách toàn bộ người dùng, phân quyền sinh viên, giảng
-                    viên và quản trị viên.
+                    Phân quyền sinh viên, trưởng nhóm, giảng viên, reviewer và
+                    admin.
                   </p>
                 </div>
                 <button
                   onClick={handleOpenCreateUser}
-                  className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm transition flex items-center space-x-2 shrink-0"
+                  className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm transition shrink-0"
                 >
-                  <span>+ Thêm tài khoản mới</span>
+                  + Thêm tài khoản mới
                 </button>
               </div>
 
-              <div className="bg-white p-4 border border-[#E8E2D9] flex flex-col md:flex-row justify-between items-center gap-4 shadow-xs">
+              <div className="bg-white p-4 border border-[#E8E2D9] flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
                   <span className="text-xs font-bold text-[#6B635B] mr-2">
                     Lọc vai trò:
@@ -639,13 +493,14 @@ export default function AdminDashboard() {
                     { label: "Tất cả", value: "" },
                     { label: "Admin", value: "ADMIN" },
                     { label: "Giảng viên", value: "INSTRUCTOR" },
+                    { label: "Reviewer", value: "REVIEWER" },
                     { label: "Trưởng nhóm", value: "GROUP_LEADER" },
                     { label: "Sinh viên", value: "STUDENT" },
                   ].map((roleObj) => (
                     <button
                       key={roleObj.value}
                       onClick={() => setSelectedRole(roleObj.value)}
-                      className={`px-4 py-2 text-xs font-bold transition ${
+                      className={`px-3.5 py-2 text-xs font-bold transition ${
                         selectedRole === roleObj.value
                           ? "bg-[#E65100] text-white shadow-xs"
                           : "bg-[#FBF9F5] text-[#6B635B] border border-[#E8E2D9] hover:bg-gray-100"
@@ -667,20 +522,16 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-white border border-[#E8E2D9] shadow-xs overflow-hidden">
+              <div className="bg-white border border-[#E8E2D9] overflow-hidden">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase tracking-wider">
-                        Họ và tên
-                      </th>
-                      <th className="p-4 font-black uppercase tracking-wider">
+                      <th className="p-4 font-black uppercase">Họ và tên</th>
+                      <th className="p-4 font-black uppercase">
                         Email định danh
                       </th>
-                      <th className="p-4 font-black uppercase tracking-wider">
-                        Vai trò (Role)
-                      </th>
-                      <th className="p-4 font-black uppercase tracking-wider text-right">
+                      <th className="p-4 font-black uppercase">Vai trò</th>
+                      <th className="p-4 font-black uppercase text-right">
                         Thao tác
                       </th>
                     </tr>
@@ -692,29 +543,17 @@ export default function AdminDashboard() {
                           key={u.id}
                           className="hover:bg-[#FBF9F5]/70 transition"
                         >
-                          <td className="p-4">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 rounded-full bg-orange-100 text-[#E65100] font-black flex items-center justify-center text-xs shrink-0">
-                                {u.fullName
-                                  ? u.fullName.charAt(0).toUpperCase()
-                                  : "U"}
-                              </div>
-                              <div>
-                                <span className="font-bold text-[#2C2825] block">
-                                  {u.fullName}
-                                </span>
-                                <span className="text-[10px] text-[#9E958C]">
-                                  ID: {u.id?.slice(0, 8)}...
-                                </span>
-                              </div>
-                            </div>
+                          <td className="p-4 font-bold text-[#2C2825]">
+                            {u.fullName}
                           </td>
                           <td className="p-4 text-[#6B635B] font-medium">
                             {u.email}
                           </td>
                           <td className="p-4">
                             <span
-                              className={`px-3 py-1 font-extrabold text-[10px] uppercase tracking-wider inline-block ${getRoleBadgeStyle(u.role)}`}
+                              className={`px-3 py-1 font-extrabold text-[10px] uppercase tracking-wider inline-block ${getRoleBadgeStyle(
+                                u.role
+                              )}`}
                             >
                               {u.role || "STUDENT"}
                             </span>
@@ -722,9 +561,9 @@ export default function AdminDashboard() {
                           <td className="p-4 text-right">
                             <button
                               onClick={() => handleOpenEditUser(u)}
-                              className="px-3.5 py-1.5 bg-white border border-[#E8E2D9] hover:bg-[#FBF9F5] text-[#2C2825] font-bold text-xs transition shadow-2xs inline-flex items-center space-x-1"
+                              className="px-3.5 py-1.5 bg-white border border-[#E8E2D9] hover:bg-[#FBF9F5] text-[#2C2825] font-bold text-xs transition"
                             >
-                              <span>✏️ Sửa</span>
+                              ✏️ Sửa
                             </button>
                           </td>
                         </tr>
@@ -735,7 +574,7 @@ export default function AdminDashboard() {
                           colSpan="4"
                           className="p-12 text-center text-[#6B635B] italic"
                         >
-                          Không tìm thấy tài khoản phù hợp với điều kiện lọc.
+                          Không tìm thấy tài khoản phù hợp.
                         </td>
                       </tr>
                     )}
@@ -745,14 +584,14 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- TOPICS & QUESTION BANK (ĐÃ THIẾT KẾ LẠI BẮT MẮT, RÕ RÀNG) --- */}
+          {/* --- TOPICS & QUESTION BANK --- */}
           {activeMenu === "topics" && (
             <div className="p-8 space-y-6">
               {selectedTopicForQuestions ? (
                 <div className="space-y-4">
                   <button
                     onClick={() => setSelectedTopicForQuestions(null)}
-                    className="px-4 py-2.5 bg-white border border-[#E8E2D9] text-[#2C2825] font-bold text-xs shadow-2xs hover:bg-[#FBF9F5] transition"
+                    className="px-4 py-2.5 bg-white border border-[#E8E2D9] text-[#2C2825] font-bold text-xs hover:bg-[#FBF9F5] transition"
                   >
                     ← Quay lại danh sách đề tài
                   </button>
@@ -763,8 +602,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Header card đề tài */}
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border border-[#E8E2D9] shadow-xs gap-4">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border border-[#E8E2D9] gap-4">
                     <div className="space-y-1">
                       <span className="px-2.5 py-0.5 bg-orange-100 text-[#E65100] text-[10px] font-black uppercase">
                         Academic Topics
@@ -773,8 +611,8 @@ export default function AdminDashboard() {
                         Quản lý đề tài & Ngân hàng câu hỏi
                       </h2>
                       <p className="text-xs text-[#6B635B]">
-                        Kiểm duyệt đề tài đồ án tốt nghiệp và cấu hình bộ câu
-                        hỏi đánh giá.
+                        Kiểm duyệt đề tài đồ án tốt nghiệp và cấu hình câu hỏi
+                        đánh giá.
                       </p>
                     </div>
                     <button
@@ -785,17 +623,16 @@ export default function AdminDashboard() {
                     </button>
                   </div>
 
-                  {/* Thanh lọc trạng thái và tìm kiếm đề tài */}
-                  <div className="bg-white p-4 border border-[#E8E2D9] flex flex-col md:flex-row justify-between items-center gap-4 shadow-xs">
+                  <div className="bg-white p-4 border border-[#E8E2D9] flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
                       <span className="text-xs font-bold text-[#6B635B] mr-2">
                         Trạng thái:
                       </span>
                       {[
                         { label: "Tất cả", value: "" },
-                        { label: "Draft ( Bản nháp )", value: "DRAFT" },
-                        { label: "Published ( Đã xuất bản )", value: "PUBLISHED" },
-                        { label: "Archived ( Đã lưu trữ )", value: "ARCHIVED" },
+                        { label: "Draft", value: "DRAFT" },
+                        { label: "Published", value: "PUBLISHED" },
+                        { label: "Archived", value: "ARCHIVED" },
                       ].map((statusObj) => (
                         <button
                           key={statusObj.value}
@@ -822,21 +659,18 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Bảng danh sách đề tài sắc nét */}
-                  <div className="bg-white border border-[#E8E2D9] shadow-xs overflow-hidden">
+                  <div className="bg-white border border-[#E8E2D9] overflow-hidden">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                          <th className="p-4 font-black uppercase tracking-wider">
-                            Mã đề tài
-                          </th>
-                          <th className="p-4 font-black uppercase tracking-wider">
+                          <th className="p-4 font-black uppercase">Mã đề tài</th>
+                          <th className="p-4 font-black uppercase">
                             Tên đề tài & Thể loại
                           </th>
-                          <th className="p-4 font-black uppercase tracking-wider">
+                          <th className="p-4 font-black uppercase">
                             Trạng thái
                           </th>
-                          <th className="p-4 font-black uppercase tracking-wider text-right">
+                          <th className="p-4 font-black uppercase text-right">
                             Thao tác
                           </th>
                         </tr>
@@ -863,7 +697,9 @@ export default function AdminDashboard() {
                               </td>
                               <td className="p-4">
                                 <span
-                                  className={`px-3 py-1 font-extrabold text-[10px] uppercase tracking-wider inline-block ${getTopicStatusBadge(t.status)}`}
+                                  className={`px-3 py-1 font-extrabold text-[10px] uppercase tracking-wider inline-block ${getTopicStatusBadge(
+                                    t.status
+                                  )}`}
                                 >
                                   {t.status || "DRAFT"}
                                 </span>
@@ -873,14 +709,14 @@ export default function AdminDashboard() {
                                   onClick={() =>
                                     setSelectedTopicForQuestions(t)
                                   }
-                                  className="px-3.5 py-1.5 bg-[#2C2825] hover:bg-black text-white font-bold text-xs transition shadow-2xs inline-flex items-center space-x-1"
+                                  className="px-3.5 py-1.5 bg-[#2C2825] hover:bg-black text-white font-bold text-xs transition inline-flex items-center space-x-1"
                                 >
                                   <span>❓ Câu hỏi</span>
                                 </button>
                                 {t.status !== "PUBLISHED" && (
                                   <button
                                     onClick={() => handleApproveTopic(t)}
-                                    className="px-3.5 py-1.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold text-xs transition shadow-2xs inline-flex items-center space-x-1"
+                                    className="px-3.5 py-1.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold text-xs transition inline-flex items-center space-x-1"
                                   >
                                     <span>✓ Duyệt</span>
                                   </button>
@@ -910,7 +746,7 @@ export default function AdminDashboard() {
 
       {/* Modal Tạo/Sửa User */}
       {isUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white w-full max-w-md p-8 border border-[#E8E2D9] space-y-6 shadow-xl">
             <div className="flex justify-between items-center border-b border-[#F0EBE1] pb-3">
               <h3 className="font-black text-base text-[#2C2825]">
@@ -989,6 +825,7 @@ export default function AdminDashboard() {
                     GROUP_LEADER (Trưởng nhóm)
                   </option>
                   <option value="INSTRUCTOR">INSTRUCTOR (Giảng viên)</option>
+                  <option value="REVIEWER">REVIEWER (Giảng viên phản biện)</option>
                   <option value="ADMIN">ADMIN (Quản trị viên)</option>
                 </select>
               </div>
@@ -1015,7 +852,7 @@ export default function AdminDashboard() {
 
       {/* Modal Thêm Đề Tài */}
       {isTopicModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white w-full max-w-md p-8 border border-[#E8E2D9] space-y-6 shadow-xl">
             <div className="flex justify-between items-center border-b border-[#F0EBE1] pb-3">
               <h3 className="font-black text-base text-[#2C2825]">

@@ -1,19 +1,32 @@
 import React from "react";
 
 export default function ProgressGroup({ groupData }) {
-    // Lấy dữ liệu tiến độ từ groupData (nếu Backend có trả về, ngược lại có thể dùng giá trị mặc định)
+    // Lấy dữ liệu tiến độ từ groupData với giá trị mặc định an toàn
     const progressPercentage = groupData?.progressPercentage || 48;
-    const currentStage = groupData?.currentStage || "Giai đoạn 3/5";
+    const currentStageIndex = groupData?.currentStageIndex || 3; // Ví dụ: Giai đoạn hiện tại (1-5)
     const completedStagesCount = groupData?.completedStagesCount || 2;
 
-    // Danh sách các mốc giai đoạn đồ án mẫu chuẩn học vụ FPT
-    const stages = [
-        { id: 1, name: "Giai đoạn 1: Đăng ký & Đề xuất đề tài", status: "Đã hoàn thành" },
-        { id: 2, name: "Giai đoạn 2: Bảo vệ đề cương chi tiết", status: "Đã hoàn thành" },
-        { id: 3, name: "Giai đoạn 3: Thực hiện & Kiểm tra tiến độ giữa kỳ", status: "Đang thực hiện" },
-        { id: 4, name: "Giai đoạn 4: Hoàn thiện tính năng & Báo cáo", status: "Chưa bắt đầu" },
-        { id: 5, name: "Giai đoạn 5: Bảo vệ đồ án trước hội đồng", status: "Chưa bắt đầu" },
+    // Danh sách các mốc giai đoạn đồ án chuẩn học vụ FPT
+    const baseStages = [
+        { id: 1, name: "Giai đoạn 1: Đăng ký & Đề xuất đề tài" },
+        { id: 2, name: "Giai đoạn 2: Bảo vệ đề cương chi tiết" },
+        { id: 3, name: "Giai đoạn 3: Thực hiện & Kiểm tra tiến độ giữa kỳ" },
+        { id: 4, name: "Giai đoạn 4: Hoàn thiện tính năng & Báo cáo" },
+        { id: 5, name: "Giai đoạn 5: Bảo vệ đồ án trước hội đồng" },
     ];
+
+    // Tự động gán trạng thái dựa trên tiến độ thực tế từ Backend
+    const stages = baseStages.map((stage) => {
+        let status = "Chưa bắt đầu";
+        if (stage.id <= completedStagesCount) {
+            status = "Đã hoàn thành";
+        } else if (stage.id === currentStageIndex) {
+            status = "Đang thực hiện";
+        }
+        return { ...stage, status };
+    });
+
+    const currentStageText = groupData?.currentStage || `Giai đoạn ${currentStageIndex}/5`;
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -36,7 +49,7 @@ export default function ProgressGroup({ groupData }) {
                             <span className="text-[10px] font-bold text-[#E65100]">{completedStagesCount}/5 giai đoạn</span>
                         </div>
                         <p className="text-[11px] text-[#6B635B]">
-                            {currentStage} • Đang thực hiện đúng thời hạn kế hoạch
+                            {currentStageText} • Đang thực hiện đúng thời hạn kế hoạch
                         </p>
                         <div className="w-full bg-[#F3EFEA] h-2 rounded-full overflow-hidden mt-1">
                             <div className="bg-[#E65100] h-full rounded-full transition-all duration-500" style={{ width: `${progressPercentage}%` }}></div>
