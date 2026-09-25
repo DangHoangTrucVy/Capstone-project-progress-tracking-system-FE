@@ -27,7 +27,7 @@ export default function StudentDashboard() {
             (m) =>
               m.userId === userRes.id ||
               m.userEmail === userRes.email ||
-              m.id === userRes.id,
+              m.id === userRes.id
           );
 
           if (detailedGroup && isMember) {
@@ -44,7 +44,7 @@ export default function StudentDashboard() {
 
       if (userRes?.groupId) {
         const detailedGroup = await getGroupById(userRes.groupId).catch(
-          () => null,
+          () => null
         );
         if (detailedGroup) {
           localStorage.setItem("groupId", userRes.groupId);
@@ -67,7 +67,7 @@ export default function StudentDashboard() {
             (m) =>
               m.userId === userRes.id ||
               m.userEmail === userRes.email ||
-              m.id === userRes.id,
+              m.id === userRes.id
           )
         ) {
           foundGroup = detail;
@@ -101,7 +101,7 @@ export default function StudentDashboard() {
   if (hasGroup === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FBF9F5] text-xs font-bold text-[#6B635B]">
-        Đang kiểm tra thông tin nhóm...
+        Đang kiểm tra thông tin nhóm đồ án...
       </div>
     );
   }
@@ -110,7 +110,7 @@ export default function StudentDashboard() {
     (m) =>
       m.userId === currentUser?.id ||
       m.userEmail === currentUser?.email ||
-      m.id === currentUser?.id,
+      m.id === currentUser?.id
   );
 
   const isLeader =
@@ -127,7 +127,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans">
-      {/* SIDEBAR BÊN TRÁI - ĐỒNG BỘ LOGO & TÊN MỚI */}
+      {/* SIDEBAR BÊN TRÁI */}
       <aside className="w-72 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0">
         <div className="space-y-6">
           {/* Logo chuẩn "Lịch Đồ Án" */}
@@ -147,12 +147,12 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Card thông tin nhóm tinh chỉnh đẹp mắt */}
+          {/* Card thông tin nhóm (Cập nhật chuẩn sĩ số 4-6 thành viên) */}
           <div className="bg-[#F8F6F0] p-4 rounded-2xl border border-[#E8E2D9] space-y-3">
             <div className="flex justify-between items-center text-xs">
               <span className="font-bold text-[#6B635B]">Mã nhóm:</span>
               <span className="font-black text-[#E65100]">
-                {hasGroup ? groupData?.groupCode || "SE192635" : "Chưa có"}
+                {hasGroup ? groupData?.groupCode || "SE-GROUP" : "Chưa có"}
               </span>
             </div>
 
@@ -160,8 +160,8 @@ export default function StudentDashboard() {
               <span className="font-bold text-[#6B635B]">Thành viên:</span>
               <span className="font-bold text-[#2C2825]">
                 {hasGroup
-                  ? `${groupData?.members?.length || 1}/5 người`
-                  : "0/5"}
+                  ? `${groupData?.members?.length || 4}/6 người`
+                  : "0/6 (Yêu cầu 4-6)"}
               </span>
             </div>
 
@@ -172,20 +172,20 @@ export default function StudentDashboard() {
                   !hasGroup
                     ? "bg-amber-100 text-amber-700"
                     : isLeader
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-orange-100 text-[#E65100]"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-orange-100 text-[#E65100]"
                 }`}
               >
                 {!hasGroup
                   ? "Chưa tham gia"
                   : isLeader
-                    ? "👑 Leader"
-                    : "👤 Member"}
+                  ? "👑 Leader"
+                  : "👤 Member"}
               </span>
             </div>
           </div>
 
-          {/* Menu Điều Hướng chuẩn FPT Capstone Manager */}
+          {/* Menu Điều Hướng */}
           {hasGroup && (
             <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
               <button
@@ -263,7 +263,7 @@ export default function StudentDashboard() {
           )}
         </div>
 
-        {/* Footer Profile & Đăng xuất (Nút đỏ pastel, không icon) */}
+        {/* Footer Profile & Đăng xuất */}
         <div className="pt-4 border-t border-[#E8E2D9] space-y-3">
           <div className="flex items-center space-x-3">
             {currentUser?.avatarUrl ? (
@@ -325,15 +325,15 @@ export default function StudentDashboard() {
                 !hasGroup
                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                   : isLeader
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-orange-50 text-[#E65100] border border-orange-200"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-orange-50 text-[#E65100] border border-orange-200"
               }`}
             >
               {!hasGroup
                 ? "🎓 STUDENT"
                 : isLeader
-                  ? "👑 GROUP LEADER"
-                  : "👤 MEMBER"}
+                ? "👑 GROUP LEADER"
+                : "👤 MEMBER"}
             </span>
           </div>
         </header>
@@ -361,7 +361,7 @@ export default function StudentDashboard() {
                     Cài đặt & Thông báo nhóm
                   </h3>
                   <p className="text-xs text-[#6B635B] mt-1">
-                    Quản lý tùy chỉnh thông báo email và cấu hình nhóm đồ án.
+                    Quản lý tùy chỉnh thông báo và cấu hình nhóm đồ án tốt nghiệp.
                   </p>
                 </div>
               )}

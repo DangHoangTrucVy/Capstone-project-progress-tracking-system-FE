@@ -4,7 +4,7 @@ import { getTopicQuestions, createTopicQuestion } from "../../services/topicServ
 const TopicQuestions = ({ topicId, topicTitle }) => {
     const [questions, setQuestions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [newQuestion, setNewQuestion] = useState({ category: "", questionText: "", guidanceNotes: "" });
+    const [newQuestion, setNewQuestion] = useState({ category: "Technical", questionText: "", guidanceNotes: "" });
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
@@ -31,7 +31,7 @@ const TopicQuestions = ({ topicId, topicTitle }) => {
         try {
             await createTopicQuestion(topicId, newQuestion);
             alert("Thêm câu hỏi thành công!");
-            setNewQuestion({ category: "", questionText: "", guidanceNotes: "" });
+            setNewQuestion({ category: "Technical", questionText: "", guidanceNotes: "" });
             fetchQuestions();
         } catch (error) {
             alert("Thêm câu hỏi thất bại, vui lòng thử lại!");
@@ -60,15 +60,17 @@ const TopicQuestions = ({ topicId, topicTitle }) => {
                 <h4 className="font-bold text-xs text-[#2C2825]">Thêm câu hỏi mới vào ngân hàng</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Thể loại (Category)</label>
-                        <input 
-                            type="text" 
-                            placeholder="VD: Front-End, Database, Architecture..." 
+                        <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Phân loại (Category)</label>
+                        <select 
                             value={newQuestion.category}
                             onChange={(e) => setNewQuestion({...newQuestion, category: e.target.value})}
                             required
-                            className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl"
-                        />
+                            className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
+                        >
+                            <option value="Technical">Technical (Kỹ thuật, Công nghệ, Database)</option>
+                            <option value="Requirement">Requirement (Phạm vi, Luồng nghiệp vụ)</option>
+                            <option value="General">General (Tiến độ, Tài liệu, Quy chế)</option>
+                        </select>
                     </div>
                     <div>
                         <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Ghi chú hướng dẫn (Guidance Notes)</label>
@@ -77,7 +79,7 @@ const TopicQuestions = ({ topicId, topicTitle }) => {
                             placeholder="Ghi chú dành cho giảng viên/hội đồng..." 
                             value={newQuestion.guidanceNotes}
                             onChange={(e) => setNewQuestion({...newQuestion, guidanceNotes: e.target.value})}
-                            className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl"
+                            className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                         />
                     </div>
                 </div>
@@ -89,7 +91,7 @@ const TopicQuestions = ({ topicId, topicTitle }) => {
                         value={newQuestion.questionText}
                         onChange={(e) => setNewQuestion({...newQuestion, questionText: e.target.value})}
                         required
-                        className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl"
+                        className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                     />
                 </div>
                 <button 
@@ -111,7 +113,9 @@ const TopicQuestions = ({ topicId, topicTitle }) => {
                         {questions.map((q, index) => (
                             <div key={q.id || index} className="p-5 bg-white border border-[#E8E2D9] rounded-2xl space-y-2 text-xs shadow-xs hover:border-[#E65100]/40 transition">
                                 <div className="flex justify-between items-center">
-                                    <span className="px-3 py-1 bg-orange-50 text-[#E65100] font-bold rounded-lg text-[10px]">{q.category}</span>
+                                    <span className="px-3 py-1 bg-orange-50 text-[#E65100] font-bold rounded-lg text-[10px] uppercase">
+                                        🏷️ {q.category}
+                                    </span>
                                     <span className="text-[10px] font-bold text-[#6B635B] bg-[#FBF9F5] px-2 py-1 rounded-md">{q.status || "DRAFT"}</span>
                                 </div>
                                 <p className="font-bold text-[#2C2825] text-sm">{q.questionText}</p>

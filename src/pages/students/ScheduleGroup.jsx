@@ -5,15 +5,14 @@ import {
   cancelBooking,
   getGroupBookings,
 } from "../../services/scheduleService";
-import { getUsers } from "../../services/userService"; // Thêm service lấy users
+import { getUsers } from "../../services/userService";
 
 export default function ScheduleGroup({ groupId }) {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
-  const [instructors, setInstructors] = useState([]); // State chứa danh sách giảng viên từ BE
+  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Lấy ngày hiện tại thực tế
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDateStr, setSelectedDateStr] = useState(
@@ -23,7 +22,6 @@ export default function ScheduleGroup({ groupId }) {
   const [instructorFilter, setInstructorFilter] = useState("ALL");
   const [meetingType, setMeetingType] = useState("ALL");
 
-  // Hàm hỗ trợ lấy tên giảng viên an toàn từ bất kỳ cấu trúc dữ liệu nào của BE
   const getInstructorName = (item) => {
     if (!item) return "Giảng viên hướng dẫn";
     return (
@@ -39,25 +37,20 @@ export default function ScheduleGroup({ groupId }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Gọi API lấy danh sách slots rảnh
       const resSlots = await getSlots({ status: "AVAILABLE" });
       setAvailableSlots(resSlots.content || resSlots || []);
 
-      // 2. Gọi API lấy danh sách bookings của nhóm
       if (groupId) {
         const resBookings = await getGroupBookings(groupId);
         setMyBookings(resBookings.content || resBookings || []);
       }
 
-      // 3. Gọi API lấy danh sách người dùng để lọc Giảng viên (Role: INSTRUCTOR hoặc lấy từ danh sách users)
       const resUsers = await getUsers().catch(() => []);
       const userList = resUsers.content || resUsers || [];
-      // Lọc ra các tài khoản có role là INSTRUCTOR hoặc ADMIN (giảng viên)
       const instructorList = userList.filter(
         (u) => u.role === "INSTRUCTOR" || u.role === "ADMIN"
       );
       setInstructors(instructorList);
-
     } catch (err) {
       console.error("Lỗi tải dữ liệu lịch hẹn:", err);
     } finally {
@@ -77,49 +70,65 @@ export default function ScheduleGroup({ groupId }) {
         groupId: groupId,
         notes: "Nhóm đăng ký buổi gặp GVHD",
       });
-      alert("Đặt lịch hẹn thành công!");
+      alert("Đặt lịch hẹn thành công! (Chờ GVHD phê duyệt)");
       loadData();
     } catch (err) {
       const msg =
         err.response?.data?.message ||
-        "Đặt lịch thất bại, khung giờ có thể đã được nhóm khác đặt trước!";
+        "Đặt lịch thất bại. Lưu ý quy định phải đặt trước ít nhất 24 giờ và hoàn thành buổi meeting cũ!";
       alert(msg);
     }
   };
 
-  const handleCancel = async (bookingId) => {
+  const handleCancel = async (booking) => {
+    // Kiểm tra quy tắc hủy chuẩn >= 12h (BR-CANCEL-02)
+    const slotStartTime = new Date(booking.startTime || booking.slotTime);
+    const now = new Date();
+    const hoursDifference = (slotStartTime - now) / (1000 * 60 * 60);
+
+    if (hoursDifference < 12) {
+      alert(
+        "Đã quá thời hạn tự hủy (dưới 12 giờ trước giờ hẹn). Vui lòng liên hệ trực tiếp Giảng viên hướng dẫn để được hỗ trợ hủy/dời lịch (Late Cancellation)."
+      );
+      return;
+    }
+
     if (
       !window.confirm(
-        "Bạn có chắc chắn muốn hủy lịch hẹn này? (Lưu ý quy định cửa sổ hủy trễ)",
+        "Bạn có chắc chắn muốn hủy lịch hẹn này? (Hủy trước 12h không bị ghi nhận vi phạm)"
       )
     )
       return;
+
     try {
-      await cancelBooking(bookingId);
+      await cancelBooking(booking.id);
       alert("Hủy lịch hẹn thành công!");
       loadData();
     } catch (err) {
       const msg =
         err.response?.data?.message ||
-        "Không thể hủy lịch do vi phạm thời hạn cho phép hủy trễ (late-cancellation window).";
+        "Không thể hủy lịch do vi phạm thời hạn cho phép.";
       alert(msg);
     }
   };
 
-  // --- LỌC SLOTS THEO GIẢNG VIÊN VÀ HÌNH THỨC ---
+  // --- LỌC SLOTS THEO NGÀY, GIẢNG VIÊN VÀ HÌNH THỨC ---
   const filteredSlots = availableSlots.filter((slot) => {
+    const slotDateStr = new Date(slot.startTime).toISOString().split("T")[0];
+    const matchDate = slotDateStr === selectedDateStr;
+
     const matchInstructor =
       instructorFilter === "ALL" ||
       slot.instructorId === instructorFilter ||
       slot.instructorName === instructorFilter;
-    
+
     const matchType =
       meetingType === "ALL" || slot.locationType === meetingType;
 
-    return matchInstructor && matchType;
+    return matchDate && matchInstructor && matchType;
   });
 
-  // --- LOGIC TẠO LỊCH ĐỘNG THEO THÁNG THỰC TẾ ---
+  // --- LOGIC TẠO LỊCH THÁNG ---
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -182,8 +191,7 @@ export default function ScheduleGroup({ groupId }) {
             </span>
           </div>
           <p className="text-xs text-[#6B635B]">
-            Trưởng nhóm có thể chọn khung giờ trống hoặc hủy/dời lịch hẹn đã đặt
-            trước đó theo quy định.
+            Quy định: Đặt lịch trước ít nhất 24 giờ, tối đa 1 slot/ngày và hoàn thành buổi meeting cũ trước khi book lịch mới.
           </p>
         </div>
 
@@ -191,23 +199,22 @@ export default function ScheduleGroup({ groupId }) {
           <button
             onClick={() =>
               alert(
-                "Quy định gặp GVHD: Mỗi nhóm tối đa 2 buổi/tuần. Hủy lịch trước ít nhất 24 giờ.",
+                "Quy định gặp GVHD:\n- Đặt lịch trước ít nhất 24h.\n- Tối đa 1 slot/ngày.\n- Hủy chuẩn trước >= 12h; dưới 12h phải liên hệ GVHD (Late Cancellation)."
               )
             }
-            className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-[#2C2825] text-xs font-bold rounded-2xl transition flex items-center gap-1.5"
+            className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-[#2C2825] text-xs font-bold rounded-2xl transition flex items-center gap-1.5 cursor-pointer"
           >
             <span>📖</span>
-            <span>Quy định gặp GVHD</span>
+            <span>Quy định đặt/hủy lịch</span>
           </button>
         </div>
       </div>
 
       {/* 2. LAYOUT CHÍNH CHIA 2 CỘT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* CỘT TRÁI: LỊCH THÁNG & BỘ LỌC TỪ BE */}
+        {/* CỘT TRÁI: LỊCH THÁNG & BỘ LỌC */}
         <div className="lg:col-span-4 space-y-6">
-          
-          {/* Lịch tháng thời gian thực */}
+          {/* Lịch tháng */}
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-black text-sm text-[#2C2825]">
@@ -216,25 +223,25 @@ export default function ScheduleGroup({ groupId }) {
               <div className="flex items-center gap-1">
                 <button
                   onClick={handlePrevMonth}
-                  className="p-1 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-500 px-2"
+                  className="p-1 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-500 px-2 cursor-pointer"
                 >
                   &lt;
                 </button>
                 <button
                   onClick={handleToday}
-                  className="px-2.5 py-1 bg-[#FBF9F5] border text-[11px] font-bold rounded-lg hover:bg-gray-100"
+                  className="px-2.5 py-1 bg-[#FBF9F5] border text-[11px] font-bold rounded-lg hover:bg-gray-100 cursor-pointer"
                 >
                   Hôm nay
                 </button>
                 <button
                   onClick={handleNextMonth}
-                  className="p-1 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-500 px-2"
+                  className="p-1 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-500 px-2 cursor-pointer"
                 >
                   &gt;
                 </button>
               </div>
             </div>
-            <p className="text-[11px] text-[#6B635B]">Lịch biểu chính thức</p>
+            <p className="text-[11px] text-[#6B635B]">Chọn ngày để xem slot trống</p>
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-[#6B635B]">
               <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
@@ -249,7 +256,7 @@ export default function ScheduleGroup({ groupId }) {
                   <button
                     key={idx}
                     onClick={() => setSelectedDateStr(cell.dateStr)}
-                    className={`p-2 relative rounded-xl font-bold transition flex items-center justify-center h-9 ${
+                    className={`p-2 relative rounded-xl font-bold transition flex items-center justify-center h-9 cursor-pointer ${
                       isSelected
                         ? "bg-[#E65100] text-white shadow-md"
                         : isToday
@@ -266,7 +273,7 @@ export default function ScheduleGroup({ groupId }) {
             </div>
           </div>
 
-          {/* Bộ lọc giảng viên lấy động từ Backend */}
+          {/* Bộ lọc giảng viên & hình thức */}
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
             <h3 className="font-black text-sm text-[#2C2825]">
               Bộ lọc giảng viên & hình thức
@@ -291,21 +298,19 @@ export default function ScheduleGroup({ groupId }) {
             </div>
 
             <div className="space-y-1.5 text-xs">
-              <label className="font-bold text-[#2C2825]">
-                Hình thức gặp gỡ
-              </label>
+              <label className="font-bold text-[#2C2825]">Hình thức gặp gỡ</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setMeetingType("ALL")}
-                  className={`p-2.5 rounded-xl border text-center font-bold transition ${meetingType === "ALL" ? "bg-orange-50 border-[#E65100] text-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9] text-[#6B635B]"}`}
+                  className={`p-2.5 rounded-xl border text-center font-bold transition cursor-pointer ${meetingType === "ALL" ? "bg-orange-50 border-[#E65100] text-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9] text-[#6B635B]"}`}
                 >
                   Tất cả
                 </button>
                 <button
                   type="button"
                   onClick={() => setMeetingType("ONLINE")}
-                  className={`p-2.5 rounded-xl border text-center font-bold transition ${meetingType === "ONLINE" ? "bg-orange-50 border-[#E65100] text-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9] text-[#6B635B]"}`}
+                  className={`p-2.5 rounded-xl border text-center font-bold transition cursor-pointer ${meetingType === "ONLINE" ? "bg-orange-50 border-[#E65100] text-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9] text-[#6B635B]"}`}
                 >
                   Online / Lab
                 </button>
@@ -316,15 +321,14 @@ export default function ScheduleGroup({ groupId }) {
 
         {/* CỘT PHẢI: LỊCH HẸN VÀ SLOT RẢNH */}
         <div className="lg:col-span-8 space-y-6">
-          
-          {/* Lịch hẹn hiện tại */}
+          {/* Lịch hẹn hiện tại của nhóm */}
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
               <h3 className="font-black text-sm text-[#2C2825]">
                 Lịch hẹn hiện tại của nhóm
               </h3>
               <span className="text-[11px] text-[#6B635B]">
-                {myBookings.length} lịch hẹn đã xác nhận
+                {myBookings.length} lịch hẹn
               </span>
             </div>
 
@@ -337,11 +341,11 @@ export default function ScheduleGroup({ groupId }) {
                   >
                     <div className="flex justify-between items-center">
                       <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-lg">
-                        GVHD Đã xác nhận
+                        {b.status || "BOOKED"}
                       </span>
                       <button
-                        onClick={() => handleCancel(b.id)}
-                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition"
+                        onClick={() => handleCancel(b)}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition cursor-pointer"
                       >
                         ✕ Hủy lịch
                       </button>
@@ -362,7 +366,7 @@ export default function ScheduleGroup({ groupId }) {
                         🕒{" "}
                         <strong>
                           {new Date(
-                            b.startTime || b.slotTime || Date.now(),
+                            b.startTime || b.slotTime || Date.now()
                           ).toLocaleString()}
                         </strong>
                       </span>
@@ -379,15 +383,15 @@ export default function ScheduleGroup({ groupId }) {
             )}
           </div>
 
-          {/* Khung giờ rảnh thực tế từ Backend */}
+          {/* Khung giờ rảnh theo ngày đã chọn */}
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
               <div>
                 <h3 className="font-black text-sm text-[#2C2825]">
-                  Khung giờ rảnh có sẵn để đặt
+                  Khung giờ rảnh ngày {selectedDateStr}
                 </h3>
                 <p className="text-[11px] text-[#6B635B]">
-                  Lấy dữ liệu trực tiếp từ API hệ thống
+                  Áp dụng quy tắc đặt trước tối thiểu 24h
                 </p>
               </div>
               <span className="text-xs font-bold text-[#E65100]">
@@ -401,52 +405,69 @@ export default function ScheduleGroup({ groupId }) {
               </p>
             ) : filteredSlots.length > 0 ? (
               <div className="space-y-3">
-                {filteredSlots.map((slot) => (
-                  <div
-                    key={slot.id}
-                    className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center px-3 py-2 bg-white rounded-xl border border-[#E8E2D9] shrink-0">
-                        <span className="text-xs font-black text-[#E65100] block">
-                          {new Date(slot.startTime).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        <span className="text-[10px] text-[#6B635B]">
-                          {slot.durationMinutes || 45} min
-                        </span>
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-xs text-[#2C2825]">
-                            {getInstructorName(slot)}
-                          </h4>
-                          <span className="px-2 py-0.5 bg-orange-100 text-[#E65100] text-[9px] font-bold rounded">
-                            {slot.locationType || "ONLINE"}
+                {filteredSlots.map((slot) => {
+                  // Kiểm tra quy tắc 24h (BR-BOOKING-03)
+                  const slotTime = new Date(slot.startTime);
+                  const now = new Date();
+                  const hoursUntilSlot = (slotTime - now) / (1000 * 60 * 60);
+                  const isTooLateToBook = hoursUntilSlot < 24;
+
+                  return (
+                    <div
+                      key={slot.id}
+                      className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="text-center px-3 py-2 bg-white rounded-xl border border-[#E8E2D9] shrink-0">
+                          <span className="text-xs font-black text-[#E65100] block">
+                            {new Date(slot.startTime).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          <span className="text-[10px] text-[#6B635B]">
+                            {slot.durationMinutes || 45} min
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#6B635B]">
-                          📅 {new Date(slot.startTime).toLocaleString()} • Sức chứa:{" "}
-                          <strong className="text-emerald-600">
-                            {slot.capacity || 1} nhóm
-                          </strong>
-                        </p>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-xs text-[#2C2825]">
+                              {getInstructorName(slot)}
+                            </h4>
+                            <span className="px-2 py-0.5 bg-orange-100 text-[#E65100] text-[9px] font-bold rounded">
+                              {slot.locationType || "ONLINE"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#6B635B]">
+                            📅 {new Date(slot.startTime).toLocaleString()} • Sức chứa:{" "}
+                            <strong className="text-emerald-600">1 nhóm</strong>
+                          </p>
+                          {isTooLateToBook && (
+                            <p className="text-[10px] text-red-500 font-bold">
+                              ⚠️ Không đủ 24h trước giờ hẹn (Đã khóa đặt lịch)
+                            </p>
+                          )}
+                        </div>
                       </div>
+
+                      <button
+                        onClick={() => handleBook(slot.id)}
+                        disabled={isTooLateToBook}
+                        className={`px-4 py-2.5 text-xs font-bold rounded-xl transition shadow-sm w-full sm:w-auto ${
+                          isTooLateToBook
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-[#E65100] hover:bg-[#D84315] text-white cursor-pointer"
+                        }`}
+                      >
+                        {isTooLateToBook ? "Đã khóa (<24h)" : "Đặt lịch ngay"}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleBook(slot.id)}
-                      className="px-4 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition shadow-sm w-full sm:w-auto"
-                    >
-                      Đặt lịch ngay
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-[#6B635B] py-6 text-center italic">
-                Hiện tại không có khung giờ rảnh nào phù hợp với bộ lọc.
+                Không có khung giờ rảnh nào vào ngày {selectedDateStr} thỏa mãn bộ lọc.
               </p>
             )}
           </div>

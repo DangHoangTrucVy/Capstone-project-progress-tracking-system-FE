@@ -9,7 +9,7 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(false);
   const [filterTab, setFilterTab] = useState("ALL"); // ALL, BOOKED, AVAILABLE
 
-  // Form tạo Slot
+  // Form tạo Slot (Đã cố định capacity = 1 theo BR-BOOKING-02)
   const [form, setForm] = useState({
     startTime: "",
     endTime: "",
@@ -26,7 +26,6 @@ export default function InstructorDashboard() {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
 
-      // Bắt lỗi an toàn khi backend bị lỗi SQL 500
       const resSlots = await getSlots().catch(() => []);
       setSlots(resSlots.content || resSlots || []);
     } catch (err) {
@@ -48,7 +47,7 @@ export default function InstructorDashboard() {
         startTime: new Date(form.startTime).toISOString(),
         endTime: new Date(form.endTime).toISOString(),
         durationMinutes: Number(form.durationMinutes),
-        capacity: Number(form.capacity),
+        capacity: 1, // Luôn chuẩn hóa bằng 1 theo nguyên tắc 1:1
         locationType: form.locationType,
         meetingUrl: form.meetingUrl.trim(),
         notes: form.notes.trim(),
@@ -170,7 +169,7 @@ export default function InstructorDashboard() {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition shadow-2xs cursor-pointer"
+            className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition cursor-pointer"
           >
             Đăng xuất
           </button>
@@ -199,7 +198,7 @@ export default function InstructorDashboard() {
                     Tạo & Quản lý lịch rảnh (Schedule Slots)
                   </h1>
                   <p className="text-xs text-[#6B635B]">
-                    Thiết lập các khung giờ rảnh để sinh viên chủ động đặt lịch hẹn trao đổi.
+                    Thiết lập các khung giờ rảnh (mỗi slot phục vụ độc lập 1 nhóm) để sinh viên đặt lịch.
                   </p>
                 </div>
               </div>
@@ -222,7 +221,7 @@ export default function InstructorDashboard() {
                         onChange={(e) =>
                           setForm({ ...form, startTime: e.target.value })
                         }
-                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                       />
                     </div>
                     <div>
@@ -236,23 +235,18 @@ export default function InstructorDashboard() {
                         onChange={(e) =>
                           setForm({ ...form, endTime: e.target.value })
                         }
-                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#2C2825] mb-1">
-                        Sức chứa tối đa (Số nhóm) *
+                        Sức chứa nhóm (Cố định 1 nhóm/slot)
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        max="5"
-                        required
-                        value={form.capacity}
-                        onChange={(e) =>
-                          setForm({ ...form, capacity: e.target.value })
-                        }
-                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                        type="text"
+                        disabled
+                        value="1 Nhóm / Slot (Tiêu chuẩn 1:1)"
+                        className="w-full px-4 py-3 text-xs bg-gray-100 text-gray-500 border border-[#E8E2D9] rounded-xl cursor-not-allowed"
                       />
                     </div>
                     <div>
@@ -261,18 +255,18 @@ export default function InstructorDashboard() {
                       </label>
                       <input
                         type="text"
-                        placeholder="https://meet.google.com/..."
+                        placeholder="https://meet.google.com/... hoặc link phòng học"
                         value={form.meetingUrl}
                         onChange={(e) =>
                           setForm({ ...form, meetingUrl: e.target.value })
                         }
-                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                       />
                     </div>
                   </div>
                   <button
                     type="submit"
-                    className="px-6 py-3.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition"
+                    className="px-6 py-3.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
                   >
                     + Tạo khung giờ rảnh
                   </button>
@@ -299,7 +293,7 @@ export default function InstructorDashboard() {
                             {new Date(s.endTime).toLocaleTimeString()}
                           </p>
                           <p className="text-[11px] text-[#6B635B]">
-                            Sức chứa: {s.bookedCount || 0}/{s.capacity} nhóm • Link:{" "}
+                            Sức chứa: 1 nhóm • Link:{" "}
                             {s.meetingUrl || "Online"}
                           </p>
                         </div>

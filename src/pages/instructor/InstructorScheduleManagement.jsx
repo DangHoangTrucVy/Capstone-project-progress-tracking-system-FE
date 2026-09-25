@@ -6,6 +6,7 @@ export default function InstructorScheduleManagement() {
     const [loading, setLoading] = useState(false);
     const [filterStatus, setFilterStatus] = useState("");
     
+    // Form tạo slot mới (Đã cố định capacity = 1 theo chuẩn 1:1)
     const [form, setForm] = useState({
         startTime: "",
         endTime: "",
@@ -39,7 +40,7 @@ export default function InstructorScheduleManagement() {
                 startTime: new Date(form.startTime).toISOString(),
                 endTime: new Date(form.endTime).toISOString(),
                 durationMinutes: Number(form.durationMinutes),
-                capacity: Number(form.capacity),
+                capacity: 1, // Luôn chuẩn hóa bằng 1 theo nguyên tắc 1:1
                 locationType: form.locationType,
                 meetingUrl: form.meetingUrl.trim()
             };
@@ -59,7 +60,7 @@ export default function InstructorScheduleManagement() {
             <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl space-y-2 shadow-xs">
                 <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-md">Sprint 2 · Quản lý Slot rảnh</span>
                 <h1 className="text-xl font-black text-[#2C2825]">Tạo & Quản lý Khung giờ rảnh (Schedule Slots)</h1>
-                <p className="text-xs text-[#6B635B]">Giảng viên tạo lịch trống, hệ thống tự động kiểm tra xung đột thời gian.</p>
+                <p className="text-xs text-[#6B635B]">Giảng viên tạo lịch trống (mỗi slot phục vụ độc lập 1 nhóm), hệ thống tự động kiểm tra xung đột thời gian.</p>
             </div>
 
             {/* Form tạo slot mới */}
@@ -73,7 +74,7 @@ export default function InstructorScheduleManagement() {
                             required
                             value={form.startTime}
                             onChange={(e) => setForm({...form, startTime: e.target.value})}
-                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                         />
                     </div>
                     <div>
@@ -83,18 +84,16 @@ export default function InstructorScheduleManagement() {
                             required
                             value={form.endTime}
                             onChange={(e) => setForm({...form, endTime: e.target.value})}
-                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                         />
                     </div>
                     <div>
-                        <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Sức chứa tối đa (Số nhóm)</label>
+                        <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Sức chứa nhóm</label>
                         <input 
-                            type="number" 
-                            min="1" max="5"
-                            required
-                            value={form.capacity}
-                            onChange={(e) => setForm({...form, capacity: e.target.value})}
-                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                            type="text" 
+                            disabled
+                            value="1 Nhóm / Slot (Tiêu chuẩn 1:1)"
+                            className="w-full px-4 py-3 text-xs bg-gray-100 text-gray-500 border border-[#E8E2D9] rounded-xl cursor-not-allowed"
                         />
                     </div>
                     <div>
@@ -104,11 +103,11 @@ export default function InstructorScheduleManagement() {
                             placeholder="https://meet.google.com/..."
                             value={form.meetingUrl}
                             onChange={(e) => setForm({...form, meetingUrl: e.target.value})}
-                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none"
+                            className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                         />
                     </div>
                     <div className="md:col-span-2 pt-2">
-                        <button type="submit" className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition shadow-sm">
+                        <button type="submit" className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer">
                             Xác nhận tạo Slot
                         </button>
                     </div>
@@ -143,7 +142,7 @@ export default function InstructorScheduleManagement() {
                                         📅 {new Date(s.startTime).toLocaleString()} → {new Date(s.endTime).toLocaleTimeString()}
                                     </p>
                                     <p className="text-[11px] text-[#6B635B]">
-                                        Giảng viên: {s.instructorName || "Bạn"} • Đã đặt: {s.bookedCount || 0}/{s.capacity} nhóm
+                                        Giảng viên: {s.instructorName || "Bạn"} • Sức chứa: 1 nhóm
                                     </p>
                                 </div>
                                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full ${

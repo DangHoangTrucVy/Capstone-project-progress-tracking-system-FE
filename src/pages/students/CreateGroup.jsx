@@ -69,8 +69,9 @@ export default function CreateGroup({ onGroupCreated }) {
         });
 
         const detailedGroups = await Promise.all(detailedGroupsPromises);
+        // Cập nhật giới hạn tối đa < 6 thành viên theo chuẩn BR-GROUP-02
         setValidGroups(
-          detailedGroups.filter((g) => (g.members ? g.members.length : 0) < 5),
+          detailedGroups.filter((g) => (g.members ? g.members.length : 0) < 6),
         );
       } catch (error) {
         console.error("Lỗi tải dữ liệu ban đầu:", error);
@@ -108,12 +109,11 @@ export default function CreateGroup({ onGroupCreated }) {
     }
   };
 
- const handleJoinGroup = async (groupId) => {
+  const handleJoinGroup = async (groupId) => {
     if (!window.confirm("Bạn có chắc chắn muốn tham gia nhóm này không?"))
       return;
     setJoiningId(groupId);
     try {
-      // Gọi đúng endpoint POST /api/v1/groups/{id}/join dành cho student tự join
       await joinGroup(groupId);
 
       alert("Tham gia nhóm thành công!");
@@ -167,7 +167,7 @@ export default function CreateGroup({ onGroupCreated }) {
           <button
             type="button"
             onClick={() => setSubTab("create")}
-            className={`py-3 text-xs font-bold rounded-xl transition-all duration-200 ${
+            className={`py-3 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer ${
               subTab === "create"
                 ? "bg-white text-[#2C2825] shadow-md scale-[1.02]"
                 : "text-[#6B635B]"
@@ -178,7 +178,7 @@ export default function CreateGroup({ onGroupCreated }) {
           <button
             type="button"
             onClick={() => setSubTab("join")}
-            className={`py-3 text-xs font-bold rounded-xl transition-all duration-200 ${
+            className={`py-3 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer ${
               subTab === "join"
                 ? "bg-white text-[#2C2825] shadow-md scale-[1.02]"
                 : "text-[#6B635B]"
@@ -277,13 +277,13 @@ export default function CreateGroup({ onGroupCreated }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 px-6 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-black tracking-wider uppercase rounded-xl shadow-md transition-all flex flex-col items-center justify-center space-y-0.5"
+                  className="w-full py-4 px-6 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-black tracking-wider uppercase rounded-xl shadow-md transition-all flex flex-col items-center justify-center space-y-0.5 cursor-pointer"
                 >
                   <span>
                     {loading ? "Đang xử lý..." : "Xác nhận tạo nhóm ngay"}
                   </span>
                   <span className="text-[10px] font-normal normal-case opacity-90">
-                    (Khi tạo nhóm, bạn sẽ trở thành Nhóm Trưởng)
+                    (Khi tạo nhóm, bạn sẽ trở thành Trưởng nhóm)
                   </span>
                 </button>
               </form>
@@ -299,7 +299,7 @@ export default function CreateGroup({ onGroupCreated }) {
                     Mỗi sinh viên chỉ được tham gia duy nhất 01 nhóm trong học
                     kỳ.
                   </li>
-                  <li>Số lượng thành viên từ 3 đến 5 người.</li>
+                  <li>Số lượng thành viên theo quy chế từ 4 đến 6 người.</li>
                   <li>
                     Sau khi tạo nhóm, bạn có thể thêm/xóa thành viên thủ công.
                   </li>
@@ -337,7 +337,7 @@ export default function CreateGroup({ onGroupCreated }) {
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition"
+                className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
               >
                 Tham gia ngay →
               </button>
@@ -372,7 +372,7 @@ export default function CreateGroup({ onGroupCreated }) {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition shrink-0 ${
+                  className={`px-4 py-2 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer ${
                     selectedCategory === cat
                       ? "bg-[#2C2825] text-white shadow-sm"
                       : "bg-white text-[#6B635B] border border-[#E8E2D9]"
@@ -389,7 +389,7 @@ export default function CreateGroup({ onGroupCreated }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredGroups.map((g) => {
                     const memberCount = g.members ? g.members.length : 0;
-                    const slotsLeft = 5 - memberCount;
+                    const slotsLeft = 6 - memberCount; // Tính số chỗ trống dựa trên tối đa 6 người
                     return (
                       <div
                         key={g.id}
@@ -418,7 +418,7 @@ export default function CreateGroup({ onGroupCreated }) {
                           <div className="text-[11px] text-[#6B635B] pt-2 border-t border-[#F0EBE1]">
                             <span>Thành viên hiện tại: </span>
                             <strong className="text-[#2C2825]">
-                              {memberCount}/5 người
+                              {memberCount}/6 người
                             </strong>
                           </div>
                         </div>
@@ -426,7 +426,7 @@ export default function CreateGroup({ onGroupCreated }) {
                         <button
                           onClick={() => handleJoinGroup(g.id)}
                           disabled={joiningId === g.id}
-                          className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50"
+                          className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
                         >
                           {joiningId === g.id
                             ? "Đang xử lý..."
