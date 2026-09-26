@@ -5,13 +5,20 @@ import api from "./api";
  * Lấy danh sách các slot rảnh / lịch hẹn
  */
 export const getSlots = async (params = {}) => {
-  try {
-    const response = await api.get("/slots", { params });
-    return response.data;
-  } catch (error) {
-    console.warn("Backend đang lỗi kết nối CSDL tại /slots:", error);
-    return { content: [], empty: true }; // Trả về cấu trúc phân trang rỗng an toàn cho UI
-  }
+  // Lọc sạch sẽ các giá trị null, undefined, chuỗi rỗng
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== null && v !== undefined && v !== "")
+  );
+
+  // Bắt buộc phải truyền kèm page và size để Spring Boot map được đối tượng Pageable
+  const queryParams = {
+    page: 0,
+    size: 10,
+    ...cleanParams,
+  };
+
+  const response = await api.get("/slots", { params: queryParams });
+  return response.data;
 };
 
 /**

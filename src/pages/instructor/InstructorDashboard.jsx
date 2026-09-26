@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { getSlots, createSlot } from "../../services/scheduleService";
 import { getCurrentUser } from "../../services/authService";
-import Profile from "../../auth/Profile"; // Import component Profile
+import { getAllGroups, getGroupById } from "../../services/groupService";
+import Profile from "../../auth/Profile";
 
 export default function InstructorDashboard() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("slots");
   const [slots, setSlots] = useState([]);
+  const [instructorGroups, setInstructorGroups] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterTab, setFilterTab] = useState("ALL"); // ALL, BOOKED, AVAILABLE
+  const [filterTab, setFilterTab] = useState("ALL");
 
-  // Form tạo Slot (Đã cố định capacity = 1 theo BR-BOOKING-02)
+  // Form tạo Slot
   const [form, setForm] = useState({
     startTime: "",
     endTime: "",
@@ -27,11 +29,44 @@ export default function InstructorDashboard() {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
 
+      // 1. Tải danh sách slots
       const resSlots = await getSlots().catch(() => []);
       setSlots(resSlots.content || resSlots || []);
+
+      // 2. Tải danh sách nhóm tổng quát
+      const resGroups = await getAllGroups().catch(() => []);
+      const allGroups = resGroups.content || resGroups || [];
+
+      const myGroups = allGroups.filter(
+        (g) =>
+          g.supervisorId === currentUser?.id ||
+          g.instructorId === currentUser?.id ||
+          g.supervisorEmail === currentUser?.email ||
+          g.instructorEmail === currentUser?.email ||
+          (g.supervisor &&
+            (g.supervisor.id === currentUser?.id ||
+              g.supervisor.email === currentUser?.email)),
+      );
+
+      const targetGroups = myGroups.length > 0 ? myGroups : allGroups;
+
+      // 3. Gọi bổ sung getGroupById cho từng nhóm để lấy đầy đủ thông tin thành viên (members)
+      const detailedGroups = await Promise.all(
+        targetGroups.map(async (g) => {
+          try {
+            const detail = await getGroupById(g.id);
+            return detail || g; // Nếu gọi thành công thì lấy dữ liệu chi tiết, không thì dùng dữ liệu cũ
+          } catch (e) {
+            return g;
+          }
+        }),
+      );
+
+      setInstructorGroups(detailedGroups);
     } catch (err) {
       console.error("Lỗi tải dữ liệu giảng viên:", err);
       setSlots([]);
+      setInstructorGroups([]);
     } finally {
       setLoading(false);
     }
@@ -48,7 +83,7 @@ export default function InstructorDashboard() {
         startTime: new Date(form.startTime).toISOString(),
         endTime: new Date(form.endTime).toISOString(),
         durationMinutes: Number(form.durationMinutes),
-        capacity: 1, // Luôn chuẩn hóa bằng 1 theo nguyên tắc 1:1
+        capacity: 1,
         locationType: form.locationType,
         meetingUrl: form.meetingUrl.trim(),
         notes: form.notes.trim(),
@@ -338,13 +373,76 @@ export default function InstructorDashboard() {
           )}
 
           {activeTab === "groups" && (
-            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm">
+            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
               <h2 className="text-sm font-black text-[#2C2825]">
-                Danh sách nhóm hướng dẫn
+                Danh sách nhóm hướng dẫn ({instructorGroups.length})
               </h2>
-              <p className="text-xs text-[#6B635B] mt-1">
-                Tính năng quản lý các nhóm đồ án đang được cập nhật.
-              </p>
+              {loading ? (
+                <p className="text-xs text-[#6B635B] py-4">
+                  Đang tải danh sách nhóm...
+                </p>
+              ) : instructorGroups.length > 0 ? (
+                <div className="space-y-4">
+                  {instructorGroups.map((g) => {
+                    // Lấy danh sách thành viên từ API chi tiết getGroupById
+                    const members = g.members || g.groupMembers || [];
+                    const memberCount = members.length || g.memberCount || 0;
+
+                    // Tìm Trưởng nhóm (Leader)
+                    const leader = members.find(
+                      (m) =>
+                        m.isLeader === true ||
+                        m.role === "GROUP_LEADER" ||
+                        m.role === "LEADER",
+                    );
+                    const leaderName =
+                      leader?.userFullName ||
+                      leader?.fullName ||
+                      leader?.name ||
+                      g.leaderName ||
+                      "Chưa cập nhật";
+
+                    return (
+                      <div
+                        key={g.id}
+                        className="p-5 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-3 text-xs"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-extrabold text-[#E65100] text-sm">
+                            Mã nhóm: {g.groupCode || g.code || "N/A"}
+                          </span>
+                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 font-bold rounded-lg text-[10px]">
+                            {g.status || "ACTIVE"}
+                          </span>
+                        </div>
+
+                        <p className="font-bold text-[#2C2825]">
+                          Đề tài:{" "}
+                          {g.topicTitle ||
+                            g.topic?.title ||
+                            "Chưa cập nhật đề tài"}
+                        </p>
+
+                        <div className="pt-2 border-t border-[#E8E2D9] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <span className="text-[#6B635B]">
+                            👑 Trưởng nhóm:{" "}
+                            <strong className="text-[#2C2825]">
+                              {leaderName}
+                            </strong>
+                          </span>
+                          <span className="px-2.5 py-1 bg-orange-50 text-[#E65100] font-bold rounded-lg">
+                            👥 Tổng số thành viên: {memberCount} sinh viên
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-[#6B635B] italic py-6">
+                  Chưa có nhóm đồ án nào được phân công hướng dẫn trên hệ thống.
+                </p>
+              )}
             </div>
           )}
 

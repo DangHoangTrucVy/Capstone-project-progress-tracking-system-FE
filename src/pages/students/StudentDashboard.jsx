@@ -28,7 +28,7 @@ export default function StudentDashboard() {
             (m) =>
               m.userId === userRes.id ||
               m.userEmail === userRes.email ||
-              m.id === userRes.id
+              m.id === userRes.id,
           );
 
           if (detailedGroup && isMember) {
@@ -45,7 +45,7 @@ export default function StudentDashboard() {
 
       if (userRes?.groupId) {
         const detailedGroup = await getGroupById(userRes.groupId).catch(
-          () => null
+          () => null,
         );
         if (detailedGroup) {
           localStorage.setItem("groupId", userRes.groupId);
@@ -68,7 +68,7 @@ export default function StudentDashboard() {
             (m) =>
               m.userId === userRes.id ||
               m.userEmail === userRes.email ||
-              m.id === userRes.id
+              m.id === userRes.id,
           )
         ) {
           foundGroup = detail;
@@ -111,7 +111,7 @@ export default function StudentDashboard() {
     (m) =>
       m.userId === currentUser?.id ||
       m.userEmail === currentUser?.email ||
-      m.id === currentUser?.id
+      m.id === currentUser?.id,
   );
 
   const isLeader =
@@ -173,15 +173,15 @@ export default function StudentDashboard() {
                   !hasGroup
                     ? "bg-amber-100 text-amber-700"
                     : isLeader
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-orange-100 text-[#E65100]"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-orange-100 text-[#E65100]"
                 }`}
               >
                 {!hasGroup
                   ? "Chưa tham gia"
                   : isLeader
-                  ? "👑 Leader"
-                  : "👤 Member"}
+                    ? "👑 Leader"
+                    : "👤 Member"}
               </span>
             </div>
           </div>
@@ -326,15 +326,15 @@ export default function StudentDashboard() {
                 !hasGroup
                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                   : isLeader
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-orange-50 text-[#E65100] border border-orange-200"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-orange-50 text-[#E65100] border border-orange-200"
               }`}
             >
               {!hasGroup
                 ? "🎓 STUDENT"
                 : isLeader
-                ? "👑 GROUP LEADER"
-                : "👤 MEMBER"}
+                  ? "👑 GROUP LEADER"
+                  : "👤 MEMBER"}
             </span>
           </div>
         </header>
@@ -348,7 +348,10 @@ export default function StudentDashboard() {
                 <MemberGroup groupId={groupData?.id} isLeader={isLeader} />
               )}
               {activeTab === "schedule" && (
-                <ScheduleGroup groupId={groupData?.id} />
+                <ScheduleGroup
+                  groupId={groupData?.id}
+                  topicId={groupData?.topicId || groupData?.topic?.id}
+                />
               )}
               {activeTab === "progress" && (
                 <ProgressGroup groupId={groupData?.id} />
@@ -356,7 +359,8 @@ export default function StudentDashboard() {
               {activeTab === "documents" && (
                 <DocumentGroup groupId={groupData?.id} />
               )}
-              {activeTab === "settings" && <Profile />} {/* <-- Hiển thị component Profile tại đây */}
+              {activeTab === "settings" && <Profile />}{" "}
+              {/* <-- Hiển thị component Profile tại đây */}
             </>
           ) : (
             <CreateGroup onGroupCreated={() => checkUserGroup()} />
