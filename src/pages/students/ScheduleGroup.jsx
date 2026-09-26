@@ -5,22 +5,26 @@ import {
   cancelBooking,
   getGroupBookings,
 } from "../../services/scheduleService";
-import { getUsers } from "../../services/userService";
+import {
+  getTopicQuestions,
+  addTopicQuestion,
+} from "../../services/topicService";
 
-export default function ScheduleGroup({ groupId }) {
+export default function ScheduleGroup({ groupId, topicId }) {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
-  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // State cho phần Câu hỏi trước buổi họp (Pre-meeting Questions)
+  const [questions, setQuestions] = useState([]);
+  const [newQuestion, setNewQuestion] = useState("");
+  const [questionLoading, setQuestionLoading] = useState(false);
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDateStr, setSelectedDateStr] = useState(
-    today.toISOString().split("T")[0]
+    today.toISOString().split("T")[0],
   );
-
-  const [instructorFilter, setInstructorFilter] = useState("ALL");
-  const [meetingType, setMeetingType] = useState("ALL");
 
   const getInstructorName = (item) => {
     if (!item) return "Giảng viên hướng dẫn";
@@ -37,30 +41,30 @@ export default function ScheduleGroup({ groupId }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const resSlots = await getSlots({ status: "AVAILABLE" });
+      const resSlots = await getSlots({ status: "AVAILABLE" }).catch(() => []);
       setAvailableSlots(resSlots.content || resSlots || []);
 
       if (groupId) {
-        const resBookings = await getGroupBookings(groupId);
+        const resBookings = await getGroupBookings(groupId).catch(() => []);
         setMyBookings(resBookings.content || resBookings || []);
       }
 
-      const resUsers = await getUsers().catch(() => []);
-      const userList = resUsers.content || resUsers || [];
-      const instructorList = userList.filter(
-        (u) => u.role === "INSTRUCTOR" || u.role === "ADMIN"
-      );
-      setInstructors(instructorList);
+      if (topicId) {
+        setQuestionLoading(true);
+        const resQuestions = await getTopicQuestions(topicId).catch(() => []);
+        setQuestions(resQuestions.content || resQuestions || []);
+      }
     } catch (err) {
-      console.error("Lỗi tải dữ liệu lịch hẹn:", err);
+      console.warn("Lỗi tải dữ liệu lịch hẹn:", err);
     } finally {
       setLoading(false);
+      setQuestionLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [groupId]);
+  }, [groupId, topicId]);
 
   const handleBook = async (slotId) => {
     if (!window.confirm("Xác nhận đặt lịch hẹn khung giờ này cho nhóm?"))
@@ -81,21 +85,20 @@ export default function ScheduleGroup({ groupId }) {
   };
 
   const handleCancel = async (booking) => {
-    // Kiểm tra quy tắc hủy chuẩn >= 12h (BR-CANCEL-02)
     const slotStartTime = new Date(booking.startTime || booking.slotTime);
     const now = new Date();
     const hoursDifference = (slotStartTime - now) / (1000 * 60 * 60);
 
     if (hoursDifference < 12) {
       alert(
-        "Đã quá thời hạn tự hủy (dưới 12 giờ trước giờ hẹn). Vui lòng liên hệ trực tiếp Giảng viên hướng dẫn để được hỗ trợ hủy/dời lịch (Late Cancellation)."
+        "Đã quá thời hạn tự hủy (dưới 12 giờ trước giờ hẹn). Vui lòng liên hệ trực tiếp Giảng viên hướng dẫn để được hỗ trợ hủy/dời lịch (Late Cancellation).",
       );
       return;
     }
 
     if (
       !window.confirm(
-        "Bạn có chắc chắn muốn hủy lịch hẹn này? (Hủy trước 12h không bị ghi nhận vi phạm)"
+        "Bạn có chắc chắn muốn hủy lịch hẹn này? (Hủy trước 12h không bị ghi nhận vi phạm)",
       )
     )
       return;
@@ -112,29 +115,41 @@ export default function ScheduleGroup({ groupId }) {
     }
   };
 
-  // --- LỌC SLOTS THEO NGÀY, GIẢNG VIÊN VÀ HÌNH THỨC ---
+  // Gửi câu hỏi mới trước buổi họp
+  const handleAddQuestion = async (e) => {
+    e.preventDefault();
+    if (!newQuestion.trim()) return;
+    if (!topicId) {
+      alert("Nhóm cần được gán đề tài để gửi câu hỏi thảo luận!");
+      return;
+    }
+
+    try {
+      const payload = { questionText: newQuestion.trim() };
+      await addTopicQuestion(topicId, payload);
+      alert("Đã gửi câu hỏi thành công cho GVHD!");
+      setNewQuestion("");
+      
+      const resQuestions = await getTopicQuestions(topicId);
+      setQuestions(resQuestions.content || resQuestions || []);
+    } catch (err) {
+      alert("Gửi câu hỏi thất bại!");
+    }
+  };
+
+  // --- LỌC SLOTS THEO NGÀY ---
   const filteredSlots = availableSlots.filter((slot) => {
     const slotDateStr = new Date(slot.startTime).toISOString().split("T")[0];
-    const matchDate = slotDateStr === selectedDateStr;
-
-    const matchInstructor =
-      instructorFilter === "ALL" ||
-      slot.instructorId === instructorFilter ||
-      slot.instructorName === instructorFilter;
-
-    const matchType =
-      meetingType === "ALL" || slot.locationType === meetingType;
-
-    return matchDate && matchInstructor && matchType;
+    return slotDateStr === selectedDateStr;
   });
 
-  // --- LOGIC TẠO LỊCH THÁNG ---
+  // --- LỊCH THÁNG ---
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
   const monthNames = [
     "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
-    "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+    "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
   ];
 
   const firstDayIndex = new Date(year, month, 1).getDay();
@@ -147,7 +162,9 @@ export default function ScheduleGroup({ groupId }) {
     calendarCells.push({
       day: prevTotalDays - i,
       isCurrentMonth: false,
-      dateStr: new Date(year, month - 1, prevTotalDays - i).toISOString().split("T")[0],
+      dateStr: new Date(year, month - 1, prevTotalDays - i)
+        .toISOString()
+        .split("T")[0],
     });
   }
   for (let i = 1; i <= totalDays; i++) {
@@ -184,14 +201,14 @@ export default function ScheduleGroup({ groupId }) {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-black text-[#2C2825]">
-              Lịch hẹn của nhóm đồ án
+              Lịch hẹn & Câu hỏi thảo luận GVHD
             </h1>
             <span className="px-2.5 py-0.5 bg-orange-50 text-[#E65100] font-extrabold rounded-md text-xs">
               Kỳ 1 - Spring 2026
             </span>
           </div>
           <p className="text-xs text-[#6B635B]">
-            Quy định: Đặt lịch trước ít nhất 24 giờ, tối đa 1 slot/ngày và hoàn thành buổi meeting cũ trước khi book lịch mới.
+            Quản lý lịch hẹn, đặt slot trống và chuẩn bị câu hỏi trước buổi gặp giảng viên hướng dẫn.
           </p>
         </div>
 
@@ -199,22 +216,21 @@ export default function ScheduleGroup({ groupId }) {
           <button
             onClick={() =>
               alert(
-                "Quy định gặp GVHD:\n- Đặt lịch trước ít nhất 24h.\n- Tối đa 1 slot/ngày.\n- Hủy chuẩn trước >= 12h; dưới 12h phải liên hệ GVHD (Late Cancellation)."
+                "Quy định gặp GVHD:\n- Đặt lịch trước ít nhất 24h.\n- Tối đa 1 slot/ngày.\n- Hủy chuẩn trước >= 12h.",
               )
             }
             className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-[#2C2825] text-xs font-bold rounded-2xl transition flex items-center gap-1.5 cursor-pointer"
           >
             <span>📖</span>
-            <span>Quy định đặt/hủy lịch</span>
+            <span>Quy định đặt lịch</span>
           </button>
         </div>
       </div>
 
       {/* 2. LAYOUT CHÍNH CHIA 2 CỘT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* CỘT TRÁI: LỊCH THÁNG & BỘ LỌC */}
+        {/* CỘT TRÁI: LỊCH THÁNG */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Lịch tháng */}
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-black text-sm text-[#2C2825]">
@@ -241,10 +257,18 @@ export default function ScheduleGroup({ groupId }) {
                 </button>
               </div>
             </div>
-            <p className="text-[11px] text-[#6B635B]">Chọn ngày để xem slot trống</p>
+            <p className="text-[11px] text-[#6B635B]">
+              Chọn ngày để xem slot trống
+            </p>
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-[#6B635B]">
-              <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+              <span>T2</span>
+              <span>T3</span>
+              <span>T4</span>
+              <span>T5</span>
+              <span>T6</span>
+              <span>T7</span>
+              <span>CN</span>
             </div>
 
             <div className="grid grid-cols-7 gap-1.5 text-center text-xs">
@@ -272,56 +296,11 @@ export default function ScheduleGroup({ groupId }) {
               })}
             </div>
           </div>
-
-          {/* Bộ lọc giảng viên & hình thức */}
-          <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-            <h3 className="font-black text-sm text-[#2C2825]">
-              Bộ lọc giảng viên & hình thức
-            </h3>
-
-            <div className="space-y-1.5 text-xs">
-              <label className="font-bold text-[#2C2825]">
-                Giảng viên hướng dẫn (GVHD)
-              </label>
-              <select
-                value={instructorFilter}
-                onChange={(e) => setInstructorFilter(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
-              >
-                <option value="ALL">Tất cả giảng viên ({instructors.length})</option>
-                {instructors.map((ins) => (
-                  <option key={ins.id} value={ins.id}>
-                    {ins.fullName} ({ins.email})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              <label className="font-bold text-[#2C2825]">Hình thức gặp gỡ</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMeetingType("ALL")}
-                  className={`p-2.5 rounded-xl border text-center font-bold transition cursor-pointer ${meetingType === "ALL" ? "bg-orange-50 border-[#E65100] text-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9] text-[#6B635B]"}`}
-                >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMeetingType("ONLINE")}
-                  className={`p-2.5 rounded-xl border text-center font-bold transition cursor-pointer ${meetingType === "ONLINE" ? "bg-orange-50 border-[#E65100] text-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9] text-[#6B635B]"}`}
-                >
-                  Online / Lab
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* CỘT PHẢI: LỊCH HẸN VÀ SLOT RẢNH */}
+        {/* CỘT PHẢI: LỊCH HẸN, SLOT RẢNH & GỬI CÂU HỎI */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Lịch hẹn hiện tại của nhóm */}
+          {/* Lịch hẹn hiện tại */}
           <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
               <h3 className="font-black text-sm text-[#2C2825]">
@@ -366,7 +345,7 @@ export default function ScheduleGroup({ groupId }) {
                         🕒{" "}
                         <strong>
                           {new Date(
-                            b.startTime || b.slotTime || Date.now()
+                            b.startTime || b.slotTime || Date.now(),
                           ).toLocaleString()}
                         </strong>
                       </span>
@@ -381,6 +360,69 @@ export default function ScheduleGroup({ groupId }) {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* TÍCH HỢP MODULE PRE-MEETING QUESTIONS */}
+          <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
+            <div className="border-b border-[#E8E2D9] pb-3">
+              <h3 className="font-black text-sm text-[#2C2825]">
+                💬 Câu hỏi thảo luận trước buổi gặp (Pre-meeting Questions)
+              </h3>
+              <p className="text-[11px] text-[#6B635B]">
+                Gửi thắc mắc hoặc nội dung cần GVHD tư vấn trước khi họp.
+              </p>
+            </div>
+
+            <form onSubmit={handleAddQuestion} className="space-y-3">
+              <textarea
+                rows={2}
+                required
+                value={newQuestion}
+                onChange={(e) => setNewQuestion(e.target.value)}
+                placeholder="Nhập nội dung thắc mắc, vấn đề code hoặc kiến trúc cần thảo luận..."
+                className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
+              />
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer"
+              >
+                + Gửi câu hỏi cho GVHD
+              </button>
+            </form>
+
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-black uppercase text-[#6B635B]">
+                Lịch sử câu hỏi ({questions.length})
+              </h4>
+              {questionLoading ? (
+                <p className="text-xs text-[#6B635B] py-2">
+                  Đang tải câu hỏi...
+                </p>
+              ) : questions.length > 0 ? (
+                <div className="space-y-2.5 max-h-60 overflow-y-auto">
+                  {questions.map((q) => (
+                    <div
+                      key={q.id}
+                      className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-2 text-xs"
+                    >
+                      <p className="font-bold text-[#2C2825]">❓ {q.content}</p>
+                      {q.instructorAnswer && (
+                        <div className="p-2.5 bg-white rounded-xl border border-orange-100 space-y-1">
+                          <p className="font-bold text-[#E65100]">
+                            💡 Phản hồi từ GVHD:
+                          </p>
+                          <p className="text-[#6B635B]">{q.instructorAnswer}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[#6B635B] italic py-2">
+                  Chưa có câu hỏi nào được gửi cho đề tài này.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Khung giờ rảnh theo ngày đã chọn */}
@@ -406,7 +448,6 @@ export default function ScheduleGroup({ groupId }) {
             ) : filteredSlots.length > 0 ? (
               <div className="space-y-3">
                 {filteredSlots.map((slot) => {
-                  // Kiểm tra quy tắc 24h (BR-BOOKING-03)
                   const slotTime = new Date(slot.startTime);
                   const now = new Date();
                   const hoursUntilSlot = (slotTime - now) / (1000 * 60 * 60);
@@ -439,7 +480,8 @@ export default function ScheduleGroup({ groupId }) {
                             </span>
                           </div>
                           <p className="text-[11px] text-[#6B635B]">
-                            📅 {new Date(slot.startTime).toLocaleString()} • Sức chứa:{" "}
+                            📅 {new Date(slot.startTime).toLocaleString()} • Sức
+                            chứa:{" "}
                             <strong className="text-emerald-600">1 nhóm</strong>
                           </p>
                           {isTooLateToBook && (
@@ -467,7 +509,7 @@ export default function ScheduleGroup({ groupId }) {
               </div>
             ) : (
               <p className="text-xs text-[#6B635B] py-6 text-center italic">
-                Không có khung giờ rảnh nào vào ngày {selectedDateStr} thỏa mãn bộ lọc.
+                Không có khung giờ rảnh nào vào ngày {selectedDateStr} thỏa mãn.
               </p>
             )}
           </div>

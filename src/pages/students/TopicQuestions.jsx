@@ -1,48 +1,54 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { getTopicQuestions, addTopicQuestion } from "../../services/topicService";
 
-export default function TopicQuestions({ groupId }) {
-    const [questions, setQuestions] = useState([
-        {
-            id: 1,
-            content: "Nhóm xin ý kiến GVHD về việc lựa chọn cơ chế Realtime bằng SignalR hay WebSocket cho tính năng cứu trợ khẩn cấp?",
-            status: "Đã trả lời",
-            instructorAnswer: "Nên ưu tiên dùng SignalR vì tích hợp mượt mà hơn với .NET Backend mà nhóm đang chọn."
-        },
-        {
-            id: 2,
-            content: "Thầy xem giúp em cấu trúc bảng phân quyền Storage trong database đã tối ưu chưa ạ?",
-            status: "Chờ phản hồi",
-            instructorAnswer: ""
-        }
-    ]);
-
+export default function TopicQuestions({ topicId, topicTitle }) {
+    const [questions, setQuestions] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [newQuestion, setNewQuestion] = useState("");
 
-    const handleAddQuestion = (e) => {
+    // Gọi API lấy danh sách câu hỏi theo topicId thực tế
+    const fetchQuestions = async () => {
+        if (!topicId) return;
+        setLoading(true);
+        try {
+            const res = await getTopicQuestions(topicId);
+            setQuestions(res.content || res || []);
+        } catch (err) {
+            console.error("Lỗi tải danh sách câu hỏi:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchQuestions();
+    }, [topicId]);
+
+    const handleAddQuestion = async (e) => {
         e.preventDefault();
         if (!newQuestion.trim()) return;
 
-        const newItem = {
-            id: Date.now(),
-            content: newQuestion.trim(),
-            status: "Chờ phản hồi",
-            instructorAnswer: ""
-        };
-
-        setQuestions([newItem, ...questions]);
-        setNewQuestion("");
-        alert("Đã gửi câu hỏi thành công cho GVHD!");
+        try {
+            const payload = { content: newQuestion.trim() };
+            await addTopicQuestion(topicId, payload);
+            
+            alert("Đã gửi câu hỏi thành công cho GVHD!");
+            setNewQuestion("");
+            fetchQuestions(); // Tải lại danh sách sau khi thêm thành công
+        } catch (err) {
+            alert("Gửi câu hỏi thất bại!");
+        }
     };
 
     return (
         <div className="space-y-6 animate-fadeIn font-sans text-[#2C2825]">
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-2">
                 <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-md">
-                    Pre-meeting Questions · Chuẩn bị họp GVHD
+                    Pre-meeting Questions · Ngân hàng câu hỏi đề tài
                 </span>
-                <h1 className="text-xl font-black">Danh sách câu hỏi trước buổi gặp</h1>
+                <h1 className="text-xl font-black">Đề tài: {topicTitle || "Chi tiết đề tài"}</h1>
                 <p className="text-xs text-[#6B635B]">
-                    Nhóm ghi lại các vấn đề cần thảo luận để giảng viên chuẩn bị nội dung tư vấn hiệu quả nhất.
+                    Quản lý danh sách câu hỏi thảo luận, phản biện giữa nhóm và giảng viên hướng dẫn.
                 </p>
             </div>
 
@@ -69,17 +75,17 @@ export default function TopicQuestions({ groupId }) {
 
             {/* Danh sách câu hỏi */}
             <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-                <h3 className="text-xs font-black uppercase text-[#6B635B]">Lịch sử câu hỏi của nhóm ({questions.length})</h3>
+                <h3 className="text-xs font-black uppercase text-[#6B635B]">Lịch sử câu hỏi của đề tài ({questions.length})</h3>
                 
-                <div className="space-y-3">
-                    {questions.length > 0 ? (
-                        questions.map((q) => (
+                {loading ? (
+                    <p className="text-xs text-[#6B635B] py-4 text-center">Đang tải dữ liệu...</p>
+                ) : questions.length > 0 ? (
+                    <div className="space-y-3">
+                        {questions.map((q) => (
                             <div key={q.id} className="p-5 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-3 text-xs">
                                 <div className="flex justify-between items-center">
-                                    <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg ${
-                                        q.status === "Đã trả lời" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                                    }`}>
-                                        {q.status}
+                                    <span className="px-2.5 py-1 text-[10px] font-black rounded-lg bg-emerald-100 text-emerald-700">
+                                        {q.status || "Đã tiếp nhận"}
                                     </span>
                                 </div>
                                 <p className="font-bold text-[#2C2825] text-sm">
@@ -92,11 +98,11 @@ export default function TopicQuestions({ groupId }) {
                                     </div>
                                 )}
                             </div>
-                        ))
-                    ) : (
-                        <p className="text-xs text-[#6B635B] italic py-4">Chưa có câu hỏi nào được gửi.</p>
-                    )}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-xs text-[#6B635B] italic py-4">Chưa có câu hỏi nào trong ngân hàng câu hỏi của đề tài này.</p>
+                )}
             </div>
         </div>
     );
