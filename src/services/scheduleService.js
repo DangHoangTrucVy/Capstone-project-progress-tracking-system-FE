@@ -9,8 +9,8 @@ export const getSlots = async (params = {}) => {
     const response = await api.get("/slots", { params });
     return response.data;
   } catch (error) {
-    console.error("Backend đang lỗi SQL 500 tại /slots, tạm thời trả về mảng rỗng:", error);
-    return []; // Trả về mảng rỗng để UI không bị crash
+    console.warn("Backend đang lỗi kết nối CSDL tại /slots:", error);
+    return { content: [], empty: true }; // Trả về cấu trúc phân trang rỗng an toàn cho UI
   }
 };
 

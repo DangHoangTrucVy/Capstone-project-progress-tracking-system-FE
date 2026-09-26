@@ -5,6 +5,7 @@ import ScheduleGroup from "./ScheduleGroup";
 import ProgressGroup from "./ProgressGroup";
 import DocumentGroup from "./DocumentGroup";
 import CreateGroup from "./CreateGroup";
+import Profile from "../../auth/Profile"; // <-- Import component Profile từ thư mục auth
 import { getAllGroups, getGroupById } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 
@@ -147,7 +148,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Card thông tin nhóm (Cập nhật chuẩn sĩ số 4-6 thành viên) */}
+          {/* Card thông tin nhóm */}
           <div className="bg-[#F8F6F0] p-4 rounded-2xl border border-[#E8E2D9] space-y-3">
             <div className="flex justify-between items-center text-xs">
               <span className="font-bold text-[#6B635B]">Mã nhóm:</span>
@@ -190,7 +191,7 @@ export default function StudentDashboard() {
             <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
               <button
                 onClick={() => setActiveTab("overview")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "overview"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -202,7 +203,7 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("members")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "members"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -214,7 +215,7 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("schedule")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "schedule"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -226,7 +227,7 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("progress")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "progress"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -238,7 +239,7 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("documents")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "documents"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
@@ -250,14 +251,14 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("settings")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "settings"
                     ? "bg-[#E65100] text-white shadow-md"
                     : "hover:bg-[#F8F6F0]"
                 }`}
               >
                 <span>⚙️</span>
-                <span>Cài đặt & Thông báo</span>
+                <span>Hồ sơ cá nhân</span>
               </button>
             </nav>
           )}
@@ -308,7 +309,7 @@ export default function StudentDashboard() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <button className="px-4 py-2 bg-[#FBF9F5] border border-[#E8E2D9] hover:bg-gray-100 text-[#2C2825] font-bold rounded-xl transition flex items-center gap-1.5">
+            <button className="px-4 py-2 bg-[#FBF9F5] border border-[#E8E2D9] hover:bg-gray-100 text-[#2C2825] font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
               <span>📖</span>
               <span>Hướng dẫn đồ án</span>
             </button>
@@ -355,16 +356,7 @@ export default function StudentDashboard() {
               {activeTab === "documents" && (
                 <DocumentGroup groupId={groupData?.id} />
               )}
-              {activeTab === "settings" && (
-                <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9]">
-                  <h3 className="font-black text-base text-[#2C2825]">
-                    Cài đặt & Thông báo nhóm
-                  </h3>
-                  <p className="text-xs text-[#6B635B] mt-1">
-                    Quản lý tùy chỉnh thông báo và cấu hình nhóm đồ án tốt nghiệp.
-                  </p>
-                </div>
-              )}
+              {activeTab === "settings" && <Profile />} {/* <-- Hiển thị component Profile tại đây */}
             </>
           ) : (
             <CreateGroup onGroupCreated={() => checkUserGroup()} />

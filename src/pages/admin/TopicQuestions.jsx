@@ -1,140 +1,103 @@
-import React, { useEffect, useState } from "react";
-import { getTopicQuestions, createTopicQuestion } from "../../services/topicService";
+import React, { useState } from "react";
 
-const TopicQuestions = ({ topicId, topicTitle }) => {
-    const [questions, setQuestions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [newQuestion, setNewQuestion] = useState({ category: "Technical", questionText: "", guidanceNotes: "" });
-    const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (topicId) {
-            fetchQuestions();
+export default function TopicQuestions({ groupId }) {
+    const [questions, setQuestions] = useState([
+        {
+            id: 1,
+            content: "Nhóm xin ý kiến GVHD về việc lựa chọn cơ chế Realtime bằng SignalR hay WebSocket cho tính năng cứu trợ khẩn cấp?",
+            status: "Đã trả lời",
+            instructorAnswer: "Nên ưu tiên dùng SignalR vì tích hợp mượt mà hơn với .NET Backend mà nhóm đang chọn."
+        },
+        {
+            id: 2,
+            content: "Thầy xem giúp em cấu trúc bảng phân quyền Storage trong database đã tối ưu chưa ạ?",
+            status: "Chờ phản hồi",
+            instructorAnswer: ""
         }
-    }, [topicId]);
+    ]);
 
-    const fetchQuestions = async () => {
-        setLoading(true);
-        try {
-            const data = await getTopicQuestions(topicId, { page: 0, size: 20 });
-            setQuestions(data.content || data);
-        } catch (error) {
-            console.error("Lỗi khi tải ngân hàng câu hỏi:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [newQuestion, setNewQuestion] = useState("");
 
-    const handleAddQuestion = async (e) => {
+    const handleAddQuestion = (e) => {
         e.preventDefault();
-        setSubmitting(true);
-        try {
-            await createTopicQuestion(topicId, newQuestion);
-            alert("Thêm câu hỏi thành công!");
-            setNewQuestion({ category: "Technical", questionText: "", guidanceNotes: "" });
-            fetchQuestions();
-        } catch (error) {
-            alert("Thêm câu hỏi thất bại, vui lòng thử lại!");
-        } finally {
-            setSubmitting(false);
-        }
-    };
+        if (!newQuestion.trim()) return;
 
-    if (!topicId) {
-        return (
-            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] text-center text-xs text-[#6B635B]">
-                Vui lòng chọn một đề tài cụ thể để quản lý ngân hàng câu hỏi.
-            </div>
-        );
-    }
+        const newItem = {
+            id: Date.now(),
+            content: newQuestion.trim(),
+            status: "Chờ phản hồi",
+            instructorAnswer: ""
+        };
+
+        setQuestions([newItem, ...questions]);
+        setNewQuestion("");
+        alert("Đã gửi câu hỏi thành công cho GVHD!");
+    };
 
     return (
-        <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
-            <div className="border-b border-[#F0EBE1] pb-4">
-                <h3 className="text-lg font-black text-[#2C2825]">Ngân hàng câu hỏi</h3>
-                <p className="text-xs text-[#6B635B] mt-1">Đề tài: <span className="font-bold text-[#E65100]">{topicTitle || topicId}</span></p>
+        <div className="space-y-6 animate-fadeIn font-sans text-[#2C2825]">
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-2">
+                <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-md">
+                    Pre-meeting Questions · Chuẩn bị họp GVHD
+                </span>
+                <h1 className="text-xl font-black">Danh sách câu hỏi trước buổi gặp</h1>
+                <p className="text-xs text-[#6B635B]">
+                    Nhóm ghi lại các vấn đề cần thảo luận để giảng viên chuẩn bị nội dung tư vấn hiệu quả nhất.
+                </p>
             </div>
 
             {/* Form thêm câu hỏi mới */}
-            <form onSubmit={handleAddQuestion} className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
-                <h4 className="font-bold text-xs text-[#2C2825]">Thêm câu hỏi mới vào ngân hàng</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Phân loại (Category)</label>
-                        <select 
-                            value={newQuestion.category}
-                            onChange={(e) => setNewQuestion({...newQuestion, category: e.target.value})}
-                            required
-                            className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                        >
-                            <option value="Technical">Technical (Kỹ thuật, Công nghệ, Database)</option>
-                            <option value="Requirement">Requirement (Phạm vi, Luồng nghiệp vụ)</option>
-                            <option value="General">General (Tiến độ, Tài liệu, Quy chế)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Ghi chú hướng dẫn (Guidance Notes)</label>
-                        <input 
-                            type="text" 
-                            placeholder="Ghi chú dành cho giảng viên/hội đồng..." 
-                            value={newQuestion.guidanceNotes}
-                            onChange={(e) => setNewQuestion({...newQuestion, guidanceNotes: e.target.value})}
-                            className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                        />
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-[11px] font-bold text-[#6B635B] mb-1">Nội dung câu hỏi (Question Text)</label>
-                    <textarea 
-                        rows="2"
-                        placeholder="Nhập nội dung câu hỏi chi tiết..." 
-                        value={newQuestion.questionText}
-                        onChange={(e) => setNewQuestion({...newQuestion, questionText: e.target.value})}
+            <form onSubmit={handleAddQuestion} className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
+                <h3 className="text-xs font-black uppercase text-[#6B635B]">Gửi câu hỏi mới cho Giảng viên</h3>
+                <div className="space-y-2">
+                    <textarea
+                        rows={3}
                         required
-                        className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
+                        value={newQuestion}
+                        onChange={(e) => setNewQuestion(e.target.value)}
+                        placeholder="Nhập nội dung thắc mắc, lỗi code, hoặc vấn đề kiến trúc cần trao đổi..."
+                        className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                     />
                 </div>
-                <button 
-                    type="submit" 
-                    disabled={submitting}
-                    className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition shadow-sm"
+                <button
+                    type="submit"
+                    className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer"
                 >
-                    {submitting ? "Đang xử lý..." : "Thêm câu hỏi"}
+                    + Gửi câu hỏi
                 </button>
             </form>
 
             {/* Danh sách câu hỏi */}
-            <div className="space-y-4">
-                <h4 className="font-bold text-xs text-[#2C2825]">Danh sách câu hỏi hiện có ({questions.length})</h4>
-                {loading ? (
-                    <div className="text-center py-6 text-xs text-[#6B635B]">Đang tải danh sách câu hỏi...</div>
-                ) : questions.length > 0 ? (
-                    <div className="space-y-3">
-                        {questions.map((q, index) => (
-                            <div key={q.id || index} className="p-5 bg-white border border-[#E8E2D9] rounded-2xl space-y-2 text-xs shadow-xs hover:border-[#E65100]/40 transition">
+            <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
+                <h3 className="text-xs font-black uppercase text-[#6B635B]">Lịch sử câu hỏi của nhóm ({questions.length})</h3>
+                
+                <div className="space-y-3">
+                    {questions.length > 0 ? (
+                        questions.map((q) => (
+                            <div key={q.id} className="p-5 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-3 text-xs">
                                 <div className="flex justify-between items-center">
-                                    <span className="px-3 py-1 bg-orange-50 text-[#E65100] font-bold rounded-lg text-[10px] uppercase">
-                                        🏷️ {q.category}
+                                    <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg ${
+                                        q.status === "Đã trả lời" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                                    }`}>
+                                        {q.status}
                                     </span>
-                                    <span className="text-[10px] font-bold text-[#6B635B] bg-[#FBF9F5] px-2 py-1 rounded-md">{q.status || "DRAFT"}</span>
                                 </div>
-                                <p className="font-bold text-[#2C2825] text-sm">{q.questionText}</p>
-                                {q.guidanceNotes && (
-                                    <p className="text-[#6B635B] italic bg-[#FBF9F5] p-2.5 rounded-xl border border-[#E8E2D9]/60">
-                                        💡 <span className="font-semibold">Ghi chú:</span> {q.guidanceNotes}
-                                    </p>
+                                <p className="font-bold text-[#2C2825] text-sm">
+                                    ❓ {q.content}
+                                </p>
+                                {q.instructorAnswer && (
+                                    <div className="p-3 bg-white rounded-xl border border-orange-100 space-y-1">
+                                        <p className="font-bold text-[#E65100]">💡 Phản hồi từ GVHD:</p>
+                                        <p className="text-[#6B635B]">{q.instructorAnswer}</p>
+                                    </div>
                                 )}
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-8 bg-[#FBF9F5] rounded-2xl border border-dashed border-[#E8E2D9] text-xs text-[#6B635B]">
-                        Chưa có câu hỏi nào trong ngân hàng của đề tài này.
-                    </div>
-                )}
+                        ))
+                    ) : (
+                        <p className="text-xs text-[#6B635B] italic py-4">Chưa có câu hỏi nào được gửi.</p>
+                    )}
+                </div>
             </div>
         </div>
     );
-};
-
-export default TopicQuestions;
+}

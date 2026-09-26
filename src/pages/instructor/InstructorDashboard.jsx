@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getSlots, createSlot } from "../../services/scheduleService";
 import { getCurrentUser } from "../../services/authService";
+import Profile from "../../auth/Profile"; // Import component Profile
 
 export default function InstructorDashboard() {
   const [user, setUser] = useState(null);
@@ -108,7 +109,7 @@ export default function InstructorDashboard() {
           <nav className="space-y-1.5 text-xs font-bold text-[#6B635B]">
             <button
               onClick={() => setActiveTab("slots")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeTab === "slots"
                   ? "bg-[#E65100] text-white shadow-md font-extrabold"
                   : "hover:bg-[#F8F6F0]"
@@ -119,7 +120,7 @@ export default function InstructorDashboard() {
             </button>
             <button
               onClick={() => setActiveTab("groups")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeTab === "groups"
                   ? "bg-[#E65100] text-white shadow-md font-extrabold"
                   : "hover:bg-[#F8F6F0]"
@@ -130,7 +131,7 @@ export default function InstructorDashboard() {
             </button>
             <button
               onClick={() => setActiveTab("schedule")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeTab === "schedule"
                   ? "bg-[#E65100] text-white shadow-md font-extrabold"
                   : "hover:bg-[#F8F6F0]"
@@ -141,7 +142,7 @@ export default function InstructorDashboard() {
             </button>
             <button
               onClick={() => setActiveTab("stats")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeTab === "stats"
                   ? "bg-[#E65100] text-white shadow-md font-extrabold"
                   : "hover:bg-[#F8F6F0]"
@@ -149,6 +150,17 @@ export default function InstructorDashboard() {
             >
               <span>📊</span>
               <span>Thống kê & Báo cáo</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                activeTab === "settings"
+                  ? "bg-[#E65100] text-white shadow-md font-extrabold"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>⚙️</span>
+              <span>Cài đặt tài khoản</span>
             </button>
           </nav>
         </div>
@@ -162,8 +174,8 @@ export default function InstructorDashboard() {
               <h4 className="text-xs font-black truncate text-[#2C2825]">
                 {user?.fullName || "Giảng viên"}
               </h4>
-              <p className="text-[10px] text-[#6B635B] truncate">
-                {user?.email}
+              <p className="text-[10px] text-[#E65100] font-bold truncate">
+                {user?.title || "Giảng viên hướng dẫn (Supervisor)"}
               </p>
             </div>
           </div>
@@ -183,10 +195,17 @@ export default function InstructorDashboard() {
             <span className="text-gray-400">Giảng Viên Dashboard</span>
             <span>/</span>
             <span className="text-[#2C2825] font-bold">
-              Quản lý Khung Giờ (SLOTS)
+              {activeTab === "slots" && "Quản lý Khung Giờ (SLOTS)"}
+              {activeTab === "groups" && "Nhóm Hướng Dẫn"}
+              {activeTab === "schedule" && "Lịch hẹn sắp tới"}
+              {activeTab === "stats" && "Thống kê & Báo cáo"}
+              {activeTab === "settings" && "Cài đặt tài khoản"}
             </span>
           </div>
-          <span>Xin chào, <strong className="text-[#E65100]">{user?.fullName}</strong></span>
+          <span>
+            Xin chào,{" "}
+            <strong className="text-[#E65100]">{user?.fullName}</strong>
+          </span>
         </header>
 
         <div className="p-8 max-w-6xl mx-auto w-full space-y-8">
@@ -198,7 +217,8 @@ export default function InstructorDashboard() {
                     Tạo & Quản lý lịch rảnh (Schedule Slots)
                   </h1>
                   <p className="text-xs text-[#6B635B]">
-                    Thiết lập các khung giờ rảnh (mỗi slot phục vụ độc lập 1 nhóm) để sinh viên đặt lịch.
+                    Thiết lập các khung giờ rảnh (mỗi slot phục vụ độc lập 1
+                    nhóm) để sinh viên đặt lịch.
                   </p>
                 </div>
               </div>
@@ -293,8 +313,7 @@ export default function InstructorDashboard() {
                             {new Date(s.endTime).toLocaleTimeString()}
                           </p>
                           <p className="text-[11px] text-[#6B635B]">
-                            Sức chứa: 1 nhóm • Link:{" "}
-                            {s.meetingUrl || "Online"}
+                            Sức chứa: 1 nhóm • Link: {s.meetingUrl || "Online"}
                           </p>
                         </div>
                         <span
@@ -317,6 +336,41 @@ export default function InstructorDashboard() {
               </div>
             </div>
           )}
+
+          {activeTab === "groups" && (
+            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm">
+              <h2 className="text-sm font-black text-[#2C2825]">
+                Danh sách nhóm hướng dẫn
+              </h2>
+              <p className="text-xs text-[#6B635B] mt-1">
+                Tính năng quản lý các nhóm đồ án đang được cập nhật.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "schedule" && (
+            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm">
+              <h2 className="text-sm font-black text-[#2C2825]">
+                Lịch hẹn sắp tới
+              </h2>
+              <p className="text-xs text-[#6B635B] mt-1">
+                Danh sách các buổi họp đã được sinh viên đặt lịch.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "stats" && (
+            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm">
+              <h2 className="text-sm font-black text-[#2C2825]">
+                Thống kê & Báo cáo
+              </h2>
+              <p className="text-xs text-[#6B635B] mt-1">
+                Thống kê số lượng slot và các buổi họp hoàn thành.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "settings" && <Profile />}
         </div>
       </main>
     </div>
