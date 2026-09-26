@@ -32,6 +32,14 @@ export default function AdminDashboard() {
     role: "STUDENT",
   });
 
+  // State cho phần Profile của Admin
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [adminProfileForm, setAdminProfileForm] = useState({
+    fullName: "",
+    avatarUrl: "",
+    status: "ACTIVE",
+  });
+
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
   const [topicForm, setTopicForm] = useState({
     topicCode: "",
@@ -49,6 +57,13 @@ export default function AdminDashboard() {
       try {
         const currentUser = await getCurrentUser();
         setUser(currentUser);
+        if (currentUser) {
+          setAdminProfileForm({
+            fullName: currentUser.fullName || "",
+            avatarUrl: currentUser.avatarUrl || "",
+            status: currentUser.status || "ACTIVE",
+          });
+        }
 
         const groupsRes = await getAllGroups().catch(() => []);
         setGroups(groupsRes?.content || groupsRes || []);
@@ -107,6 +122,23 @@ export default function AdminDashboard() {
     }
   };
 
+  // Hàm cập nhật Profile cá nhân của Admin
+  const handleUpdateAdminProfile = async (e) => {
+    e.preventDefault();
+    if (!user?.id) return;
+    setSubmitting(true);
+    try {
+      await updateUser(user.id, adminProfileForm);
+      setUser({ ...user, ...adminProfileForm });
+      alert("Cập nhật hồ sơ cá nhân thành công!");
+      setIsEditingProfile(false);
+    } catch (error) {
+      alert(error.response?.data?.message || "Cập nhật hồ sơ thất bại!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleCreateTopic = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -132,12 +164,25 @@ export default function AdminDashboard() {
 
   const handleApproveTopic = async (topic) => {
     try {
-      await updateTopic(topic.id, { ...topic, status: "PUBLISHED" });
-      alert(`Đã duyệt đề tài ${topic.topicCode} thành công!`);
+      const payload = {
+        topicCode: topic.topicCode || "",
+        title: topic.title || "",
+        description: topic.description || "",
+        category: topic.category || "General",
+        status: "PUBLISHED",
+      };
+
+      await updateTopic(topic.id, payload);
+      alert(`Đã duyệt đề tài ${topic.topicCode || topic.title} thành công!`);
+
       const topicsRes = await getTopics();
       setTopics(topicsRes?.content || topicsRes || []);
     } catch (error) {
-      alert("Duyệt đề tài thất bại!");
+      console.error("Lỗi duyệt đề tài:", error);
+      alert(
+        error.response?.data?.message ||
+          "Duyệt đề tài thất bại! Vui lòng kiểm tra lại API.",
+      );
     }
   };
 
@@ -151,7 +196,7 @@ export default function AdminDashboard() {
       (g.groupCode &&
         g.groupCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (g.topicTitle &&
-        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   const filteredUsers = users.filter((u) => {
@@ -208,6 +253,14 @@ export default function AdminDashboard() {
       default:
         return "bg-gray-100 text-gray-600 border border-gray-200";
     }
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "AD";
+    const words = name.trim().split(" ");
+    return words.length > 1
+      ? words[words.length - 2][0] + words[words.length - 1][0]
+      : words[0].slice(0, 2).toUpperCase();
   };
 
   return (
@@ -297,14 +350,41 @@ export default function AdminDashboard() {
               <span>📚</span>
               <span>Đề tài & Câu hỏi ({topics.length})</span>
             </button>
+
+            <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
+              Cá nhân
+            </p>
+            <button
+              onClick={() => {
+                setActiveMenu("profile");
+                setSelectedTopicForQuestions(null);
+                setSearchQuery("");
+              }}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${
+                activeMenu === "profile"
+                  ? "bg-[#E65100] text-white shadow-md"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>⚙️</span>
+              <span>Hồ sơ Admin</span>
+            </button>
           </div>
         </div>
 
         <div className="pt-6 border-t border-[#E8E2D9] space-y-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs">
-              AD
-            </div>
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt="Avatar"
+                className="w-10 h-10 rounded-xl object-cover shadow-sm"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs">
+                {getInitials(user?.fullName)}
+              </div>
+            )}
             <div className="overflow-hidden">
               <h4 className="text-xs font-black truncate">
                 {user?.fullName || "System Admin"}
@@ -316,7 +396,7 @@ export default function AdminDashboard() {
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center space-x-2 text-xs font-bold text-red-500 hover:underline"
+            className="w-full flex items-center space-x-2 text-xs font-bold text-red-500 hover:underline cursor-pointer"
           >
             <span>🚪</span>
             <span>Đăng xuất</span>
@@ -345,8 +425,8 @@ export default function AdminDashboard() {
                   Bảng điều khiển quản trị đồ án
                 </h1>
                 <p className="text-xs text-[#6B635B]">
-                  Theo dõi số lượng nhóm sinh viên, tài khoản và kiểm duyệt thông
-                  tin thời gian thực.
+                  Theo dõi số lượng nhóm sinh viên, tài khoản và kiểm duyệt
+                  thông tin thời gian thực.
                 </p>
               </div>
 
@@ -478,7 +558,7 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   onClick={handleOpenCreateUser}
-                  className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm transition shrink-0"
+                  className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm transition shrink-0 cursor-pointer"
                 >
                   + Thêm tài khoản mới
                 </button>
@@ -500,7 +580,7 @@ export default function AdminDashboard() {
                     <button
                       key={roleObj.value}
                       onClick={() => setSelectedRole(roleObj.value)}
-                      className={`px-3.5 py-2 text-xs font-bold transition ${
+                      className={`px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
                         selectedRole === roleObj.value
                           ? "bg-[#E65100] text-white shadow-xs"
                           : "bg-[#FBF9F5] text-[#6B635B] border border-[#E8E2D9] hover:bg-gray-100"
@@ -552,7 +632,7 @@ export default function AdminDashboard() {
                           <td className="p-4">
                             <span
                               className={`px-3 py-1 font-extrabold text-[10px] uppercase tracking-wider inline-block ${getRoleBadgeStyle(
-                                u.role
+                                u.role,
                               )}`}
                             >
                               {u.role || "STUDENT"}
@@ -561,7 +641,7 @@ export default function AdminDashboard() {
                           <td className="p-4 text-right">
                             <button
                               onClick={() => handleOpenEditUser(u)}
-                              className="px-3.5 py-1.5 bg-white border border-[#E8E2D9] hover:bg-[#FBF9F5] text-[#2C2825] font-bold text-xs transition"
+                              className="px-3.5 py-1.5 bg-white border border-[#E8E2D9] hover:bg-[#FBF9F5] text-[#2C2825] font-bold text-xs transition cursor-pointer"
                             >
                               ✏️ Sửa
                             </button>
@@ -591,7 +671,7 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   <button
                     onClick={() => setSelectedTopicForQuestions(null)}
-                    className="px-4 py-2.5 bg-white border border-[#E8E2D9] text-[#2C2825] font-bold text-xs hover:bg-[#FBF9F5] transition"
+                    className="px-4 py-2.5 bg-white border border-[#E8E2D9] text-[#2C2825] font-bold text-xs hover:bg-[#FBF9F5] transition cursor-pointer"
                   >
                     ← Quay lại danh sách đề tài
                   </button>
@@ -617,7 +697,7 @@ export default function AdminDashboard() {
                     </div>
                     <button
                       onClick={() => setIsTopicModalOpen(true)}
-                      className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm transition shrink-0"
+                      className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm transition shrink-0 cursor-pointer"
                     >
                       + Thêm đề tài mới
                     </button>
@@ -637,7 +717,7 @@ export default function AdminDashboard() {
                         <button
                           key={statusObj.value}
                           onClick={() => setSelectedStatus(statusObj.value)}
-                          className={`px-4 py-2 text-xs font-bold transition ${
+                          className={`px-4 py-2 text-xs font-bold transition cursor-pointer ${
                             selectedStatus === statusObj.value
                               ? "bg-[#E65100] text-white shadow-xs"
                               : "bg-[#FBF9F5] text-[#6B635B] border border-[#E8E2D9] hover:bg-gray-100"
@@ -663,7 +743,9 @@ export default function AdminDashboard() {
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                          <th className="p-4 font-black uppercase">Mã đề tài</th>
+                          <th className="p-4 font-black uppercase">
+                            Mã đề tài
+                          </th>
                           <th className="p-4 font-black uppercase">
                             Tên đề tài & Thể loại
                           </th>
@@ -698,7 +780,7 @@ export default function AdminDashboard() {
                               <td className="p-4">
                                 <span
                                   className={`px-3 py-1 font-extrabold text-[10px] uppercase tracking-wider inline-block ${getTopicStatusBadge(
-                                    t.status
+                                    t.status,
                                   )}`}
                                 >
                                   {t.status || "DRAFT"}
@@ -709,14 +791,14 @@ export default function AdminDashboard() {
                                   onClick={() =>
                                     setSelectedTopicForQuestions(t)
                                   }
-                                  className="px-3.5 py-1.5 bg-[#2C2825] hover:bg-black text-white font-bold text-xs transition inline-flex items-center space-x-1"
+                                  className="px-3.5 py-1.5 bg-[#2C2825] hover:bg-black text-white font-bold text-xs transition inline-flex items-center space-x-1 cursor-pointer"
                                 >
                                   <span>❓ Câu hỏi</span>
                                 </button>
                                 {t.status !== "PUBLISHED" && (
                                   <button
                                     onClick={() => handleApproveTopic(t)}
-                                    className="px-3.5 py-1.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold text-xs transition inline-flex items-center space-x-1"
+                                    className="px-3.5 py-1.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold text-xs transition inline-flex items-center space-x-1 cursor-pointer"
                                   >
                                     <span>✓ Duyệt</span>
                                   </button>
@@ -741,6 +823,149 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
+
+          {/* --- ADMIN PROFILE --- */}
+          {activeMenu === "profile" && (
+            <div className="p-8 space-y-6 max-w-4xl mx-auto w-full">
+              <div className="bg-white p-6 border border-[#E8E2D9] space-y-2">
+                <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold">
+                  Hồ sơ cá nhân Admin · Account Settings
+                </span>
+                <h1 className="text-2xl font-black text-[#2C2825]">
+                  Thông tin tài khoản quản trị
+                </h1>
+                <p className="text-xs text-[#6B635B]">
+                  Quản lý thông tin định danh và hình ảnh đại diện của tài khoản
+                  Admin.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 border border-[#E8E2D9] space-y-4 text-center flex flex-col items-center">
+                  {adminProfileForm.avatarUrl ? (
+                    <img
+                      src={adminProfileForm.avatarUrl}
+                      alt="Avatar"
+                      className="w-24 h-24 rounded-2xl object-cover shadow-md border-2 border-orange-100"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 bg-orange-100 text-[#E65100] font-black rounded-2xl flex items-center justify-center text-2xl shadow-md">
+                      {getInitials(user?.fullName)}
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <h3 className="font-black text-base text-[#2C2825]">
+                      {user?.fullName}
+                    </h3>
+                    <p className="text-xs text-[#6B635B]">{user?.email}</p>
+                  </div>
+
+                  <span className="px-3 py-1 bg-red-50 text-red-600 border border-red-200 text-xs font-black uppercase tracking-wider block">
+                    {user?.role || "ADMIN"}
+                  </span>
+                </div>
+
+                <div className="md:col-span-2 bg-white p-6 md:p-8 border border-[#E8E2D9] space-y-6">
+                  <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+                    <h3 className="text-xs font-black uppercase text-[#6B635B]">
+                      Chi tiết tài khoản
+                    </h3>
+                    <button
+                      onClick={() => setIsEditingProfile(!isEditingProfile)}
+                      className="px-3.5 py-1.5 bg-[#FBF9F5] border border-[#E8E2D9] text-xs font-bold rounded-xl hover:bg-gray-100 transition cursor-pointer"
+                    >
+                      {isEditingProfile ? "Hủy" : "✏️ Chỉnh sửa"}
+                    </button>
+                  </div>
+
+                  {!isEditingProfile ? (
+                    <div className="space-y-4 text-xs">
+                      <div className="grid grid-cols-3 py-2 border-b border-[#E8E2D9]">
+                        <span className="font-bold text-[#6B635B]">
+                          Họ và tên:
+                        </span>
+                        <span className="col-span-2 font-extrabold text-[#2C2825]">
+                          {user?.fullName}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 py-2 border-b border-[#E8E2D9]">
+                        <span className="font-bold text-[#6B635B]">Email:</span>
+                        <span className="col-span-2 font-extrabold text-[#2C2825]">
+                          {user?.email}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 py-2 border-b border-[#E8E2D9]">
+                        <span className="font-bold text-[#6B635B]">
+                          Trạng thái:
+                        </span>
+                        <span className="col-span-2 font-extrabold text-emerald-600">
+                          {user?.status || "ACTIVE"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 py-2">
+                        <span className="font-bold text-[#6B635B]">
+                          Vai trò:
+                        </span>
+                        <span className="col-span-2 font-extrabold text-[#E65100]">
+                          {user?.role}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={handleUpdateAdminProfile}
+                      className="space-y-4 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <label className="font-bold text-[#2C2825]">
+                          Họ và tên
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={adminProfileForm.fullName}
+                          onChange={(e) =>
+                            setAdminProfileForm({
+                              ...adminProfileForm,
+                              fullName: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 bg-[#FBF9F5] border border-[#E8E2D9] outline-none focus:border-[#E65100]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-bold text-[#2C2825]">
+                          Ảnh đại diện (Avatar URL)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://..."
+                          value={adminProfileForm.avatarUrl}
+                          onChange={(e) =>
+                            setAdminProfileForm({
+                              ...adminProfileForm,
+                              avatarUrl: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-3 bg-[#FBF9F5] border border-[#E8E2D9] outline-none focus:border-[#E65100]"
+                        />
+                      </div>
+                      <div className="pt-2 flex gap-3">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          {submitting ? "Đang lưu..." : "Lưu thay đổi"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -756,7 +981,7 @@ export default function AdminDashboard() {
               </h3>
               <button
                 onClick={() => setIsUserModalOpen(false)}
-                className="text-gray-400 hover:text-black font-bold"
+                className="text-gray-400 hover:text-black font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -825,7 +1050,9 @@ export default function AdminDashboard() {
                     GROUP_LEADER (Trưởng nhóm)
                   </option>
                   <option value="INSTRUCTOR">INSTRUCTOR (Giảng viên)</option>
-                  <option value="REVIEWER">REVIEWER (Giảng viên phản biện)</option>
+                  <option value="REVIEWER">
+                    REVIEWER (Giảng viên phản biện)
+                  </option>
                   <option value="ADMIN">ADMIN (Quản trị viên)</option>
                 </select>
               </div>
@@ -833,14 +1060,14 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsUserModalOpen(false)}
-                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-xs font-bold"
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-xs font-bold cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm"
+                  className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm cursor-pointer"
                 >
                   {submitting ? "Đang xử lý..." : "Xác nhận lưu"}
                 </button>
@@ -860,7 +1087,7 @@ export default function AdminDashboard() {
               </h3>
               <button
                 onClick={() => setIsTopicModalOpen(false)}
-                className="text-gray-400 hover:text-black font-bold"
+                className="text-gray-400 hover:text-black font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -931,14 +1158,14 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsTopicModalOpen(false)}
-                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-xs font-bold"
+                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-xs font-bold cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm"
+                  className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold shadow-sm cursor-pointer"
                 >
                   {submitting ? "Đang xử lý..." : "Xác nhận tạo"}
                 </button>
