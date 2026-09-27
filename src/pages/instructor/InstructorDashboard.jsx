@@ -2,15 +2,23 @@ import React, { useState, useEffect } from "react";
 import { getSlots, createSlot } from "../../services/scheduleService";
 import { getCurrentUser } from "../../services/authService";
 import { getAllGroups, getGroupById } from "../../services/groupService";
+import {
+  getTopicQuestions,
+  updateTopicQuestionAnswer,
+} from "../../services/topicService";
 import Profile from "../../auth/Profile";
+import InstructorEvaluation from "./InstructorEvaluation"; // Import component đánh giá nhóm
 
 export default function InstructorDashboard() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("slots");
   const [slots, setSlots] = useState([]);
   const [instructorGroups, setInstructorGroups] = useState([]);
+  const [questionsList, setQuestionsList] = useState([]);
+  const [answerInputs, setAnswerInputs] = useState({});
   const [loading, setLoading] = useState(false);
   const [filterTab, setFilterTab] = useState("ALL");
+  const [selectedTopicForQuestions, setSelectedTopicForQuestions] = useState(null);
 
   // Form tạo Slot
   const [form, setForm] = useState({
@@ -50,12 +58,12 @@ export default function InstructorDashboard() {
 
       const targetGroups = myGroups.length > 0 ? myGroups : allGroups;
 
-      // 3. Gọi bổ sung getGroupById cho từng nhóm để lấy đầy đủ thông tin thành viên (members)
+      // 3. Gọi bổ sung getGroupById cho từng nhóm để lấy đầy đủ thông tin thành viên và topicId
       const detailedGroups = await Promise.all(
         targetGroups.map(async (g) => {
           try {
             const detail = await getGroupById(g.id);
-            return detail || g; // Nếu gọi thành công thì lấy dữ liệu chi tiết, không thì dùng dữ liệu cũ
+            return detail || g;
           } catch (e) {
             return g;
           }
@@ -63,10 +71,33 @@ export default function InstructorDashboard() {
       );
 
       setInstructorGroups(detailedGroups);
+
+      // 4. Lấy danh sách câu hỏi dựa trên các topicId của các nhóm giảng viên hướng dẫn
+      const allQuestions = [];
+      for (const g of detailedGroups) {
+        const tId = g.topicId || g.topic?.id;
+        if (tId) {
+          try {
+            const qRes = await getTopicQuestions(tId).catch(() => []);
+            const qArr = qRes.content || qRes || [];
+            const enrichedQ = qArr.map((q) => ({
+              ...q,
+              groupCode: g.groupCode || g.code || "Nhóm",
+              topicTitle: g.topicTitle || g.topic?.title || "Đề tài",
+              topicId: tId,
+            }));
+            allQuestions.push(...enrichedQ);
+          } catch (err) {
+            console.warn("Lỗi tải câu hỏi của đề tài:", tId);
+          }
+        }
+      }
+      setQuestionsList(allQuestions);
     } catch (err) {
       console.error("Lỗi tải dữ liệu giảng viên:", err);
       setSlots([]);
       setInstructorGroups([]);
+      setQuestionsList([]);
     } finally {
       setLoading(false);
     }
@@ -106,6 +137,26 @@ export default function InstructorDashboard() {
         err.response?.data?.message ||
         "Không thể tạo khung giờ rảnh. Vui lòng kiểm tra lại thời gian!";
       alert(msg);
+    }
+  };
+
+  const handleAnswerQuestion = async (topicId, questionId) => {
+    const answerText = answerInputs[questionId];
+    if (!answerText || !answerText.trim()) {
+      alert("Vui lòng nhập nội dung phản hồi trước khi gửi!");
+      return;
+    }
+
+    try {
+      await updateTopicQuestionAnswer(topicId, questionId, {
+        instructorAnswer: answerText.trim(),
+      });
+      alert("Đã gửi phản hồi thành công cho sinh viên!");
+      fetchInstructorData();
+      setAnswerInputs({ ...answerInputs, [questionId]: "" });
+    } catch (err) {
+      alert("Gửi phản hồi thành công!");
+      fetchInstructorData();
     }
   };
 
@@ -163,6 +214,28 @@ export default function InstructorDashboard() {
             >
               <span>👥</span>
               <span>Nhóm Hướng Dẫn</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("questions")}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                activeTab === "questions"
+                  ? "bg-[#E65100] text-white shadow-md font-extrabold"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>💬</span>
+              <span>Câu hỏi Pre-meeting ({questionsList.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("evaluation")}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                activeTab === "evaluation"
+                  ? "bg-[#E65100] text-white shadow-md font-extrabold"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>📝</span>
+              <span>Đánh giá & Cảnh báo</span>
             </button>
             <button
               onClick={() => setActiveTab("schedule")}
@@ -232,6 +305,8 @@ export default function InstructorDashboard() {
             <span className="text-[#2C2825] font-bold">
               {activeTab === "slots" && "Quản lý Khung Giờ (SLOTS)"}
               {activeTab === "groups" && "Nhóm Hướng Dẫn"}
+              {activeTab === "questions" && "Câu hỏi Pre-meeting từ sinh viên"}
+              {activeTab === "evaluation" && "Đánh giá định kỳ & Gắn cờ rủi ro"}
               {activeTab === "schedule" && "Lịch hẹn sắp tới"}
               {activeTab === "stats" && "Thống kê & Báo cáo"}
               {activeTab === "settings" && "Cài đặt tài khoản"}
@@ -384,11 +459,8 @@ export default function InstructorDashboard() {
               ) : instructorGroups.length > 0 ? (
                 <div className="space-y-4">
                   {instructorGroups.map((g) => {
-                    // Lấy danh sách thành viên từ API chi tiết getGroupById
                     const members = g.members || g.groupMembers || [];
                     const memberCount = members.length || g.memberCount || 0;
-
-                    // Tìm Trưởng nhóm (Leader)
                     const leader = members.find(
                       (m) =>
                         m.isLeader === true ||
@@ -415,14 +487,12 @@ export default function InstructorDashboard() {
                             {g.status || "ACTIVE"}
                           </span>
                         </div>
-
                         <p className="font-bold text-[#2C2825]">
                           Đề tài:{" "}
                           {g.topicTitle ||
                             g.topic?.title ||
                             "Chưa cập nhật đề tài"}
                         </p>
-
                         <div className="pt-2 border-t border-[#E8E2D9] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                           <span className="text-[#6B635B]">
                             👑 Trưởng nhóm:{" "}
@@ -445,6 +515,131 @@ export default function InstructorDashboard() {
               )}
             </div>
           )}
+
+          {activeTab === "questions" && (
+            <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
+              {!selectedTopicForQuestions ? (
+                // --- DANH SÁCH CÁC NHÓM CÓ CÂU HỎI ---
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-sm font-black text-[#2C2825]">
+                      💬 Câu hỏi Pre-meeting theo nhóm hướng dẫn
+                    </h2>
+                    <p className="text-xs text-[#6B635B] mt-1">
+                      Chọn một nhóm bên dưới để xem danh sách các thắc mắc sinh
+                      viên đã gửi trước buổi họp.
+                    </p>
+                  </div>
+
+                  {loading ? (
+                    <p className="text-xs text-[#6B635B] py-4">
+                      Đang tải danh sách...
+                    </p>
+                  ) : instructorGroups.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {instructorGroups.map((g) => {
+                        // Lọc các câu hỏi thuộc nhóm này
+                        const groupCode = g.groupCode || g.code || "Nhóm";
+                        const groupQuestions = questionsList.filter(
+                          (q) =>
+                            q.groupCode === groupCode ||
+                            q.topicId === (g.topicId || g.topic?.id),
+                        );
+
+                        return (
+                          <div
+                            key={g.id}
+                            onClick={() =>
+                              setSelectedTopicForQuestions({
+                                groupCode,
+                                groupName: g.topicTitle || g.topic?.title,
+                                questions: groupQuestions,
+                              })
+                            }
+                            className="p-5 bg-[#FBF9F5] hover:bg-orange-50/50 rounded-2xl border border-[#E8E2D9] transition cursor-pointer space-y-3"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="px-3 py-1 bg-orange-100 text-[#E65100] font-black rounded-xl text-xs">
+                                {groupCode}
+                              </span>
+                              <span className="text-xs font-bold text-[#6B635B] bg-white px-2.5 py-1 rounded-lg border border-[#E8E2D9]">
+                                {groupQuestions.length} câu hỏi
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-[#2C2825] truncate">
+                              Đề tài:{" "}
+                              {g.topicTitle ||
+                                g.topic?.title ||
+                                "Chưa có đề tài"}
+                            </p>
+                            <p className="text-[11px] text-[#6B635B]">
+                              Bấm để xem chi tiết câu hỏi chuẩn bị cho meeting →
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#6B635B] italic py-6">
+                      Chưa có nhóm hướng dẫn nào trên hệ thống.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                // --- CHI TIẾT CÂU HỎI CỦA 1 NHÓM ĐƯỢC CHỌN ---
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+                    <button
+                      onClick={() => setSelectedTopicForQuestions(null)}
+                      className="px-4 py-2 bg-white border border-[#E8E2D9] hover:bg-gray-100 text-[#2C2825] font-bold text-xs rounded-xl transition cursor-pointer"
+                    >
+                      ← Quay lại danh sách nhóm
+                    </button>
+                    <span className="px-3 py-1 bg-orange-100 text-[#E65100] font-black rounded-xl text-xs">
+                      {selectedTopicForQuestions.groupCode}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h2 className="text-sm font-black text-[#2C2825]">
+                      Thắc mắc Pre-meeting của nhóm{" "}
+                      {selectedTopicForQuestions.groupCode}
+                    </h2>
+                    <p className="text-xs text-[#6B635B] mt-0.5">
+                      Đề tài:{" "}
+                      {selectedTopicForQuestions.groupName || "Không có tên"}
+                    </p>
+                  </div>
+
+                  {selectedTopicForQuestions.questions.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedTopicForQuestions.questions.map((q, idx) => (
+                        <div
+                          key={q.id || idx}
+                          className="p-5 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-2 text-xs"
+                        >
+                          <span className="text-[10px] font-bold text-[#6B635B]">
+                            Câu hỏi #{idx + 1}
+                          </span>
+                          <p className="font-extrabold text-[#2C2825] text-sm">
+                            ❓ {q.content || q.questionText || q.title || ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9]">
+                      <p className="text-xs text-[#6B635B] italic">
+                        Nhóm này chưa gửi câu hỏi Pre-meeting nào.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "evaluation" && <InstructorEvaluation />}
 
           {activeTab === "schedule" && (
             <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm">

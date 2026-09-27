@@ -64,7 +64,7 @@ export const cancelBooking = async (bookingId, reason = "") => {
  */
 export const getGroupBookings = async (groupId) => {
   const response = await api.get("/slots", {
-    params: { groupId, status: "CONFIRMED" }
+    params: { groupId }
   }).catch(() => ({ data: [] }));
   
   return response.data;

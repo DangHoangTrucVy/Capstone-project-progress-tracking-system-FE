@@ -1,112 +1,122 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { getGroupDocuments, submitDocumentLink } from "../../services/documentService";
 
-export default function DocumentGroup() {
-    const [documents, setDocuments] = useState([
-        { id: 1, name: "Phiếu đề xuất đề tài.pdf", stage: "Giai đoạn 1 • Đề xuất đề tài", uploader: "Minh Trí", status: "Đã duyệt", date: "13/08/2026" },
-        { id: 2, name: "Đề cương đồ án.pdf", stage: "Giai đoạn 2 • Bảo vệ đề cương", uploader: "Bảo Châu", status: "Đã duyệt", date: "20/08/2026" },
-        { id: 3, name: "Báo cáo tiến độ tuần 4.docx", stage: "Giai đoạn 3 • Kiểm tra tiến độ lần 1", uploader: "Thu Hiền", status: "Chờ duyệt", date: "12/09/2026" }
-    ]);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [uploading, setUploading] = useState(false);
+export default function DocumentGroup({ groupId = "default-group-id" }) {
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [docForm, setDocForm] = useState({
+    title: "",
+    url: "",
+    milestoneId: "",
+  });
 
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            // Kiểm tra giới hạn 25MB
-            if (file.size > 25 * 1024 * 1024) {
-                alert("Kích thước tệp vượt quá giới hạn cho phép (tối đa 25MB).");
-                return;
-            }
-            setSelectedFile(file);
-        }
-    };
+  const fetchDocuments = async () => {
+    try {
+      const res = await getGroupDocuments(groupId);
+      setDocuments(res.content || res || []);
+    } catch (err) {
+      console.error("Lỗi tải danh sách tài liệu:", err);
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleUploadSubmit = (e) => {
-        e.preventDefault();
-        if (!selectedFile) {
-            alert("Vui lòng chọn một tệp tài liệu trước khi nộp!");
-            return;
-        }
+  useEffect(() => {
+    if (groupId) fetchDocuments();
+  }, [groupId]);
 
-        setUploading(true);
-        setTimeout(() => {
-            const newDoc = {
-                id: Date.now(),
-                name: selectedFile.name,
-                stage: "Giai đoạn 3 • Báo cáo tiến độ",
-                uploader: "Đặng Hoàng Trúc Vy", // Lấy từ user hiện tại nếu có
-                status: "Chờ duyệt",
-                date: new Date().toLocaleDateString("vi-VN")
-            };
-            setDocuments([newDoc, ...documents]);
-            setSelectedFile(null);
-            setUploading(false);
-            alert("Đã tải lên tệp tài liệu thành công!");
-        }, 800);
-    };
+  const handleSubmitDoc = async (e) => {
+    e.preventDefault();
+    try {
+      await submitDocumentLink(groupId, docForm);
+      alert("Nộp tài liệu/link thành công!");
+      setDocForm({ title: "", url: "", milestoneId: "" });
+      fetchDocuments();
+    } catch (err) {
+      alert(err.response?.data?.message || "Không thể nộp tài liệu.");
+    }
+  };
 
-    return (
-        <div className="space-y-6 animate-fadeIn text-[#2C2825]">
-            <h2 className="text-lg font-black">Tài liệu & Báo cáo đồ án</h2>
-            
-            <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] space-y-6 shadow-sm">
-                
-                {/* Khu vực nộp file */}
-                <form onSubmit={handleUploadSubmit} className="border-2 border-dashed border-[#E8E2D9] p-8 text-center rounded-2xl space-y-3 bg-[#FBF9F5]">
-                    <div className="w-10 h-10 bg-orange-100 text-[#E65100] mx-auto rounded-xl flex items-center justify-center font-black">📂</div>
-                    <div>
-                        <p className="text-xs font-bold text-[#6B635B]">Kéo thả tệp vào đây, hoặc chọn tệp từ máy tính</p>
-                        <p className="text-[10px] text-[#9E958C] mt-0.5">Định dạng hỗ trợ: PDF, DOCX, ZIP (Tối đa 25MB)</p>
-                    </div>
+  return (
+    <div className="space-y-6 p-8 max-w-5xl mx-auto font-sans animate-fadeIn text-[#2C2825]">
+      <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-2">
+        <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-md">
+          Documents / Artifacts · Nộp tài liệu
+        </span>
+        <h1 className="text-xl font-black">Quản lý Tài liệu & Báo cáo Đồ án</h1>
+        <p className="text-xs text-[#6B635B]">
+          Nộp các liên kết mã nguồn GitHub, bản vẽ thiết kế hệ thống hoặc tài liệu báo cáo qua các cột mốc.
+        </p>
+      </div>
 
-                    <input 
-                        type="file" 
-                        id="fileUpload" 
-                        className="hidden" 
-                        accept=".pdf,.docx,.doc,.zip,.rar"
-                        onChange={handleFileChange} 
-                    />
-
-                    <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
-                        <label htmlFor="fileUpload" className="px-5 py-2.5 bg-white border border-[#E8E2D9] text-[#2C2825] text-xs font-bold rounded-xl cursor-pointer shadow-2xs hover:bg-gray-50 transition">
-                            {selectedFile ? `📁 ${selectedFile.name}` : "Chọn tệp từ máy tính"}
-                        </label>
-
-                        {selectedFile && (
-                            <button 
-                                type="submit" 
-                                disabled={uploading}
-                                className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer disabled:opacity-50"
-                            >
-                                {uploading ? "Đang tải lên..." : "Xác nhận nộp file"}
-                            </button>
-                        )}
-                    </div>
-                </form>
-
-                {/* Danh sách tài liệu */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-[#6B635B]">Danh sách tài liệu đã nộp ({documents.length})</h3>
-                    {documents.length > 0 ? (
-                        documents.map((doc) => (
-                            <div key={doc.id} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs">
-                                <div className="space-y-1">
-                                    <h4 className="font-bold text-[#2C2825]">📄 {doc.name}</h4>
-                                    <p className="text-[10px] text-[#6B635B]">{doc.stage} • Nộp bởi {doc.uploader} ({doc.date})</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className={`px-3 py-1 text-[10px] font-bold rounded-full ${doc.status === "Đã duyệt" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
-                                        {doc.status}
-                                    </span>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-xs text-center text-[#6B635B] py-6 italic">Chưa có tài liệu nào được nộp.</p>
-                    )}
-                </div>
-
-            </div>
+      {/* Form nộp tài liệu */}
+      <form onSubmit={handleSubmitDoc} className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
+        <h3 className="text-xs font-black uppercase text-[#6B635B]">Nộp liên kết tài liệu mới</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-[#6B635B]">Tiêu đề tài liệu *</label>
+            <input
+              type="text"
+              required
+              value={docForm.title}
+              onChange={(e) => setDocForm({ ...docForm, title: e.target.value })}
+              placeholder="Ví dụ: Báo cáo Sprint 1 / Link GitHub Repository"
+              className="w-full px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-[#6B635B]">Đường dẫn (URL) *</label>
+            <input
+              type="url"
+              required
+              value={docForm.url}
+              onChange={(e) => setDocForm({ ...docForm, url: e.target.value })}
+              placeholder="https://github.com/username/repository"
+              className="w-full px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
+            />
+          </div>
         </div>
-    );
+
+        <button
+          type="submit"
+          className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md"
+        >
+          + Nộp tài liệu
+        </button>
+      </form>
+
+      {/* Danh sách tài liệu đã nộp */}
+      <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
+        <h3 className="text-xs font-black uppercase text-[#6B635B]">Danh sách tài liệu đã nộp ({documents.length})</h3>
+        <div className="divide-y divide-[#E8E2D9]">
+          {loading ? (
+            <p className="text-xs text-[#6B635B] py-4">Đang tải tài liệu...</p>
+          ) : documents.length > 0 ? (
+            documents.map((item) => (
+              <div key={item.id} className="py-4 flex justify-between items-center text-xs">
+                <div className="space-y-1">
+                  <p className="font-black text-[#2C2825] text-sm">📄 {item.title}</p>
+                  <a 
+                    href={item.url} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-[#E65100] hover:underline font-bold truncate block max-w-md"
+                  >
+                    {item.url}
+                  </a>
+                </div>
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold">
+                  {item.status || "Đã nộp"}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-[#6B635B] italic py-4">Chưa có tài liệu nào được nộp.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

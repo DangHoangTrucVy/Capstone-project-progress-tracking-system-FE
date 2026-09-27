@@ -129,7 +129,7 @@ export default function ScheduleGroup({ groupId, topicId }) {
       await addTopicQuestion(topicId, payload);
       alert("Đã gửi câu hỏi thành công cho GVHD!");
       setNewQuestion("");
-      
+
       const resQuestions = await getTopicQuestions(topicId);
       setQuestions(resQuestions.content || resQuestions || []);
     } catch (err) {
@@ -148,8 +148,18 @@ export default function ScheduleGroup({ groupId, topicId }) {
   const month = currentDate.getMonth();
 
   const monthNames = [
-    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
-    "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
+    "Tháng 1",
+    "Tháng 2",
+    "Tháng 3",
+    "Tháng 4",
+    "Tháng 5",
+    "Tháng 6",
+    "Tháng 7",
+    "Tháng 8",
+    "Tháng 9",
+    "Tháng 10",
+    "Tháng 11",
+    "Tháng 12",
   ];
 
   const firstDayIndex = new Date(year, month, 1).getDay();
@@ -208,7 +218,8 @@ export default function ScheduleGroup({ groupId, topicId }) {
             </span>
           </div>
           <p className="text-xs text-[#6B635B]">
-            Quản lý lịch hẹn, đặt slot trống và chuẩn bị câu hỏi trước buổi gặp giảng viên hướng dẫn.
+            Quản lý lịch hẹn, đặt slot trống và chuẩn bị câu hỏi trước buổi gặp
+            giảng viên hướng dẫn.
           </p>
         </div>
 
@@ -284,10 +295,10 @@ export default function ScheduleGroup({ groupId, topicId }) {
                       isSelected
                         ? "bg-[#E65100] text-white shadow-md"
                         : isToday
-                        ? "border-2 border-[#E65100] text-[#E65100] bg-orange-50/50"
-                        : cell.isCurrentMonth
-                        ? "text-[#2C2825] hover:bg-gray-100"
-                        : "text-gray-300"
+                          ? "border-2 border-[#E65100] text-[#E65100] bg-orange-50/50"
+                          : cell.isCurrentMonth
+                            ? "text-[#2C2825] hover:bg-gray-100"
+                            : "text-gray-300"
                     }`}
                   >
                     {cell.day}
@@ -405,7 +416,13 @@ export default function ScheduleGroup({ groupId, topicId }) {
                       key={q.id}
                       className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-2 text-xs"
                     >
-                      <p className="font-bold text-[#2C2825]">❓ {q.content}</p>
+                      <p className="font-bold text-[#2C2825]">
+                        ❓{" "}
+                        {q.content ||
+                          q.questionText ||
+                          q.title ||
+                          "Nội dung câu hỏi"}
+                      </p>
                       {q.instructorAnswer && (
                         <div className="p-2.5 bg-white rounded-xl border border-orange-100 space-y-1">
                           <p className="font-bold text-[#E65100]">

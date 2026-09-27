@@ -30,3 +30,8 @@ export const addTopicQuestion = async (topicId, payload) => {
     const res = await api.post(`/topics/${topicId}/questions`, payload);
     return res.data;
 };
+
+export const updateTopicQuestionAnswer = async (topicId, questionId, payload) => {
+    const res = await api.put(`/topics/${topicId}/questions/${questionId}`, payload);
+    return res.data;
+};

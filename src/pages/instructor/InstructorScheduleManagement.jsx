@@ -18,7 +18,7 @@ export default function InstructorScheduleManagement() {
   // Lấy danh sách slot rảnh của giảng viên theo GET /api/v1/slots
   const fetchSlots = async () => {
     try {
-      const res = await api.get("/api/v1/slots");
+      const res = await api.get("/slots");
       setSlots(res.data.content || res.data || []);
     } catch (err) {
       console.error("Lỗi tải danh sách slot:", err);
@@ -45,7 +45,7 @@ export default function InstructorScheduleManagement() {
         meetingUrl: newSlotForm.meetingUrl,
       };
 
-      await api.post("/api/v1/slots", payload);
+      await api.post("/slots", payload);
       alert("Tạo khung giờ rảnh thành công!");
       setNewSlotForm({
         startDate: "",
@@ -67,7 +67,7 @@ export default function InstructorScheduleManagement() {
   // Duyệt hoặc từ chối booking
   const handleApproveBooking = async (slotId, status) => {
     try {
-      await api.put(`/api/v1/slots/${slotId}`, { status });
+      await api.put(`/slots/${slotId}`, { status });
       alert(`Đã cập nhật trạng thái lịch hẹn thành công!`);
       fetchSlots();
     } catch (err) {
