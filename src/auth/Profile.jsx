@@ -78,7 +78,7 @@ export default function Profile() {
 
                     <div className="space-y-1 w-full">
                         <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-xs font-black rounded-xl border border-orange-100 uppercase block">
-                            {user?.role || "STUDENT"}
+                            {user?.role || "LEADER"}
                         </span>
                         <p className="text-[11px] font-bold text-gray-600 pt-1">
                             {user?.title || "Thành viên hệ thống đồ án"}

@@ -1,22 +1,57 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 
+const normalizeRole = (value) =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z_]/g, '');
+
+const roleGroups = {
+  ADMIN: ['ADMIN', 'SYSTEM_ADMIN'],
+  LEADER: ['LEADER', 'GROUP_LEADER'],
+  INSTRUCTOR: ['INSTRUCTOR', 'LECTURER', 'TEACHER', 'REVIEWER'],
+  COUNCIL: ['COUNCIL', 'COUNCIL_MEMBER', 'COUNCILCHAIR'],
+};
+
+const acceptedRoles = new Set(
+  Object.values(roleGroups).flatMap((roles) => roles),
+);
+
+const isRoleAllowed = (userRole, allowedRoles = []) => {
+  const normalizedUserRole = normalizeRole(userRole);
+  if (!normalizedUserRole || !acceptedRoles.has(normalizedUserRole)) {
+    return false;
+  }
+
+  const normalizedAllowed = allowedRoles.map((role) => normalizeRole(role));
+
+  return normalizedAllowed.some((allowedRole) => {
+    const group = Object.entries(roleGroups).find(([, roles]) =>
+      roles.includes(allowedRole),
+    );
+
+    if (!group) {
+      return allowedRole === normalizedUserRole;
+    }
+
+    const [, aliasList] = group;
+    return aliasList.includes(normalizedUserRole);
+  });
+};
+
 const ProtectedRoute = ({ allowedRoles }) => {
   const token = localStorage.getItem('accessToken');
-  // Lấy thông tin user/role đã lưu khi login (ví dụ: 'STUDENT' hoặc 'LECTURER')
-  const userRole = localStorage.getItem('role'); 
+  const userRole = localStorage.getItem('role');
 
-  // Nếu chưa đăng nhập -> Chuyển về trang /login
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  // Nếu role không hợp lệ -> Chuyển về trang không có quyền hoặc trang chủ
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
+  if (allowedRoles && !isRoleAllowed(userRole, allowedRoles)) {
     return <Navigate to="/" replace />;
   }
 
-  // Đủ điều kiện -> Cho phép truy cập route con
   return <Outlet />;
 };
 

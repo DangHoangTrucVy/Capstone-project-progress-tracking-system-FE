@@ -1,31 +1,56 @@
 import React, { useEffect, useState } from "react";
 import { getUsers, createUser, updateUser } from "../../services/userService";
-import {
-  getTopics,
-  createTopic,
-  updateTopic,
-} from "../../services/topicService";
-import { getAllGroups, updateGroup } from "../../services/groupService";
+import { getAllGroups } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
+import { getReportsSummary } from "../../services/progressService";
+import Profile from "../../auth/Profile";
+
+const defaultSystemSettings = {
+  semester: "Spring2026",
+  maxTopicAttempts: 4,
+  firstAttemptDays: 14,
+  retryAttemptDays: 10,
+  topicSubmissionOpen: false,
+  currentAttempt: 1,
+};
+
+const getManagedRole = (role) => {
+  const normalizedRole = String(role || "").trim().toUpperCase();
+  const aliases = {
+    GROUP_LEADER: "LEADER",
+    LECTURER: "INSTRUCTOR",
+    TEACHER: "INSTRUCTOR",
+    REVIEWER: "COUNCIL",
+    COUNCIL_MEMBER: "COUNCIL",
+    COUNCILCHAIR: "COUNCIL",
+    SYSTEM_ADMIN: "ADMIN",
+  };
+  return aliases[normalizedRole] || normalizedRole;
+};
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
-  const [activeMenu, setActiveMenu] = useState("groups"); // Ưu tiên tab quản lý nhóm/duyệt đề tài
+  const [activeMenu, setActiveMenu] = useState("monitoring");
   const [loading, setLoading] = useState(true);
 
   const [groups, setGroups] = useState([]);
   const [users, setUsers] = useState([]);
-  const [topics, setTopics] = useState([]);
-  const [instructors, setInstructors] = useState([]);
-
-  // State phục vụ modal duyệt đề tài & phân công GVHD
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [selectedInstructorId, setSelectedInstructorId] = useState("");
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [reportsSummary, setReportsSummary] = useState(null);
+  const [reportsError, setReportsError] = useState("");
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [systemSettings, setSystemSettings] = useState(() => {
+    try {
+      return {
+        ...defaultSystemSettings,
+        ...JSON.parse(localStorage.getItem("adminSystemSettings") || "{}"),
+      };
+    } catch {
+      return defaultSystemSettings;
+    }
+  });
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
@@ -34,23 +59,7 @@ export default function AdminDashboard() {
     email: "",
     fullName: "",
     password: "",
-    role: "STUDENT",
-  });
-
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [adminProfileForm, setAdminProfileForm] = useState({
-    fullName: "",
-    avatarUrl: "",
-    status: "ACTIVE",
-  });
-
-  const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
-  const [topicForm, setTopicForm] = useState({
-    topicCode: "",
-    title: "",
-    description: "",
-    category: "",
-    status: "PUBLISHED",
+    role: "LEADER",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,13 +67,6 @@ export default function AdminDashboard() {
     try {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
-      if (currentUser) {
-        setAdminProfileForm({
-          fullName: currentUser.fullName || "",
-          avatarUrl: currentUser.avatarUrl || "",
-          status: currentUser.status || "ACTIVE",
-        });
-      }
 
       const groupsRes = await getAllGroups().catch(() => []);
       const groupList = groupsRes?.content || groupsRes || [];
@@ -74,14 +76,6 @@ export default function AdminDashboard() {
       const userList = usersRes?.content || usersRes || [];
       setUsers(userList);
 
-      // Lọc danh sách giảng viên để phân công
-      const instructorList = userList.filter(
-        (u) => u.role === "INSTRUCTOR" || u.role === "ADMIN",
-      );
-      setInstructors(instructorList);
-
-      const topicsRes = await getTopics().catch(() => []);
-      setTopics(topicsRes?.content || topicsRes || []);
     } catch (error) {
       console.error("Lỗi tải dữ liệu quản trị:", error);
     } finally {
@@ -93,72 +87,42 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  // --- LOGIC DUYỆT ĐỀ TÀI & PHÂN CÔNG GVHD (CÓ CHECK ĐỘC QUYỀN TOPIC) ---
-  const handleOpenApproveModal = (group) => {
-    setSelectedGroup(group);
-    setSelectedInstructorId(group.supervisorId || "");
-    setIsApproveModalOpen(true);
-  };
-
-  const handleApproveGroupTopic = async (e) => {
-    e.preventDefault();
-    if (!selectedGroup) return;
-
-    if (!selectedInstructorId) {
-      alert("Vui lòng chọn Giảng viên hướng dẫn trước khi duyệt đề tài!");
-      return;
-    }
-
-    const targetTopicId = selectedGroup.topicId || selectedGroup.topic?.id;
-    if (!targetTopicId) {
-      alert("Nhóm chưa gửi đề tài để Admin xét duyệt.");
-      return;
-    }
-
-    if (targetTopicId) {
-      const alreadyApprovedGroup = groups.find(
-        (g) =>
-          g.id !== selectedGroup.id &&
-          (g.topicId === targetTopicId || g.topic?.id === targetTopicId) &&
-          g.status === "ACTIVE", // Kiểm tra theo status hợp lệ của backend
-      );
-
-      if (alreadyApprovedGroup) {
-        alert(
-          `Đề tài này đã được giao và phê duyệt độc quyền cho nhóm [${alreadyApprovedGroup.groupCode}] trước đó. Vui lòng yêu cầu nhóm này đổi đề tài khác!`,
-        );
-        return;
-      }
-    }
-
-    setSubmitting(true);
+  const fetchReportsSummary = async () => {
+    setReportsLoading(true);
+    setReportsError("");
     try {
-      // Sửa status thành "ACTIVE" theo đúng enum của backend: [ARCHIVED, FORMED, ACTIVE, COMPLETED]
-      await updateGroup(selectedGroup.id, {
-        groupCode: selectedGroup.groupCode,
-        semester: selectedGroup.semester,
-        status: "ACTIVE",
-        topicId: targetTopicId,
-        supervisorId: selectedInstructorId,
-      });
-
-      alert("Phê duyệt đề tài và phân công GVHD cho nhóm thành công!");
-      setIsApproveModalOpen(false);
-      setSelectedGroup(null);
-      fetchAdminData();
+      const response = await getReportsSummary();
+      setReportsSummary(response?.data ?? response);
     } catch (error) {
-      alert(
-        error.response?.data?.message || "Không thể phê duyệt đề tài cho nhóm.",
+      setReportsError(
+        error.response?.data?.message || "Không thể tải báo cáo tổng hợp.",
       );
+      setReportsSummary(null);
     } finally {
-      setSubmitting(false);
+      setReportsLoading(false);
     }
   };
+
+  const reportEntries = Object.entries(
+    reportsSummary?.summary ?? reportsSummary ?? {},
+  ).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value));
+
+  const formatReportValue = (value) => {
+    if (typeof value === "number") return value.toLocaleString("vi-VN");
+    if (typeof value === "boolean") return value ? "Có" : "Không";
+    return value;
+  };
+
+  const formatReportLabel = (key) =>
+    key
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/^./, (character) => character.toLocaleUpperCase("vi-VN"));
 
   const handleOpenCreateUser = () => {
     setIsEditingUser(false);
     setEditingUserId(null);
-    setUserForm({ email: "", fullName: "", password: "", role: "STUDENT" });
+    setUserForm({ email: "", fullName: "", password: "", role: "LEADER" });
     setIsUserModalOpen(true);
   };
 
@@ -169,7 +133,7 @@ export default function AdminDashboard() {
       email: u.email || "",
       fullName: u.fullName || "",
       password: "",
-      role: u.role || "STUDENT",
+      role: getManagedRole(u.role) || "LEADER",
     });
     setIsUserModalOpen(true);
   };
@@ -178,11 +142,13 @@ export default function AdminDashboard() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const payload = { ...userForm };
+      if (isEditingUser && !payload.password) delete payload.password;
       if (isEditingUser) {
-        await updateUser(editingUserId, userForm);
+        await updateUser(editingUserId, payload);
         alert("Cập nhật tài khoản thành công!");
       } else {
-        await createUser(userForm);
+        await createUser(payload);
         alert("Tạo tài khoản thành công!");
       }
       setIsUserModalOpen(false);
@@ -194,42 +160,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateAdminProfile = async (e) => {
-    e.preventDefault();
-    if (!user?.id) return;
-    setSubmitting(true);
-    try {
-      await updateUser(user.id, adminProfileForm);
-      setUser({ ...user, ...adminProfileForm });
-      alert("Cập nhật hồ sơ cá nhân thành công!");
-      setIsEditingProfile(false);
-    } catch (error) {
-      alert(error.response?.data?.message || "Cập nhật hồ sơ thất bại!");
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSaveSystemSettings = (event) => {
+    event.preventDefault();
+    localStorage.setItem("adminSystemSettings", JSON.stringify(systemSettings));
+    alert("Đã lưu cấu hình trên trình duyệt này. Cần API cấu hình backend để áp dụng toàn hệ thống.");
   };
 
-  const handleCreateTopic = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await createTopic(topicForm);
-      alert("Tạo đề tài thành công!");
-      setIsTopicModalOpen(false);
-      setTopicForm({
-        topicCode: "",
-        title: "",
-        description: "",
-        category: "",
-        status: "PUBLISHED",
-      });
-      fetchAdminData();
-    } catch (error) {
-      alert("Tạo đề tài thất bại!");
-    } finally {
-      setSubmitting(false);
-    }
+  const updateSystemSetting = (key, value) => {
+    setSystemSettings((current) => ({ ...current, [key]: value }));
   };
 
   const handleLogout = () => {
@@ -252,7 +190,11 @@ export default function AdminDashboard() {
     return timeA - timeB;
   });
 
-  const filteredUsers = users.filter((u) => {
+  const manageableRoles = ["LEADER", "INSTRUCTOR", "COUNCIL", "ADMIN"];
+  const manageableUsers = users
+    .map((account) => ({ ...account, role: getManagedRole(account.role) }))
+    .filter((account) => manageableRoles.includes(account.role));
+  const filteredUsers = manageableUsers.filter((u) => {
     const matchesRole = !selectedRole || u.role === selectedRole;
     const matchesSearch =
       !searchQuery ||
@@ -260,18 +202,6 @@ export default function AdminDashboard() {
         u.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesRole && matchesSearch;
-  });
-
-  const filteredTopics = topics.filter((t) => {
-    const matchesStatus = !selectedStatus || t.status === selectedStatus;
-    const matchesSearch =
-      !searchQuery ||
-      (t.title && t.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (t.topicCode &&
-        t.topicCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (t.category &&
-        t.category.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesStatus && matchesSearch;
   });
 
   if (loading) {
@@ -288,8 +218,9 @@ export default function AdminDashboard() {
         return "bg-red-50 text-red-600 border border-red-200";
       case "INSTRUCTOR":
         return "bg-blue-50 text-blue-600 border border-blue-200";
-      case "REVIEWER":
+      case "COUNCIL":
         return "bg-purple-50 text-purple-600 border border-purple-200";
+      case "LEADER":
       case "GROUP_LEADER":
         return "bg-emerald-50 text-emerald-600 border border-emerald-200";
       default:
@@ -326,47 +257,34 @@ export default function AdminDashboard() {
 
           <div className="space-y-1.5 text-xs font-bold text-[#6B635B]">
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mb-2 px-3">
-              Tổng quan
+              Quản trị hệ thống
             </p>
             <button
               onClick={() => {
-                setActiveMenu("overview");
+                setActiveMenu("monitoring");
                 setSearchQuery("");
+                fetchReportsSummary();
               }}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "overview"
+                activeMenu === "monitoring"
                   ? "bg-[#E65100] text-white shadow-md"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
               <span>📊</span>
-              <span>Bảng điều khiển</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveMenu("groups");
-                setSearchQuery("");
-              }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "groups"
-                  ? "bg-[#E65100] text-white shadow-md"
-                  : "hover:bg-[#F8F6F0]"
-              }`}
-            >
-              <span>👥</span>
-              <span>Duyệt đề tài & Nhóm ({groups.length})</span>
+              <span>Giám sát toàn cục</span>
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
-              Quản lý danh mục
+              Tài khoản & cấu hình
             </p>
             <button
               onClick={() => {
-                setActiveMenu("users");
+                setActiveMenu("accounts");
                 setSearchQuery("");
               }}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "users"
+                activeMenu === "accounts"
                   ? "bg-[#E65100] text-white shadow-md"
                   : "hover:bg-[#F8F6F0]"
               }`}
@@ -376,17 +294,31 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => {
-                setActiveMenu("topics");
+                setActiveMenu("settings");
                 setSearchQuery("");
               }}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "topics"
+                activeMenu === "settings"
                   ? "bg-[#E65100] text-white shadow-md"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>📚</span>
-              <span>Danh mục Đề tài ({topics.length})</span>
+              <span>⚙️</span>
+              <span>Cấu hình hệ thống</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveMenu("gate");
+                setSearchQuery("");
+              }}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+                activeMenu === "gate"
+                  ? "bg-[#E65100] text-white shadow-md"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>🚦</span>
+              <span>Cổng nộp đề tài</span>
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
@@ -443,25 +375,24 @@ export default function AdminDashboard() {
 
         <div className="w-full flex-1 flex flex-col">
           {/* --- OVERVIEW --- */}
-          {activeMenu === "overview" && (
+          {activeMenu === "__legacyOverview" && (
             <div className="p-8 space-y-6">
               <div className="bg-white p-6 border border-[#E8E2D9] space-y-2 rounded-2xl">
                 <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-                  Tổng quan hệ thống
+                  Tổng quan hệ thống · 6 giai đoạn
                 </span>
                 <h1 className="text-2xl font-black text-[#2C2825]">
-                  Bảng điều khiển quản trị đồ án
+                  Bảng điều khiển quản trị toàn bộ quy trình đồ án
                 </h1>
                 <p className="text-xs text-[#6B635B]">
-                  Kiểm duyệt đề tài, phân công GVHD và theo dõi tiến độ các
-                  nhóm.
+                  Admin theo dõi toàn bộ chuỗi: đăng nhập & xác thực, đề tài, lịch tư vấn, tiến độ, review và bảo vệ cuối kỳ, đồng thời mở/đóng các đợt duyệt theo quy chế.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white p-6 border border-[#E8E2D9] space-y-1 rounded-2xl">
                   <p className="text-xs font-bold text-[#6B635B]">
-                    Tổng số nhóm
+                    Giai đoạn 1–2 · Đăng nhập & Đề tài
                   </p>
                   <p className="text-3xl font-black text-[#2C2825]">
                     {groups.length}
@@ -474,35 +405,118 @@ export default function AdminDashboard() {
                           g.status === "FORMED",
                       ).length
                     }{" "}
-                    nhóm đang chờ duyệt
-                  </p>
-                </div>
-                <div className="bg-white p-6 border border-[#E8E2D9] space-y-1 rounded-2xl">
-                  <p className="text-xs font-bold text-[#6B635B]">Tài khoản</p>
-                  <p className="text-3xl font-black text-[#E65100]">
-                    {users.length}
-                  </p>
-                  <p className="text-[11px] text-[#6B635B] pt-2">
-                    Sinh viên, Giảng viên & Admin
+                    nhóm đang gửi/đợi duyệt
                   </p>
                 </div>
                 <div className="bg-white p-6 border border-[#E8E2D9] space-y-1 rounded-2xl">
                   <p className="text-xs font-bold text-[#6B635B]">
-                    Đề tài sẵn có
+                    Giai đoạn 3–4 · Tư vấn & Tiến độ
                   </p>
-                  <p className="text-3xl font-black text-[#2C2825]">
-                    {topics.filter((t) => t.status === "PUBLISHED").length}
+                  <p className="text-3xl font-black text-[#E65100]">
+                    {users.length}
                   </p>
                   <p className="text-[11px] text-[#6B635B] pt-2">
-                    Đã phát hành cho sinh viên chọn
+                    Theo dõi lịch hẹn, pre-meeting và warning flags
                   </p>
+                </div>
+                <div className="bg-white p-6 border border-[#E8E2D9] space-y-1 rounded-2xl">
+                  <p className="text-xs font-bold text-[#6B635B]">
+                    Giai đoạn 5–6 · Review & Bảo vệ
+                  </p>
+                  <p className="text-3xl font-black text-[#2C2825]">
+                    {groups.filter((group) => group.status === "ACTIVE").length}
+                  </p>
+                  <p className="text-[11px] text-[#6B635B] pt-2">
+                    Đánh giá tiến độ, hội đồng kín và chấm bảo vệ cuối kỳ
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#E65100]">KPI chính</p>
+                  <h3 className="mt-2 text-base font-black text-[#2C2825]">40 nhóm / luồng đồng bộ</h3>
+                  <p className="mt-2 text-[11px] text-[#6B635B]">Hệ thống đảm bảo chạy theo giai đoạn để tránh dồn lịch cùng lúc.</p>
+                </div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Quy chế</p>
+                  <h3 className="mt-2 text-base font-black text-[#2C2825]">Tối đa 4 lần duyệt</h3>
+                  <p className="mt-2 text-[11px] text-[#6B635B]">Lần 1: 14 ngày, từ lần 2: 10 ngày do Admin mở cổng.</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Bảo vệ</p>
+                  <h3 className="mt-2 text-base font-black text-[#2C2825]">Lần 1 & Lần 2</h3>
+                  <p className="mt-2 text-[11px] text-[#6B635B]">Một nhóm chỉ vào lịch bảo vệ khi đã qua hội đồng kín và đủ điều kiện.</p>
                 </div>
               </div>
             </div>
           )}
 
+          {activeMenu === "monitoring" && (
+            <section className="p-8 space-y-6">
+              <div className="bg-white p-6 border border-[#E8E2D9] space-y-2 rounded-2xl">
+                <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
+                  Giám sát toàn cục
+                </span>
+                <h1 className="text-xl font-black text-[#2C2825]">
+                  Tình hình hệ thống
+                </h1>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "Tài khoản", value: manageableUsers.length },
+                  { label: "Nhóm đồ án", value: groups.length },
+                  { label: "Đề tài đã duyệt", value: groups.filter((group) => group.status === "ACTIVE").length },
+                  { label: "Nhóm chờ duyệt", value: groups.filter((group) => group.status === "FORMED").length },
+                ].map((metric) => (
+                  <div key={metric.label} className="rounded-xl border border-[#E8E2D9] bg-white p-5">
+                    <p className="text-xs font-bold text-[#6B635B]">{metric.label}</p>
+                    <p className="mt-2 text-2xl font-black text-[#2C2825]">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-sm font-black text-[#2C2825]">Báo cáo backend</h2>
+                <button onClick={fetchReportsSummary} className="text-xs font-bold text-[#E65100] underline">Làm mới</button>
+              </div>
+              {reportsLoading ? (
+                <p className="text-xs text-[#6B635B]">Đang tải báo cáo...</p>
+              ) : reportsError ? (
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
+                  <p>{reportsError}</p>
+                  <button
+                    onClick={fetchReportsSummary}
+                    className="font-bold underline"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              ) : reportEntries.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {reportEntries.map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="rounded-xl border border-[#E8E2D9] bg-white p-5"
+                    >
+                      <p className="text-xs font-bold text-[#6B635B]">
+                        {formatReportLabel(key)}
+                      </p>
+                      <p className="mt-2 wrap-break-word text-2xl font-black text-[#2C2825]">
+                        {formatReportValue(value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[#6B635B]">
+                  API chưa trả về dữ liệu tổng hợp.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* --- GROUPS & TOPIC APPROVAL (DUYỆT ĐỀ TÀI & PHÂN CÔNG GVHD) --- */}
-          {activeMenu === "groups" && (
+          {activeMenu === "__inactiveGroups" && (
             <div className="p-8 space-y-6">
               <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl">
                 <div>
@@ -611,7 +625,7 @@ export default function AdminDashboard() {
           )}
 
           {/* --- USERS --- */}
-          {activeMenu === "users" && (
+          {activeMenu === "accounts" && (
             <div className="p-8 space-y-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl gap-4">
                 <div>
@@ -619,7 +633,7 @@ export default function AdminDashboard() {
                     Quản lý tài khoản hệ thống
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Phân quyền sinh viên, trưởng nhóm, giảng viên và admin.
+                    Quản lý tài khoản và phân quyền Leader, Instructor, Council, Admin.
                   </p>
                 </div>
                 <button
@@ -638,9 +652,9 @@ export default function AdminDashboard() {
                   {[
                     { label: "Tất cả", value: "" },
                     { label: "Admin", value: "ADMIN" },
-                    { label: "Giảng viên", value: "INSTRUCTOR" },
-                    { label: "Trưởng nhóm", value: "GROUP_LEADER" },
-                    { label: "Sinh viên", value: "STUDENT" },
+                    { label: "Leader", value: "LEADER" },
+                    { label: "Instructor", value: "INSTRUCTOR" },
+                    { label: "Council", value: "COUNCIL" },
                   ].map((roleObj) => (
                     <button
                       key={roleObj.value}
@@ -686,7 +700,7 @@ export default function AdminDashboard() {
                                 u.role,
                               )}`}
                             >
-                              {u.role || "STUDENT"}
+                              {u.role}
                             </span>
                           </td>
                           <td className="p-4 text-right">
@@ -716,178 +730,116 @@ export default function AdminDashboard() {
           )}
 
           {/* --- TOPICS --- */}
-          {activeMenu === "topics" && (
-            <div className="p-8 space-y-6">
-              <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl">
-                <div>
-                  <h2 className="text-xl font-black text-[#2C2825]">
-                    Quản lý danh mục Đề tài tốt nghiệp
-                  </h2>
-                  <p className="text-xs text-[#6B635B]">
-                    Thêm và phát hành các đề tài cho sinh viên đăng ký.
-                  </p>
+          {activeMenu === "settings" && (
+            <section className="p-8 space-y-6 max-w-4xl">
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl">
+                <h1 className="text-xl font-black text-[#2C2825]">Cấu hình hệ thống</h1>
+                <p className="mt-2 text-xs text-[#6B635B]">Thiết lập học kỳ và quy chế nộp lại đề tài.</p>
+              </div>
+              <form onSubmit={handleSaveSystemSettings} className="bg-white p-6 border border-[#E8E2D9] rounded-2xl space-y-5">
+                <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
+                  Học kỳ hiện tại
+                  <input value={systemSettings.semester} onChange={(event) => updateSystemSetting("semester", event.target.value)} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" required />
+                </label>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <label className="space-y-1 text-xs font-bold text-[#2C2825]">
+                    Số lần nộp tối đa
+                    <input type="number" min="1" max="10" value={systemSettings.maxTopicAttempts} onChange={(event) => updateSystemSetting("maxTopicAttempts", Number(event.target.value))} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" />
+                  </label>
+                  <label className="space-y-1 text-xs font-bold text-[#2C2825]">
+                    Hạn lần đầu (ngày)
+                    <input type="number" min="1" value={systemSettings.firstAttemptDays} onChange={(event) => updateSystemSetting("firstAttemptDays", Number(event.target.value))} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" />
+                  </label>
+                  <label className="space-y-1 text-xs font-bold text-[#2C2825]">
+                    Hạn nộp lại (ngày)
+                    <input type="number" min="1" value={systemSettings.retryAttemptDays} onChange={(event) => updateSystemSetting("retryAttemptDays", Number(event.target.value))} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" />
+                  </label>
                 </div>
-                <button
-                  onClick={() => setIsTopicModalOpen(true)}
-                  className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
-                >
-                  + Thêm đề tài mới
-                </button>
-              </div>
+                <button type="submit" className="rounded-xl bg-[#E65100] px-5 py-3 text-xs font-bold text-white">Lưu cấu hình</button>
+                <p className="text-[11px] text-amber-700">Backend hiện chưa có endpoint lưu cấu hình; các giá trị này chỉ lưu trên trình duyệt hiện tại, chưa áp dụng toàn hệ thống.</p>
+              </form>
+            </section>
+          )}
 
-              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase">Mã</th>
-                      <th className="p-4 font-black uppercase">Tên đề tài</th>
-                      <th className="p-4 font-black uppercase">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E8E2D9]">
-                    {filteredTopics.map((t) => (
-                      <tr
-                        key={t.id}
-                        className="hover:bg-[#FBF9F5]/70 transition"
-                      >
-                        <td className="p-4 font-mono font-bold">
-                          {t.topicCode}
-                        </td>
-                        <td className="p-4 font-extrabold text-[#2C2825]">
-                          {t.title}
-                        </td>
-                        <td className="p-4">
-                          <span className="px-3 py-1 bg-emerald-50 text-emerald-600 font-bold text-[10px] rounded-full">
-                            {t.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {activeMenu === "gate" && (
+            <section className="p-8 space-y-6 max-w-4xl">
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl">
+                <h1 className="text-xl font-black text-[#2C2825]">Cổng nộp đề tài</h1>
+                <p className="mt-2 text-xs text-[#6B635B]">Điều khiển đợt nộp tiếp theo theo chính sách học kỳ.</p>
               </div>
-            </div>
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-[#6B635B]">Đợt nộp hiện tại</p>
+                    <p className="mt-1 text-lg font-black text-[#2C2825]">Lần {systemSettings.currentAttempt} / {systemSettings.maxTopicAttempts}</p>
+                  </div>
+                  <label className="flex items-center gap-3 text-xs font-bold text-[#2C2825]">
+                    <input type="checkbox" checked={systemSettings.topicSubmissionOpen} onChange={(event) => updateSystemSetting("topicSubmissionOpen", event.target.checked)} className="h-4 w-4 accent-[#E65100]" />
+                    {systemSettings.topicSubmissionOpen ? "Cổng đang mở" : "Cổng đang đóng"}
+                  </label>
+                </div>
+                <label className="block max-w-xs space-y-1 text-xs font-bold text-[#2C2825]">
+                  Chọn lần nộp cần mở
+                  <select value={systemSettings.currentAttempt} onChange={(event) => updateSystemSetting("currentAttempt", Number(event.target.value))} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3">
+                    {Array.from({ length: systemSettings.maxTopicAttempts }, (_, index) => index + 1).map((attempt) => <option key={attempt} value={attempt}>Lần {attempt}</option>)}
+                  </select>
+                </label>
+                <button onClick={handleSaveSystemSettings} type="button" className="rounded-xl bg-[#E65100] px-5 py-3 text-xs font-bold text-white">Lưu trạng thái cổng</button>
+                <p className="text-[11px] text-amber-700">Backend hiện chưa có endpoint mở/đóng cổng; trạng thái chỉ lưu trên trình duyệt hiện tại và chưa khóa/mở quyền nộp ở các tài khoản khác.</p>
+              </div>
+            </section>
           )}
 
           {/* --- PROFILE --- */}
           {activeMenu === "profile" && (
-            <div className="p-8 space-y-6 max-w-4xl mx-auto w-full">
-              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl space-y-2">
-                <h1 className="text-2xl font-black text-[#2C2825]">
-                  Hồ sơ Quản trị viên
-                </h1>
-                <p className="text-xs text-[#6B635B]">
-                  Cập nhật thông tin định danh cá nhân.
-                </p>
-              </div>
-              <div className="bg-white p-8 border border-[#E8E2D9] rounded-2xl space-y-6">
-                <form
-                  onSubmit={handleUpdateAdminProfile}
-                  className="space-y-4 text-xs"
-                >
-                  <div>
-                    <label className="font-bold text-[#2C2825] block mb-1">
-                      Họ và tên
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={adminProfileForm.fullName}
-                      onChange={(e) =>
-                        setAdminProfileForm({
-                          ...adminProfileForm,
-                          fullName: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-2.5 bg-[#E65100] text-white font-bold rounded-xl shadow-sm cursor-pointer"
-                  >
-                    {submitting ? "Đang lưu..." : "Lưu thay đổi"}
-                  </button>
-                </form>
-              </div>
-            </div>
+            <div className="p-8 w-full"><Profile /></div>
           )}
         </div>
       </main>
 
-      {/* --- MODAL XÉT DUYỆT ĐỀ TÀI & PHÂN CÔNG GVHD --- */}
-      {isApproveModalOpen && selectedGroup && (
+      {isUserModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white w-full max-w-lg p-8 border border-[#E8E2D9] rounded-3xl space-y-6 shadow-xl">
-            <div className="flex justify-between items-center border-b border-[#F0EBE1] pb-3">
-              <h3 className="font-black text-base text-[#2C2825]">
-                Phê duyệt đề tài cho nhóm: {selectedGroup.groupCode}
+          <form onSubmit={handleSaveUser} className="w-full max-w-lg space-y-5 rounded-2xl border border-[#E8E2D9] bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#F0EBE1] pb-3">
+              <h3 className="text-base font-black text-[#2C2825]">
+                {isEditingUser ? "Cập nhật tài khoản" : "Tạo tài khoản"}
               </h3>
               <button
-                onClick={() => setIsApproveModalOpen(false)}
-                className="text-gray-400 hover:text-black font-bold cursor-pointer"
+                type="button"
+                onClick={() => setIsUserModalOpen(false)}
+                className="font-bold text-gray-400 hover:text-black"
               >
                 ✕
               </button>
             </div>
-
-            <form
-              onSubmit={handleApproveGroupTopic}
-              className="space-y-4 text-xs"
-            >
-              <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-1">
-                <p className="text-[10px] text-[#6B635B] font-bold uppercase">
-                  Đề tài nhóm đang chọn:
-                </p>
-                <p className="font-black text-sm text-[#2C2825]">
-                  {selectedGroup.topicTitle ||
-                    selectedGroup.topic?.title ||
-                    "Chưa chọn đề tài cụ thể"}
-                </p>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#2C2825] mb-1">
-                  Phân công Giảng viên hướng dẫn (GVHD) *
-                </label>
-                <select
-                  value={selectedInstructorId}
-                  onChange={(e) => setSelectedInstructorId(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
-                  required
-                >
-                  <option value="">-- Chọn giảng viên hướng dẫn --</option>
-                  {instructors.map((ins) => (
-                    <option key={ins.id} value={ins.id}>
-                      {ins.fullName} ({ins.email})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-[#6B635B] mt-1">
-                  Lưu ý: Hệ thống sẽ khóa độc quyền đề tài này cho nhóm khi bấm
-                  duyệt.
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4 border-t border-[#F0EBE1]">
-                <button
-                  type="button"
-                  onClick={() => setIsApproveModalOpen(false)}
-                  className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm cursor-pointer"
-                >
-                  {submitting ? "Đang xử lý..." : "✓ Xác nhận phê duyệt"}
-                </button>
-              </div>
-            </form>
-          </div>
+            <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
+              Họ và tên
+              <input value={userForm.fullName} onChange={(event) => setUserForm({ ...userForm, fullName: event.target.value })} required className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" />
+            </label>
+            <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
+              Email
+              <input type="email" value={userForm.email} onChange={(event) => setUserForm({ ...userForm, email: event.target.value })} required className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" />
+            </label>
+            <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
+              Mật khẩu {isEditingUser && "(để trống nếu không đổi)"}
+              <input type="password" value={userForm.password} onChange={(event) => setUserForm({ ...userForm, password: event.target.value })} required={!isEditingUser} minLength={8} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal" />
+            </label>
+            <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
+              Vai trò
+              <select value={userForm.role} onChange={(event) => setUserForm({ ...userForm, role: event.target.value })} className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal">
+                <option value="LEADER">Leader</option>
+                <option value="INSTRUCTOR">Instructor</option>
+                <option value="COUNCIL">Council</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </label>
+            <div className="flex justify-end gap-3 border-t border-[#F0EBE1] pt-4">
+              <button type="button" onClick={() => setIsUserModalOpen(false)} className="rounded-xl bg-gray-100 px-5 py-2.5 text-xs font-bold">Hủy</button>
+              <button type="submit" disabled={submitting} className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+                {submitting ? "Đang lưu..." : "Lưu tài khoản"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

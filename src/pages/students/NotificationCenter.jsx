@@ -11,14 +11,33 @@ export default function NotificationCenter() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const normalizeNotifications = (response) => {
+    const payload = response?.data ?? response;
+    const items = Array.isArray(payload)
+      ? payload
+      : payload?.content ?? payload?.items ?? payload?.results ?? [];
+    return Array.isArray(items) ? items : [];
+  };
+
+  const normalizeUnreadCount = (response) => {
+    const payload = response?.data ?? response;
+    const count =
+      payload?.count ?? payload?.unreadCount ?? payload?.totalUnread ?? payload;
+    const parsedCount = Number(count);
+    return Number.isFinite(parsedCount) ? parsedCount : 0;
+  };
+
+  const isNotificationRead = (item) =>
+    Boolean(item.isRead ?? item.read ?? item.status === "READ");
+
   const fetchNotificationData = async () => {
     try {
       const [notifsRes, countRes] = await Promise.all([
         getNotifications().catch(() => []),
         getUnreadNotificationCount().catch(() => ({ count: 0 }))
       ]);
-      setNotifications(notifsRes.content || notifsRes || []);
-      setUnreadCount(countRes.count || countRes || 0);
+      setNotifications(normalizeNotifications(notifsRes));
+      setUnreadCount(normalizeUnreadCount(countRes));
     } catch (err) {
       console.error("Lỗi tải thông báo:", err);
     } finally {
@@ -81,19 +100,19 @@ export default function NotificationCenter() {
             notifications.map((item) => (
               <div 
                 key={item.id} 
-                className={`py-4 flex justify-between items-center text-xs transition ${item.read ? "opacity-60" : "bg-orange-50/20 px-3 rounded-xl"}`}
+                className={`py-4 flex justify-between items-center text-xs transition ${isNotificationRead(item) ? "opacity-60" : "bg-orange-50/20 px-3 rounded-xl"}`}
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-black text-[#2C2825] text-sm">🔔 {item.title || "Thông báo hệ thống"}</span>
-                    {!item.read && <span className="w-2 h-2 bg-[#E65100] rounded-full"></span>}
+                    {!isNotificationRead(item) && <span className="w-2 h-2 bg-[#E65100] rounded-full"></span>}
                   </div>
                   <p className="text-[#6B635B]">{item.message || item.content}</p>
                   <span className="text-[10px] text-[#9E958C]">
                     {item.createdAt ? new Date(item.createdAt).toLocaleString("vi-VN") : "Vừa xong"}
                   </span>
                 </div>
-                {!item.read && (
+                {!isNotificationRead(item) && (
                   <button
                     onClick={() => handleMarkAsRead(item.id)}
                     className="px-3 py-1.5 bg-[#E65100] text-white font-bold rounded-xl text-[10px] cursor-pointer"

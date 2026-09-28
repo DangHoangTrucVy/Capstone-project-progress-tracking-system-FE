@@ -319,16 +319,61 @@ export default function InstructorDashboard() {
         </header>
 
         <div className="p-8 max-w-6xl mx-auto w-full space-y-8">
+          <div className="rounded-3xl border border-[#E8E2D9] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-[#9E958C]">
+                  Luồng giảng viên
+                </p>
+                <h2 className="mt-1 text-lg font-black text-[#2C2825]">
+                  Giai đoạn 3–5 · Tư vấn, cảnh báo và review
+                </h2>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+                {[
+                  "3. Pre-meeting",
+                  "4. Warning Flags",
+                  "5. Review 1-3",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[#E65100]"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#E65100]">Giai đoạn 2</p>
+              <h3 className="mt-2 text-base font-black text-[#2C2825]">Sơ duyệt đề tài</h3>
+              <p className="mt-2 text-[11px] text-[#6B635B]">Kiểm tra danh sách 10 đề tài, chọn đề tài phù hợp và chuyển lên Hội đồng.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Giai đoạn 3</p>
+              <h3 className="mt-2 text-base font-black text-[#2C2825]">Pre-meeting & slot</h3>
+              <p className="mt-2 text-[11px] text-[#6B635B]">Tạo lịch rảnh, xem câu hỏi trước buổi gặp và tư vấn trọng tâm theo đề tài.</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Giai đoạn 4–5</p>
+              <h3 className="mt-2 text-base font-black text-[#2C2825]">Cảnh báo & review</h3>
+              <p className="mt-2 text-[11px] text-[#6B635B]">Gắn Warning Flags, cập nhật nhận xét và theo dõi tiến độ nếu nhóm chậm trễ.</p>
+            </div>
+          </div>
+
           {activeTab === "slots" && (
             <div className="space-y-6">
               <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] shadow-sm flex justify-between items-center">
                 <div>
                   <h1 className="text-xl font-black text-[#2C2825]">
-                    Tạo & Quản lý lịch rảnh (Schedule Slots)
+                    Giai đoạn 3 · Tạo & Quản lý lịch rảnh tư vấn 1:1
                   </h1>
                   <p className="text-xs text-[#6B635B]">
                     Thiết lập các khung giờ rảnh (mỗi slot phục vụ độc lập 1
-                    nhóm) để sinh viên đặt lịch.
+                    nhóm) để Leader đặt lịch trước ít nhất 24 giờ.
                   </p>
                 </div>
               </div>

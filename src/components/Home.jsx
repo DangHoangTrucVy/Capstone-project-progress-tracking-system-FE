@@ -6,43 +6,53 @@ const Home = () => {
 
     const rolesData = [
         {
-            title: "Sinh viên",
-            heading: "Chủ động với đồ án của mình",
+            title: "Leader",
+            heading: "Trưởng nhóm sinh viên điều hành đồ án",
             features: [
-                "Xem lộ trình và hạn của từng mốc đồ án",
-                "Tự đặt lịch hẹn với GVHD theo khung giờ trống",
-                "Theo dõi % tiến độ và nộp tài liệu đúng hạn"
+                "Nộp danh sách đề tài sơ bộ và theo dõi kết quả duyệt",
+                "Đặt lịch hẹn tư vấn 1:1 theo slot trống của giảng viên",
+                "Theo dõi tiến độ, nộp tài liệu và nhận thông báo phản hồi"
             ],
-            btnText: "Đăng ký với vai trò Sinh viên",
-            link: "/register"
+            btnText: "Đăng nhập với vai trò Leader",
+            link: "/login"
         },
         {
-            title: "Giảng viên",
-            heading: "Quản lý nhiều sinh viên cùng lúc",
+            title: "Instructor",
+            heading: "Giảng viên hướng dẫn & reviewer",
             features: [
-                "Duyệt hoặc từ chối yêu cầu lịch hẹn",
-                "Xem tiến độ của cả danh sách sinh viên hướng dẫn",
-                "Duyệt tài liệu và ghi nhận nhận xét"
+                "Sơ duyệt danh sách đề tài và hỗ trợ tư vấn nhóm",
+                "Gắn warning flags khi nhóm chậm tiến độ hoặc thiếu chủ động",
+                "Theo dõi đánh giá review và hỗ trợ các vòng phản biện"
             ],
-            btnText: "Đăng ký với vai trò Giảng viên",
-            link: "/register"
+            btnText: "Đăng nhập với vai trò Instructor",
+            link: "/login"
         },
         {
-            title: "Trưởng bộ môn",
-            heading: "Giám sát toàn bộ khoa",
+            title: "Council",
+            heading: "Hội đồng xét duyệt và bảo vệ",
             features: [
-                "Xem lịch hẹn của tất cả giảng viên trên một màn hình",
-                "Phát hiện lịch trùng và xử lý kịp thời",
-                "Theo dõi tỷ lệ sinh viên đúng và trễ tiến độ"
+                "Thẩm định đề tài qua các đợt duyệt tối đa 4 lần",
+                "Phân loại nhóm ở Review 3 và hỗ trợ hội đồng kín",
+                "Chấm điểm bảo vệ cuối kỳ theo lịch cuốn chiếu"
             ],
-            btnText: "Xem lịch giám sát",
+            btnText: "Đăng nhập với vai trò Council",
+            link: "/login"
+        },
+        {
+            title: "Admin",
+            heading: "Quản lý hệ thống và phân quyền",
+            features: [
+                "Quản lý tài khoản, role và cấu hình hệ thống",
+                "Mở/đóng cổng nộp đề tài theo từng đợt duyệt",
+                "Giám sát toàn bộ quá trình đồ án từ đầu đến bảo vệ"
+            ],
+            btnText: "Đăng nhập với vai trò Admin",
             link: "/login"
         }
     ];
 
     return (
         <div className="min-h-screen bg-[#FBF9F5] text-[#2C2825] font-sans antialiased selection:bg-[#E65100] selection:text-white overflow-x-hidden">
-            {/* CSS Hiệu ứng nổi Floating */}
             <style>{`
                 @keyframes float-slow {
                     0%, 100% { transform: translateY(0px) rotate(-1deg); }
@@ -82,11 +92,8 @@ const Home = () => {
                     </nav>
 
                     <div className="flex items-center gap-3">
-                        <a href="/login" className="text-sm font-semibold text-[#2C2825] bg-[#F3EFEA] hover:bg-[#E8E2D9] px-5 py-2.5 rounded-xl transition-all duration-200 active:scale-95">
-                            Đăng nhập
-                        </a>
-                        <a href="/register" className="text-sm font-semibold bg-[#E65100] hover:bg-[#D84315] text-white px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-200 active:scale-95">
-                            Đăng ký miễn phí
+                        <a href="/login" className="text-sm font-semibold bg-[#E65100] hover:bg-[#D84315] text-white px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 active:scale-95">
+                            Đăng nhập hệ thống
                         </a>
                     </div>
                 </div>
@@ -112,11 +119,8 @@ const Home = () => {
                         </p>
 
                         <div className="flex flex-wrap items-center gap-4 pt-2">
-                            <a href="/register" className="bg-[#E65100] hover:bg-[#D84315] text-white font-bold px-7 py-3.5 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 active:scale-95">
-                                Bắt đầu miễn phí
-                            </a>
-                            <a href="/login" className="bg-[#F3EFEA] hover:bg-[#E8E2D9] text-[#2C2825] font-bold px-7 py-3.5 rounded-xl transition-all border border-[#E8E2D9] active:scale-95">
-                                Tôi đã có tài khoản
+                            <a href="/login" className="bg-[#E65100] hover:bg-[#D84315] text-white font-bold px-7 py-3.5 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 active:scale-95">
+                                Truy cập ngay
                             </a>
                         </div>
                     </div>
@@ -158,11 +162,6 @@ const Home = () => {
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="absolute -bottom-6 -right-2 z-20 bg-white/95 backdrop-blur-md px-5 py-3 rounded-2xl shadow-[0_12px_28px_rgba(0,0,0,0.08)] border border-slate-100 flex items-center gap-3 animate-float-badge-2">
-                                <div className="w-7 h-7 rounded-lg bg-[#F5EBE1] flex items-center justify-center text-[#E65100] text-sm">📅</div>
-                                <span className="text-xs font-bold text-[#2C2825]">Còn 46 ngày đến bảo vệ</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -171,20 +170,20 @@ const Home = () => {
                 <ScrollReveal delay={100}>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-20 border-t border-[#E8E2D9] mt-16 text-center">
                         <div className="group cursor-default">
-                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">1.200+</div>
-                            <div className="text-xs font-medium text-[#6B635B] mt-1">Sinh viên đang theo dõi đồ án</div>
+                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">10</div>
+                            <div className="text-xs font-medium text-[#6B635B] mt-1">Nhóm đồ án tham gia</div>
                         </div>
                         <div className="group cursor-default">
-                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">85</div>
-                            <div className="text-xs font-medium text-[#6B635B] mt-1">Giảng viên hướng dẫn</div>
+                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">4</div>
+                            <div className="text-xs font-medium text-[#6B635B] mt-1">Lần duyệt đề tài tối đa</div>
                         </div>
                         <div className="group cursor-default">
-                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">4.600+</div>
-                            <div className="text-xs font-medium text-[#6B635B] mt-1">Lịch hẹn đã đặt thành công</div>
+                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">3</div>
+                            <div className="text-xs font-medium text-[#6B635B] mt-1">Vòng review tiến độ</div>
                         </div>
                         <div className="group cursor-default">
-                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">96%</div>
-                            <div className="text-xs font-medium text-[#6B635B] mt-1">Bảo vệ đúng hạn</div>
+                            <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">100%</div>
+                            <div className="text-xs font-medium text-[#6B635B] mt-1">Chuẩn hóa quy trình</div>
                         </div>
                     </div>
                 </ScrollReveal>
@@ -199,38 +198,35 @@ const Home = () => {
                             <h2 className="text-3xl sm:text-4xl font-black text-[#2C2825]">
                                 Mọi thứ cần cho một đồ án đúng tiến độ
                             </h2>
-                            <p className="text-[#6B635B] text-sm sm:text-base">
-                                Từ lúc đề xuất đề tài đến ngày bảo vệ, hệ thống đồng hành cùng cả sinh viên và giảng viên.
-                            </p>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4 hover:-translate-y-1.5 hover:shadow-lg transition-all duration-300">
+                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">📊</div>
-                                <h3 className="font-bold text-lg text-[#2C2825]">Lộ trình rõ ràng</h3>
+                                <h3 className="font-bold text-lg text-[#2C2825]">Duyệt đề tài 4 lần</h3>
                                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                                    Toàn bộ mốc đồ án — đề cương, kiểm tra tiến độ, bảo vệ — hiển thị trên một lộ trình duy nhất.
+                                    Quy trình thẩm định đề tài minh bạch qua hội đồng, thời hạn chuẩn hóa rõ ràng.
                                 </p>
                             </div>
-                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4 hover:-translate-y-1.5 hover:shadow-lg transition-all duration-300">
+                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">📅</div>
-                                <h3 className="font-bold text-lg text-[#2C2825]">Đặt lịch hẹn nhanh</h3>
+                                <h3 className="font-bold text-lg text-[#2C2825]">Đặt lịch hẹn 1:1</h3>
                                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                                    Xem khung giờ trống của giảng viên hướng dẫn và đặt lịch chỉ trong vài giây.
+                                    Chọn khung giờ trống của GVHD kèm ngân hàng câu hỏi thảo luận trước buổi họp.
                                 </p>
                             </div>
-                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4 hover:-translate-y-1.5 hover:shadow-lg transition-all duration-300">
+                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">⏱️</div>
-                                <h3 className="font-bold text-lg text-[#2C2825]">Theo dõi tiến độ</h3>
+                                <h3 className="font-bold text-lg text-[#2C2825]">Cờ cảnh báo tiến độ</h3>
                                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                                    Cập nhật nhiệm vụ, nộp tài liệu và xem tiến độ tổng thể theo thời gian thực.
+                                    Giảng viên gắn cờ cảnh báo (Warning Flags) khi nhóm chậm trễ hoặc thành viên không chủ động.
                                 </p>
                             </div>
-                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4 hover:-translate-y-1.5 hover:shadow-lg transition-all duration-300">
-                                <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">👥</div>
-                                <h3 className="font-bold text-lg text-[#2C2825]">Giám sát toàn khoa</h3>
+                            <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
+                                <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">🎓</div>
+                                <h3 className="font-bold text-lg text-[#2C2825]">Hội đồng kín & Bảo vệ</h3>
                                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                                    Trưởng bộ môn xem được toàn bộ lịch hẹn trong khoa trên một lịch chung.
+                                    Trải qua 3 vòng review và hội đồng kín trước khi bước vào bảo vệ cuốn chiếu cuối kỳ.
                                 </p>
                             </div>
                         </div>
@@ -238,56 +234,26 @@ const Home = () => {
                 </section>
             </ScrollReveal>
 
-            {/* 4. Workflow Section */}
-            <ScrollReveal delay={100}>
-                <section id="cach-hoat-dong" className="py-20 max-w-7xl mx-auto px-6">
-                    <div className="text-center max-w-2xl mx-auto mb-16 space-y-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#E65100]">CÁCH HOẠT ĐỘNG</span>
-                        <h2 className="text-3xl sm:text-4xl font-black text-[#2C2825]">
-                            Bắt đầu chỉ trong ba bước
-                        </h2>
-                    </div>
-
-                    <div className="bg-[#F3EFEA] p-8 sm:p-12 rounded-3xl border border-[#E8E2D9] grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="space-y-3">
-                            <div className="w-9 h-9 rounded-full border-2 border-[#E65100] text-[#E65100] font-bold flex items-center justify-center text-sm bg-white">1</div>
-                            <h3 className="font-bold text-base text-[#2C2825]">Tạo tài khoản</h3>
-                            <p className="text-[#6B635B] text-xs leading-relaxed">Đăng ký bằng email trường theo vai trò sinh viên hoặc giảng viên hướng dẫn.</p>
-                        </div>
-                        <div className="space-y-3">
-                            <div className="w-9 h-9 rounded-full border-2 border-[#E65100] text-[#E65100] font-bold flex items-center justify-center text-sm bg-white">2</div>
-                            <h3 className="font-bold text-base text-[#2C2825]">Đặt lịch với GVHD</h3>
-                            <p className="text-[#6B635B] text-xs leading-relaxed">Chọn khung giờ trống và gửi yêu cầu hẹn, giảng viên xác nhận dễ dàng.</p>
-                        </div>
-                        <div className="space-y-3">
-                            <div className="w-9 h-9 rounded-full border-2 border-[#E65100] text-[#E65100] font-bold flex items-center justify-center text-sm bg-white">3</div>
-                            <h3 className="font-bold text-base text-[#2C2825]">Theo dõi đến ngày bảo vệ</h3>
-                            <p className="text-[#6B635B] text-xs leading-relaxed">Cập nhật nhiệm vụ theo từng giai đoạn và nộp tài liệu ngay trên hệ thống.</p>
-                        </div>
-                    </div>
-                </section>
-            </ScrollReveal>
-
-            {/* 5. Target Roles Section */}
+            {/* 4. Target Roles Section */}
             <ScrollReveal delay={100}>
                 <section id="danh-cho-ai" className="py-20 bg-white border-t border-[#E8E2D9]">
                     <div className="max-w-7xl mx-auto px-6">
                         <div className="text-center max-w-2xl mx-auto mb-16 space-y-2">
                             <span className="text-xs font-bold uppercase tracking-wider text-[#E65100]">DÀNH CHO AI</span>
-                            <h2 className="text-3xl sm:text-4xl font-black text-[#2C2825]">Một hệ thống, ba góc nhìn</h2>
+                            <h2 className="text-3xl sm:text-4xl font-black text-[#2C2825]">Phân quyền hệ thống</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                             {rolesData.map((role, index) => {
                                 const isHovered = hoveredRole === index;
                                 return (
                                     <div
                                         key={index}
                                         onMouseEnter={() => setHoveredRole(index)}
-                                        className={`p-6 rounded-2xl bg-white space-y-6 flex flex-col justify-between transition-all duration-300 cursor-pointer ${
+                                        className={`p-6 rounded-2xl bg-white space-y-6 flex flex-col justify-between transition-all duration-300 ${
                                             isHovered
-                                                ? "border-2 border-[#E65100] shadow-xl shadow-orange-500/10 -translate-y-2"
-                                                : "border border-[#E8E2D9] hover:border-[#E65100]/50 shadow-sm"
+                                                ? "border-2 border-[#E65100] shadow-xl -translate-y-2"
+                                                : "border border-[#E8E2D9]"
                                         }`}
                                     >
                                         <div className="space-y-4">
@@ -305,11 +271,7 @@ const Home = () => {
                                         </div>
                                         <a
                                             href={role.link}
-                                            className={`block text-center w-full py-3 font-bold text-xs rounded-xl transition-all duration-300 active:scale-95 ${
-                                                isHovered
-                                                    ? "bg-[#E65100] hover:bg-[#D84315] text-white shadow-md"
-                                                    : "bg-[#F3EFEA] hover:bg-[#E8E2D9] text-[#2C2825] border border-[#E8E2D9]"
-                                            }`}
+                                            className="block text-center w-full py-3 font-bold text-xs rounded-xl bg-[#E65100] text-white shadow-md hover:bg-[#D84315] transition"
                                         >
                                             {role.btnText}
                                         </a>
@@ -321,71 +283,10 @@ const Home = () => {
                 </section>
             </ScrollReveal>
 
-            {/* 6. Call to Action (CTA Banner) */}
-            <ScrollReveal delay={100}>
-                <section className="py-16 max-w-7xl mx-auto px-6">
-                    <div className="bg-[#E65100] text-white p-8 sm:p-12 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-orange-600/30">
-                        <div className="space-y-3 text-center md:text-left">
-                            <h2 className="text-2xl sm:text-3xl font-black">Sẵn sàng cho đồ án tốt nghiệp của bạn?</h2>
-                            <p className="text-white/80 text-xs sm:text-sm max-w-md">
-                                Tạo tài khoản trong một phút và đặt lịch hẹn đầu tiên với giảng viên hướng dẫn ngay hôm nay.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3 w-full md:w-auto justify-center">
-                            <a href="/register" className="bg-white text-[#2C2825] font-bold px-6 py-3 rounded-xl text-xs sm:text-sm hover:bg-gray-100 transition shadow-sm active:scale-95">
-                                Bắt đầu miễn phí
-                            </a>
-                            <a href="/login" className="bg-transparent border border-white/40 text-white font-bold px-6 py-3 rounded-xl text-xs sm:text-sm hover:bg-white/10 transition active:scale-95">
-                                Đăng nhập
-                            </a>
-                        </div>
-                    </div>
-                </section>
-            </ScrollReveal>
-
-            {/* 7. Footer */}
+            {/* 5. Footer */}
             <footer className="py-12 border-t border-[#E8E2D9] text-[#6B635B] text-xs">
-                <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-12 gap-8 mb-12">
-                    <div className="md:col-span-6 space-y-3">
-                        <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 bg-[#E65100] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                                <div className="w-3.5 h-3.5 border border-white rounded flex items-center justify-center text-[8px]">
-                                    ✓
-                                </div>
-                            </div>
-                            <span className="font-bold text-sm text-[#2C2825]">Lịch Đồ Án</span>
-                        </div>
-                        <p className="text-[#9E958C] max-w-sm">
-                            Nền tảng đặt lịch và theo dõi tiến độ đồ án tốt nghiệp cho Khoa Công nghệ thông tin.
-                        </p>
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <p className="font-bold text-[#2C2825]">Sản phẩm</p>
-                        <ul className="space-y-1.5 text-[#9E958C]">
-                            <li><a href="#tinh-nang" className="hover:text-[#E65100] transition-colors">Tính năng</a></li>
-                            <li><a href="#cach-hoat-dong" className="hover:text-[#E65100] transition-colors">Cách hoạt động</a></li>
-                            <li><a href="#danh-cho-ai" className="hover:text-[#E65100] transition-colors">Dành cho ai</a></li>
-                        </ul>
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <p className="font-bold text-[#2C2825]">Tài khoản</p>
-                        <ul className="space-y-1.5 text-[#9E958C]">
-                            <li><a href="/login" className="hover:text-[#E65100] transition-colors">Đăng nhập</a></li>
-                            <li><a href="/register" className="hover:text-[#E65100] transition-colors">Đăng ký</a></li>
-                        </ul>
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <p className="font-bold text-[#2C2825]">Hỗ trợ</p>
-                        <ul className="space-y-1.5 text-[#9E958C]">
-                            <li><a href="#" className="hover:text-[#E65100] transition-colors">Liên hệ khoa</a></li>
-                            <li><a href="#" className="hover:text-[#E65100] transition-colors">Hướng dẫn sử dụng</a></li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div className="max-w-7xl mx-auto px-6 pt-6 border-t border-[#E8E2D9]/60 flex flex-col sm:flex-row justify-between items-center gap-4 text-[#9E958C]">
-                    <p>© 2026 Lịch Đồ Án · Khoa Công nghệ thông tin</p>
-                    <p>Được xây dựng cho sinh viên và giảng viên</p>
+                <div className="max-w-7xl mx-auto px-6 text-center text-[#9E958C]">
+                    <p>© 2026 Lịch Đồ Án · Khoa Công nghệ thông tin · Đại học FPT</p>
                 </div>
             </footer>
         </div>

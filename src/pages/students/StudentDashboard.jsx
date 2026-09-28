@@ -115,7 +115,7 @@ export default function StudentDashboard() {
   );
 
   const isLeader =
-    currentUser?.role === "GROUP_LEADER" ||
+    ["LEADER", "GROUP_LEADER"].includes(currentUser?.role) ||
     (currentMemberInfo ? currentMemberInfo.isLeader : false);
   const groupMemberCount = groupData?.members?.length ?? 0;
   const hasCompleteTeam = groupMemberCount === 5;
@@ -212,7 +212,7 @@ export default function StudentDashboard() {
                 }`}
               >
                 <span>📊</span>
-                <span>Tổng quan</span>
+                <span>Giai đoạn 1–2 · Tổng quan</span>
               </button>
 
               <button
@@ -240,7 +240,7 @@ export default function StudentDashboard() {
                 }`}
               >
                 <span>📅</span>
-                <span>Lịch hẹn GVHD</span>
+                <span>Giai đoạn 3 · Tư vấn 1:1</span>
               </button>
 
               <button
@@ -256,7 +256,7 @@ export default function StudentDashboard() {
                 }`}
               >
                 <span>📈</span>
-                <span>Tiến độ & Milestones</span>
+                <span>Giai đoạn 4 · Tiến độ</span>
               </button>
 
               <button
@@ -363,9 +363,9 @@ export default function StudentDashboard() {
               }`}
             >
               {!hasGroup
-                ? "🎓 STUDENT"
+                ? "🎓 LEADER"
                 : isLeader
-                  ? "👑 GROUP LEADER"
+                  ? "👑 LEADER"
                   : "👤 MEMBER"}
             </span>
           </div>
@@ -374,6 +374,83 @@ export default function StudentDashboard() {
         <div className="p-8 max-w-7xl mx-auto w-full">
           {hasGroup ? (
             <>
+              <div className="mb-6 rounded-3xl border border-[#E8E2D9] bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-[#9E958C]">
+                      Luồng thực hiện đồ án
+                    </p>
+                    <h2 className="mt-1 text-lg font-black text-[#2C2825]">
+                      6 giai đoạn chính của dự án
+                    </h2>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+                    {[
+                      "1. Đăng nhập",
+                      "2. Đề tài",
+                      "3. Tư vấn",
+                      "4. Tiến độ",
+                      "5. Review",
+                      "6. Bảo vệ",
+                    ].map((stage, index) => (
+                      <span
+                        key={stage}
+                        className={`rounded-full border px-2.5 py-1 ${
+                          index < 2
+                            ? "border-orange-200 bg-orange-50 text-[#E65100]"
+                            : index < 4
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        {stage}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6 grid gap-4 lg:grid-cols-3">
+                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-[#E65100]">
+                    Trạng thái hiện tại
+                  </p>
+                  <h3 className="mt-2 text-base font-black text-[#2C2825]">
+                    {groupData?.status === "ACTIVE" ? "Đã được duyệt chính thức" : groupData?.topicId ? "Đang chờ duyệt" : "Chưa nộp đề tài sơ bộ"}
+                  </h3>
+                  <p className="mt-2 text-[11px] text-[#6B635B]">
+                    {groupData?.status === "ACTIVE"
+                      ? "Nhóm đã được phân công GVHD và được phép triển khai đồ án."
+                      : "Leader cần hoàn thành bước 2 để chuyển sang giai đoạn tư vấn và triển khai."}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">
+                    Bước tiếp theo
+                  </p>
+                  <h3 className="mt-2 text-base font-black text-[#2C2825]">
+                    {groupData?.status === "ACTIVE" ? "Đặt lịch tư vấn 1:1" : "Nộp đề tài sơ bộ"}
+                  </h3>
+                  <p className="mt-2 text-[11px] text-[#6B635B]">
+                    {groupData?.status === "ACTIVE"
+                      ? "Tạo slot rảnh, gửi câu hỏi và hoàn thành pre-meeting trước buổi gặp." 
+                      : "Chọn đề tài phù hợp, gửi cho instructor và hội đồng để bắt đầu quy trình."}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                    Mốc quan trọng
+                  </p>
+                  <h3 className="mt-2 text-base font-black text-[#2C2825]">
+                    Review 1 → 2 → 3 → Bảo vệ
+                  </h3>
+                  <p className="mt-2 text-[11px] text-[#6B635B]">
+                    Hệ thống sẽ hỗ trợ theo dõi tiến độ, lọc nhóm và xác định lịch bảo vệ theo từng đợt.
+                  </p>
+                </div>
+              </div>
               {activeTab === "overview" && (
                 <Overview
                   groupData={groupData}
