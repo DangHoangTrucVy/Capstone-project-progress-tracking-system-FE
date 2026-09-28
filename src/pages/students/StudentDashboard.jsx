@@ -117,6 +117,8 @@ export default function StudentDashboard() {
   const isLeader =
     currentUser?.role === "GROUP_LEADER" ||
     (currentMemberInfo ? currentMemberInfo.isLeader : false);
+  const groupMemberCount = groupData?.members?.length ?? 0;
+  const hasCompleteTeam = groupMemberCount === 5;
 
   const getInitials = (name) => {
     if (!name) return "SV";
@@ -125,6 +127,18 @@ export default function StudentDashboard() {
       ? words[words.length - 2][0] + words[words.length - 1][0]
       : words[0].slice(0, 2).toUpperCase();
   };
+
+  const incompleteTeamNotice = (
+    <div className="bg-white border border-amber-200 rounded-2xl p-8 text-center space-y-2">
+      <h2 className="text-base font-black text-[#2C2825]">
+        Nhóm cần đủ 5 thành viên
+      </h2>
+      <p className="text-xs text-[#6B635B]">
+        Hiện nhóm có {groupMemberCount}/5 thành viên. Hãy vào mục Thành viên nhóm
+        để mời thêm người; các công việc đồ án sẽ mở khi nhóm đủ 5 thành viên.
+      </p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans">
@@ -161,8 +175,8 @@ export default function StudentDashboard() {
               <span className="font-bold text-[#6B635B]">Thành viên:</span>
               <span className="font-bold text-[#2C2825]">
                 {hasGroup
-                  ? `${groupData?.members?.length || 4}/6 người`
-                  : "0/6 (Yêu cầu 4-6)"}
+                  ? `${groupData?.members?.length || 0}/5 người`
+                  : "0/5 (yêu cầu đủ 5 người)"}
               </span>
             </div>
 
@@ -215,10 +229,14 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("schedule")}
+                disabled={!hasCompleteTeam}
+                title={hasCompleteTeam ? "" : "Cần đủ 5 thành viên để mở lịch hẹn"}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "schedule"
                     ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    : hasCompleteTeam
+                      ? "hover:bg-[#F8F6F0]"
+                      : "cursor-not-allowed opacity-50"
                 }`}
               >
                 <span>📅</span>
@@ -227,10 +245,14 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("progress")}
+                disabled={!hasCompleteTeam}
+                title={hasCompleteTeam ? "" : "Cần đủ 5 thành viên để mở tiến độ"}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "progress"
                     ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    : hasCompleteTeam
+                      ? "hover:bg-[#F8F6F0]"
+                      : "cursor-not-allowed opacity-50"
                 }`}
               >
                 <span>📈</span>
@@ -239,15 +261,25 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("documents")}
+                disabled={!hasCompleteTeam}
+                title={hasCompleteTeam ? "" : "Cần đủ 5 thành viên để mở tài liệu"}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                   activeTab === "documents"
                     ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    : hasCompleteTeam
+                      ? "hover:bg-[#F8F6F0]"
+                      : "cursor-not-allowed opacity-50"
                 }`}
               >
                 <span>📂</span>
                 <span>Tài liệu & Báo cáo</span>
               </button>
+
+              {!hasCompleteTeam && (
+                <p className="px-3 py-2 text-[10px] font-medium text-amber-700">
+                  Các công việc đồ án mở khi đủ 5 thành viên.
+                </p>
+              )}
 
               <button
                 onClick={() => setActiveTab("settings")}
@@ -342,23 +374,45 @@ export default function StudentDashboard() {
         <div className="p-8 max-w-7xl mx-auto w-full">
           {hasGroup ? (
             <>
-              {activeTab === "overview" && <Overview groupData={groupData} />}
-              {activeTab === "topics" && <Overview groupData={groupData} />}
-              {activeTab === "members" && (
-                <MemberGroup groupId={groupData?.id} isLeader={isLeader} />
+              {activeTab === "overview" && (
+                <Overview
+                  groupData={groupData}
+                  onGroupUpdated={checkUserGroup}
+                  isLeader={isLeader}
+                />
               )}
-              {activeTab === "schedule" && (
+              {activeTab === "topics" && (
+                <Overview
+                  groupData={groupData}
+                  onGroupUpdated={checkUserGroup}
+                  isLeader={isLeader}
+                />
+              )}
+              {activeTab === "members" && (
+                <MemberGroup
+                  groupId={groupData?.id}
+                  isLeader={isLeader}
+                  onGroupUpdated={checkUserGroup}
+                />
+              )}
+              {activeTab === "schedule" && (hasCompleteTeam ? (
                 <ScheduleGroup
                   groupId={groupData?.id}
                   topicId={groupData?.topicId || groupData?.topic?.id}
                 />
-              )}
-              {activeTab === "progress" && (
+              ) : (
+                incompleteTeamNotice
+              ))}
+              {activeTab === "progress" && (hasCompleteTeam ? (
                 <ProgressGroup groupId={groupData?.id} />
-              )}
-              {activeTab === "documents" && (
+              ) : (
+                incompleteTeamNotice
+              ))}
+              {activeTab === "documents" && (hasCompleteTeam ? (
                 <DocumentGroup groupId={groupData?.id} />
-              )}
+              ) : (
+                incompleteTeamNotice
+              ))}
               {activeTab === "settings" && <Profile />}{" "}
               {/* <-- Hiển thị component Profile tại đây */}
             </>

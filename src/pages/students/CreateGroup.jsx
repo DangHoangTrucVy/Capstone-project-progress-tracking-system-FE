@@ -3,11 +3,9 @@ import {
   createGroup,
   getAllGroups,
   getGroupById,
-  addGroupMember,
   joinGroup,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
-import api from "../../services/api";
 
 export default function CreateGroup({ onGroupCreated }) {
   const [subTab, setSubTab] = useState("create");
@@ -17,10 +15,6 @@ export default function CreateGroup({ onGroupCreated }) {
   const [groupCode, setGroupCode] = useState("");
   const semesterOptions = ["Fall2026", "Spring2027", "Summer2027", "Fall2027"];
   const [semester, setSemester] = useState("Fall2026");
-  const [topics, setTopics] = useState([]);
-  const [supervisors, setSupervisors] = useState([]);
-  const [topicId, setTopicId] = useState("");
-  const [supervisorId, setSupervisorId] = useState("");
 
   // State cho danh sách nhóm và tìm kiếm/lọc
   const [validGroups, setValidGroups] = useState([]);
@@ -37,25 +31,6 @@ export default function CreateGroup({ onGroupCreated }) {
         const userRes = await getCurrentUser();
         setCurrentUser(userRes);
 
-        const topicsRes = await api.get("/topics", {
-          params: { page: 0, size: 50 },
-        });
-        setTopics(topicsRes.data.content || topicsRes.data || []);
-
-        const usersRes = await api
-          .get("/users", { params: { page: 0, size: 50 } })
-          .catch(() => null);
-        if (usersRes) {
-          const userList = usersRes.data.content || usersRes.data || [];
-          const instructorList = userList.filter(
-            (u) =>
-              u.role === "INSTRUCTOR" ||
-              u.role === "TEACHER" ||
-              u.role === "LECTURER",
-          );
-          setSupervisors(instructorList.length > 0 ? instructorList : userList);
-        }
-
         const groupsRes = await getAllGroups();
         const groupList = groupsRes?.content || groupsRes || [];
 
@@ -69,9 +44,9 @@ export default function CreateGroup({ onGroupCreated }) {
         });
 
         const detailedGroups = await Promise.all(detailedGroupsPromises);
-        // Cập nhật giới hạn tối đa < 6 thành viên theo chuẩn BR-GROUP-02
+        // Chỉ hiển thị nhóm còn chỗ trong giới hạn 5 thành viên.
         setValidGroups(
-          detailedGroups.filter((g) => (g.members ? g.members.length : 0) < 6),
+          detailedGroups.filter((g) => (g.members ? g.members.length : 0) < 5),
         );
       } catch (error) {
         console.error("Lỗi tải dữ liệu ban đầu:", error);
@@ -88,8 +63,6 @@ export default function CreateGroup({ onGroupCreated }) {
       const groupPayload = {
         groupCode: groupCode.trim(),
         semester: semester.trim(),
-        topicId: topicId ? topicId.trim() : null,
-        supervisorId: supervisorId ? supervisorId.trim() : null,
       };
 
       const response = await createGroup(groupPayload);
@@ -235,45 +208,6 @@ export default function CreateGroup({ onGroupCreated }) {
                     </select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-[#2C2825] uppercase">
-                    Chọn Đề tài
-                  </label>
-                  <select
-                    value={topicId}
-                    onChange={(e) => setTopicId(e.target.value)}
-                    className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                  >
-                    <option value="">
-                      -- Chọn đề tài (Có thể đăng ký sau) --
-                    </option>
-                    {topics.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.topicCode ? `[${t.topicCode}] ` : ""}
-                        {t.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-[#2C2825] uppercase">
-                    Giảng viên hướng dẫn
-                  </label>
-                  <select
-                    value={supervisorId}
-                    onChange={(e) => setSupervisorId(e.target.value)}
-                    className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                  >
-                    <option value="">
-                      -- Chọn giảng viên (Có thể phân công sau) --
-                    </option>
-                    {supervisors.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.fullName || s.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <button
                   type="submit"
                   disabled={loading}
@@ -299,7 +233,11 @@ export default function CreateGroup({ onGroupCreated }) {
                     Mỗi sinh viên chỉ được tham gia duy nhất 01 nhóm trong học
                     kỳ.
                   </li>
-                  <li>Số lượng thành viên theo quy chế từ 4 đến 6 người.</li>
+                  <li>
+                    Nhóm cần đủ đúng 5 thành viên mới đủ điều kiện đăng ký và
+                    thực hiện các công việc đồ án. Sau khi tạo nhóm, Leader có
+                    thể chọn đề tài ở mục Tổng quan và mời thêm thành viên.
+                  </li>
                   <li>
                     Sau khi tạo nhóm, bạn có thể thêm/xóa thành viên thủ công.
                   </li>
@@ -389,7 +327,7 @@ export default function CreateGroup({ onGroupCreated }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredGroups.map((g) => {
                     const memberCount = g.members ? g.members.length : 0;
-                    const slotsLeft = 6 - memberCount; // Tính số chỗ trống dựa trên tối đa 6 người
+                    const slotsLeft = 5 - memberCount;
                     return (
                       <div
                         key={g.id}
@@ -418,7 +356,7 @@ export default function CreateGroup({ onGroupCreated }) {
                           <div className="text-[11px] text-[#6B635B] pt-2 border-t border-[#F0EBE1]">
                             <span>Thành viên hiện tại: </span>
                             <strong className="text-[#2C2825]">
-                              {memberCount}/6 người
+                              {memberCount}/5 người
                             </strong>
                           </div>
                         </div>

@@ -24,10 +24,10 @@ export default function JoinGroup({ onJoined }) {
 
                 const detailedGroups = await Promise.all(detailedGroupsPromises);
 
-                // Lọc các nhóm chưa đạt tối đa 6 thành viên theo chuẩn BR-GROUP-02
+                // Chỉ hiển thị nhóm còn chỗ trong giới hạn 5 thành viên.
                 const validGroups = detailedGroups.filter(g => {
                     const memberCount = g.members ? g.members.length : 0;
-                    return memberCount < 6;
+                    return memberCount < 5;
                 });
 
                 setGroups(validGroups);
@@ -83,7 +83,7 @@ export default function JoinGroup({ onJoined }) {
                     <div>
                         <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold rounded-full">⚠️ Chưa tham gia nhóm</span>
                         <h1 className="text-xl font-black text-[#2C2825] mt-1">Vui lòng chọn nhóm đồ án</h1>
-                        <p className="text-xs text-[#6B635B]">Hệ thống chỉ hiển thị các nhóm chưa đủ thành viên (tối đa 6 thành viên theo chuẩn quy chế).</p>
+                        <p className="text-xs text-[#6B635B]">Nhóm cần đủ đúng 5 thành viên mới đủ điều kiện làm đồ án tốt nghiệp.</p>
                     </div>
                     <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-red-500 font-bold text-xs rounded-xl transition cursor-pointer">
                         Đăng xuất
@@ -107,7 +107,7 @@ export default function JoinGroup({ onJoined }) {
                                                 <span className="px-2 py-0.5 bg-orange-100 text-[#E65100] text-[10px] font-bold rounded-md">{g.semester}</span>
                                             </div>
                                             <p className="text-xs font-semibold text-[#2C2825]">Đề tài: {g.topicTitle || "Chưa chọn đề tài"}</p>
-                                            <p className="text-[10px] text-[#6B635B]">Thành viên: {count}/6 người</p>
+                                            <p className="text-[10px] text-[#6B635B]">Thành viên: {count}/5 người</p>
                                         </div>
                                         <button 
                                             onClick={() => handleJoin(g.id)}
@@ -122,7 +122,7 @@ export default function JoinGroup({ onJoined }) {
                         </div>
                     ) : (
                         <div className="text-center py-10 space-y-3">
-                            <p className="text-xs text-[#6B635B]">Hiện tại không có nhóm nào trống hoặc các nhóm đều đã đủ 6 thành viên.</p>
+                            <p className="text-xs text-[#6B635B]">Hiện không có nhóm còn chỗ (tối đa 5 thành viên).</p>
                         </div>
                     )}
                 </div>
