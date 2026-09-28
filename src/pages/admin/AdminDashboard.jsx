@@ -110,6 +110,10 @@ export default function AdminDashboard() {
     }
 
     const targetTopicId = selectedGroup.topicId || selectedGroup.topic?.id;
+    if (!targetTopicId) {
+      alert("Nhóm chưa gửi đề tài để Admin xét duyệt.");
+      return;
+    }
 
     if (targetTopicId) {
       const alreadyApprovedGroup = groups.find(
@@ -465,7 +469,9 @@ export default function AdminDashboard() {
                   <p className="text-[11px] text-amber-600 font-bold pt-2">
                     {
                       groups.filter(
-                        (g) => g.status === "PENDING" || !g.supervisorId,
+                        (g) =>
+                          Boolean(g.topicId || g.topic?.id) &&
+                          g.status === "FORMED",
                       ).length
                     }{" "}
                     nhóm đang chờ duyệt
@@ -560,9 +566,13 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-4">
                             <span
-                              className={`px-3 py-1 font-bold rounded-full text-[10px] ${g.status === "APPROVED" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}
+                              className={`px-3 py-1 font-bold rounded-full text-[10px] ${g.status === "ACTIVE" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}
                             >
-                              {g.status || "PENDING"}
+                              {g.status === "ACTIVE"
+                                ? "Đã duyệt"
+                                : g.topicId || g.topic?.id
+                                  ? "Chờ duyệt"
+                                  : "Chưa gửi đề tài"}
                             </span>
                           </td>
                           <td className="p-4 font-medium text-[#6B635B]">
@@ -573,9 +583,13 @@ export default function AdminDashboard() {
                           <td className="p-4 text-right">
                             <button
                               onClick={() => handleOpenApproveModal(g)}
-                              className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                              disabled={!(g.topicId || g.topic?.id)}
+                              title={g.topicId || g.topic?.id ? "" : "Leader chưa gửi đề tài"}
+                              className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              🎯 Xét duyệt & Phân công
+                              {g.topicId || g.topic?.id
+                                ? "🎯 Xét duyệt & Phân công"
+                                : "Chưa có đề tài"}
                             </button>
                           </td>
                         </tr>

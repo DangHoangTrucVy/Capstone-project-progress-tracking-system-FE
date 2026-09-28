@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getGroupById, addGroupMember, removeGroupMember } from "../../services/groupService";
 
-export default function MemberGroup({ groupId, isLeader }) {
+export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
     const [groupData, setGroupData] = useState(null);
     const [memberInput, setMemberInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -28,9 +28,8 @@ export default function MemberGroup({ groupId, isLeader }) {
         }
         if (!memberInput.trim()) return;
 
-        // Cập nhật giới hạn tối đa thành 6 thành viên theo chuẩn BR-GROUP-02
-        if (groupData?.members && groupData.members.length >= 6) {
-            alert("Nhóm đã đạt số lượng tối đa (6 thành viên). Không thể thêm mới!");
+        if (groupData?.members && groupData.members.length >= 5) {
+            alert("Nhóm đã đạt số lượng tối đa (5 thành viên). Không thể thêm mới!");
             return;
         }
 
@@ -43,6 +42,7 @@ export default function MemberGroup({ groupId, isLeader }) {
             await addGroupMember(groupId, payload);
             setMemberInput("");
             await fetchGroupDetails();
+            if (onGroupUpdated) await onGroupUpdated();
             alert("Thêm thành viên thành công!");
         } catch (err) {
             console.error("Lỗi thêm thành viên:", err);
@@ -61,6 +61,7 @@ export default function MemberGroup({ groupId, isLeader }) {
         try {
             await removeGroupMember(groupId, memberId);
             await fetchGroupDetails();
+            if (onGroupUpdated) await onGroupUpdated();
             alert("Đã xóa thành viên thành công!");
         } catch (err) {
             console.error("Lỗi xóa thành viên:", err);
@@ -70,7 +71,7 @@ export default function MemberGroup({ groupId, isLeader }) {
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <h2 className="text-lg font-black text-[#2C2825]">Thành viên nhóm ({groupData?.members?.length || 0}/6 người)</h2>
+            <h2 className="text-lg font-black text-[#2C2825]">Thành viên nhóm ({groupData?.members?.length || 0}/5 người)</h2>
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] space-y-6 shadow-sm">
                 
                 {/* Thông tin Mã nhóm / Mã mời */}
@@ -93,7 +94,7 @@ export default function MemberGroup({ groupId, isLeader }) {
 
                 {/* Danh sách thành viên */}
                 <div className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-[#6B635B]">Danh sách hiện tại (Yêu cầu 4-6 người)</h3>
+                    <h3 className="text-xs font-black uppercase text-[#6B635B]">Danh sách hiện tại (cần đúng 5 người để làm đồ án tốt nghiệp)</h3>
                     {groupData?.members && groupData.members.length > 0 ? (
                         groupData.members.map((m) => (
                             <div key={m.id || m.userId} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center">
@@ -124,7 +125,7 @@ export default function MemberGroup({ groupId, isLeader }) {
 
                 {/* KHU VỰC THÊM THÀNH VIÊN */}
                 {isLeader ? (
-                    groupData?.members?.length < 6 ? (
+                    (groupData?.members?.length || 0) < 5 ? (
                         <form onSubmit={handleAddMember} className="pt-4 border-t border-[#E8E2D9] space-y-3">
                             <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên bằng MSSV</label>
                             <div className="flex space-x-2">
@@ -142,7 +143,7 @@ export default function MemberGroup({ groupId, isLeader }) {
                             </div>
                         </form>
                     ) : (
-                        <p className="text-xs text-amber-600 font-bold text-center pt-2">Nhóm đã đạt tối đa 6 thành viên.</p>
+                        <p className="text-xs text-amber-600 font-bold text-center pt-2">Nhóm đã đạt tối đa 5 thành viên.</p>
                     )
                 ) : (
                     <div className="pt-4 border-t border-[#E8E2D9] text-center">

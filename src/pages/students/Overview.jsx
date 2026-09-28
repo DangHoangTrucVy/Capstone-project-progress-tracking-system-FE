@@ -1,32 +1,58 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import api from "../../services/api";
+import { getAllGroups } from "../../services/groupService";
 
-export default function Overview({ groupData, onGroupUpdated }) {
+export default function Overview({ groupData, onGroupUpdated, isLeader }) {
   const [topics, setTopics] = useState([]);
   const [isEditingTopic, setIsEditingTopic] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState(
     groupData?.topicId || "",
   );
   const [loading, setLoading] = useState(false);
+  const [loadingTopics, setLoadingTopics] = useState(false);
 
   // Trạng thái phê duyệt đề tài thực tế từ backend
-  const topicApprovalStatus = groupData?.status || "PENDING";
-  const isApproved = topicApprovalStatus === "ACTIVE"; // Kiểm tra nếu đã được duyệt (độc quyền/ACTIVE)
+  const topicApprovalStatus = groupData?.status || "FORMED";
+  const hasSubmittedTopic = Boolean(groupData?.topicId || groupData?.topic?.id);
+  const isApproved = topicApprovalStatus === "ACTIVE";
+  const groupMemberCount = groupData?.members?.length ?? 0;
 
-  // Tải danh sách đề tài đã publish để Trưởng nhóm chọn
-  useEffect(() => {
-    const fetchPublishedTopics = async () => {
-      try {
-        const res = await api.get("/topics", {
-          params: { status: "PUBLISHED" },
-        });
-        setTopics(res.data.content || res.data || []);
-      } catch (err) {
-        console.error("Không thể tải danh sách đề tài:", err);
-      }
-    };
-    fetchPublishedTopics();
-  }, []);
+  const loadAvailableTopics = async () => {
+    setLoadingTopics(true);
+    try {
+      const [topicsRes, groupsRes] = await Promise.all([
+        api.get("/topics", { params: { status: "PUBLISHED" } }),
+        getAllGroups(),
+      ]);
+      const topicList = topicsRes.data.content || topicsRes.data || [];
+      const groupList = groupsRes?.content || groupsRes || [];
+      const approvedTopicIds = new Set(
+        groupList
+          .filter((group) => group.status === "ACTIVE")
+          .map((group) => group.topicId || group.topic?.id)
+          .filter(Boolean)
+          .map(String),
+      );
+
+      setTopics(
+        topicList.filter((topic) => !approvedTopicIds.has(String(topic.id))),
+      );
+      return true;
+    } catch (err) {
+      console.error("Không thể tải danh sách đề tài:", err);
+      setTopics([]);
+      alert("Không thể tải danh sách đề tài. Vui lòng thử lại.");
+      return false;
+    } finally {
+      setLoadingTopics(false);
+    }
+  };
+
+  const handleOpenTopicSelector = async () => {
+    if (await loadAvailableTopics()) {
+      setIsEditingTopic(true);
+    }
+  };
 
   const handleUpdateTopic = async (e) => {
     e.preventDefault();
@@ -37,14 +63,18 @@ export default function Overview({ groupData, onGroupUpdated }) {
       );
       return;
     }
+    if (!isLeader) {
+      alert("Chỉ Trưởng nhóm mới có thể đăng ký đề tài.");
+      return;
+    }
 
     setLoading(true);
     try {
       await api.put(`/groups/${groupData.id}`, {
         groupCode: groupData.groupCode,
         semester: groupData.semester,
-        status: "PENDING",
-        topicId: selectedTopicId || null,
+        status: "FORMED",
+        topicId: selectedTopicId,
         supervisorId: groupData.supervisorId || null,
       });
       alert(
@@ -102,9 +132,13 @@ export default function Overview({ groupData, onGroupUpdated }) {
               <span className="font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-[11px] border border-emerald-200">
                 ✓ ĐÃ ĐƯỢC PHÊ DUYỆT (ACTIVE)
               </span>
-            ) : (
+            ) : hasSubmittedTopic ? (
               <span className="font-extrabold text-amber-700 bg-amber-50 px-3 py-1 rounded-full text-[11px] border border-amber-200">
-                ⏳ ĐANG CHỜ ADMIN / GVHD DUYỆT (PENDING)
+                ⏳ ĐANG CHỜ ADMIN DUYỆT
+              </span>
+            ) : (
+              <span className="font-extrabold text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-[11px] border border-gray-200">
+                CHƯA GỬI ĐỀ TÀI
               </span>
             )}
           </div>
@@ -130,14 +164,17 @@ export default function Overview({ groupData, onGroupUpdated }) {
 
                 <div className="flex items-center gap-2.5">
                   {/* Nút đổi đề tài chỉ hiển thị khi CHƯA được duyệt (Không hiển thị khi đã là ACTIVE) */}
-                  {!isApproved && (
+                  {!isApproved && isLeader && (
                     <button
-                      onClick={() => setIsEditingTopic(true)}
+                      onClick={handleOpenTopicSelector}
+                      disabled={loadingTopics}
                       className="px-4 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-2xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>🎯</span>
                       <span>
-                        {groupData?.topicId
+                        {loadingTopics
+                          ? "Đang tải đề tài..."
+                          : groupData?.topicId
                           ? "Đổi đề tài / Gửi lại yêu cầu"
                           : "Chọn đề tài & Gửi duyệt"}
                       </span>
@@ -158,7 +195,7 @@ export default function Overview({ groupData, onGroupUpdated }) {
                   >
                     <span>👥</span>
                     <span>
-                      Mời thành viên ({groupData?.members?.length || 1}/6)
+                      Mời thành viên ({groupMemberCount}/5)
                     </span>
                   </button>
                 </div>
@@ -179,7 +216,11 @@ export default function Overview({ groupData, onGroupUpdated }) {
                   className="flex-1 px-4 py-2.5 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                   required
                 >
-                  <option value="">-- Chọn đề tài hệ thống --</option>
+                  <option value="">
+                    {topics.length > 0
+                      ? "-- Chọn đề tài hệ thống --"
+                      : "-- Hiện không còn đề tài khả dụng --"}
+                  </option>
                   {topics.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.topicCode ? `[${t.topicCode}] ` : ""}
@@ -189,7 +230,7 @@ export default function Overview({ groupData, onGroupUpdated }) {
                 </select>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || topics.length === 0}
                   className="px-5 py-2.5 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
                 >
                   {loading ? "Đang gửi..." : "Gửi yêu cầu duyệt"}
@@ -218,7 +259,7 @@ export default function Overview({ groupData, onGroupUpdated }) {
           <div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-black text-[#2C2825]">
-                {groupData?.members?.length || 1}/6
+                {groupMemberCount}/5
               </span>
               <span className="text-xs text-[#6B635B]">sinh viên</span>
             </div>
@@ -226,13 +267,15 @@ export default function Overview({ groupData, onGroupUpdated }) {
               <div
                 className="bg-[#E65100] h-full rounded-full"
                 style={{
-                  width: `${((groupData?.members?.length || 1) / 6) * 100}%`,
+                  width: `${(groupMemberCount / 5) * 100}%`,
                 }}
               ></div>
             </div>
           </div>
           <p className="text-[10px] text-[#9E958C] pt-1">
-            Đạt chuẩn quy chế nhóm (4-6 người)
+            {groupMemberCount === 5
+              ? "Đủ 5 thành viên, được mở các công việc đồ án"
+              : `Cần đủ 5 thành viên để mở các công việc đồ án (${groupMemberCount}/5)`}
           </p>
         </div>
 
@@ -297,7 +340,9 @@ export default function Overview({ groupData, onGroupUpdated }) {
           <p className="text-[10px] text-orange-600 font-bold pt-1">
             {isApproved
               ? "Trạng thái: Đã duyệt chính thức"
-              : "Trạng thái: Chờ duyệt đề tài"}
+              : hasSubmittedTopic
+                ? "Trạng thái: Chờ Admin duyệt"
+                : "Trạng thái: Chưa gửi đề tài"}
           </p>
         </div>
       </div>
@@ -355,15 +400,21 @@ export default function Overview({ groupData, onGroupUpdated }) {
                   </p>
                   <p className="text-[10px] text-[#6B635B]">
                     {isApproved
-                      ? "Đề tài đã được Admin/GVHD thông qua và khóa độc quyền."
-                      : "Chọn đề tài hệ thống, trạng thái chuyển sang ACTIVE khi được duyệt."}
+                      ? "Đề tài đã được Admin thông qua và khóa độc quyền."
+                      : hasSubmittedTopic
+                        ? "Đề tài đã gửi Admin; trạng thái chuyển sang ACTIVE sau khi duyệt."
+                        : "Leader chọn đề tài hệ thống để gửi Admin duyệt."}
                   </p>
                 </div>
               </div>
               <span
                 className={`text-[10px] font-bold px-2.5 py-1 rounded-md shrink-0 ${isApproved ? "text-emerald-700 bg-emerald-100" : "text-amber-700 bg-amber-100"}`}
               >
-                {isApproved ? "Đã hoàn tất" : "Đang chờ duyệt"}
+                {isApproved
+                  ? "Đã hoàn tất"
+                  : hasSubmittedTopic
+                    ? "Đang chờ duyệt"
+                    : "Chưa gửi"}
               </span>
             </div>
           </div>
@@ -388,18 +439,28 @@ export default function Overview({ groupData, onGroupUpdated }) {
                 <strong
                   className={isApproved ? "text-emerald-700" : "text-[#E65100]"}
                 >
-                  {isApproved ? "Đề tài đã được khóa" : "Phê duyệt đề tài"}
+                  {isApproved
+                    ? "Đề tài đã được khóa"
+                    : hasSubmittedTopic
+                      ? "Chờ Admin duyệt đề tài"
+                      : "Gửi đề tài để duyệt"}
                 </strong>
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isApproved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
                 >
-                  {isApproved ? "Active" : "Chờ duyệt"}
+                  {isApproved
+                    ? "Active"
+                    : hasSubmittedTopic
+                      ? "Chờ duyệt"
+                      : "Chưa gửi"}
                 </span>
               </div>
               <p className="text-[11px] text-[#6B635B]">
                 {isApproved
                   ? "Nhóm đã chính thức bước vào giai đoạn thực hiện đồ án."
-                  : "Hệ thống ghi nhận đề tài và chờ Admin/GVHD thông qua."}
+                  : hasSubmittedTopic
+                    ? "Hệ thống đã ghi nhận đề tài và đang chờ Admin thông qua."
+                    : "Chọn đề tài ở mục Tổng quan để gửi Admin duyệt."}
               </p>
             </div>
           </div>
