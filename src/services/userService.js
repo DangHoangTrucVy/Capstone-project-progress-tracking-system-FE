@@ -34,6 +34,6 @@ export const updateUser = async (id, userData) => {
 // };
 
 export const getUsersByRole = async (role) => {
-  const response = await api.get(`/api/v1/users`, { params: { role } });
+  const response = await api.get(`/users`, { params: { role } });
   return response.data;
 };

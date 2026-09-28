@@ -4,54 +4,46 @@ const MainLayout = ({ children, user, onLogout }) => {
     return (
         <div className="min-h-screen bg-[#F8F6F0] text-[#2C2825] flex flex-col font-sans selection:bg-[#E65100] selection:text-white relative overflow-hidden">
             
-            {/* ================= HIỆU ỨNG NỀN AMBIENT GLOW ================= */}
             <div className="absolute top-0 left-1/4 w-125 h-125 bg-orange-300/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
             <div className="absolute bottom-10 right-10 w-112.5 h-112.5 bg-amber-200/25 rounded-full blur-[140px] pointer-events-none -z-10"></div>
-            {/* ============================================================ */}
 
-            {/* HEADER CHUYÊN NGHIỆP */}
+            {/* HEADER */}
             <header className="bg-white/80 backdrop-blur-md border-b border-[#E8E2D9] sticky top-0 z-40 shadow-sm">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center space-x-8">
                         <div className="flex items-center space-x-3">
-                            <div className="w-9 h-9 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black text-base shadow-md shadow-orange-500/20">
+                            <div className="w-9 h-9 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black text-base shadow-md">
                                 F
                             </div>
                             <span className="font-black text-base tracking-tight text-[#2C2825]">
-                                Capstone <span className="text-[#E65100]">Manager</span>
+                                Lịch <span className="text-[#E65100]">Đồ Án</span>
                             </span>
                         </div>
                         <nav className="hidden md:flex items-center space-x-1">
-                            <a href="/student/dashboard" className="px-3 py-2 rounded-xl text-xs font-bold text-[#E65100] bg-[#FFF3EE]">Tổng quan</a>
-                            <a href="#topics" className="px-3 py-2 rounded-xl text-xs font-semibold text-[#6B635B] hover:text-[#2C2825] hover:bg-gray-50/50 transition">Đề tài</a>
-                            <a href="#schedule" className="px-3 py-2 rounded-xl text-xs font-semibold text-[#6B635B] hover:text-[#2C2825] hover:bg-gray-50/50 transition">Lịch hẹn</a>
+                            <a href="/leader/dashboard" className="px-3 py-2 rounded-xl text-xs font-bold text-[#E65100] bg-[#FFF3EE]">Tổng quan</a>
                         </nav>
                     </div>
 
                     <div className="flex items-center space-x-4">
-                        {/* 🐶 CHÚ CÚN VẪY TAY CHÀO (Hiển thị ngay cạnh tên người dùng) */}
                         <div className="hidden lg:flex items-center mr-1 relative group">
-                            <div className="w-12 h-12 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center text-xl shadow-inner relative select-none right-5">
+                            <div className="w-10 h-10 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center text-lg shadow-inner relative select-none">
                                 🐶
-                                {/* Bàn tay vẫy hiệu ứng động */}
-                                <span className="absolute -top-1 -right-1 text-sm animate-wave origin-bottom-right ">
+                                <span className="absolute -top-1 -right-1 text-xs animate-wave origin-bottom-right">
                                     👋
                                 </span>
                             </div>
-                            
-                            {/* Khung chat nhỏ xuất hiện khi hover vào cún */}
-                            <div className="absolute right-0 top-12 hidden group-hover:block bg-white text-xs px-3 py-1.5 rounded-xl shadow-lg border border-orange-100 whitespace-nowrap text-[#E65100] font-semibold animate-fade-in z-50">
+                            <div className="absolute right-0 top-12 hidden group-hover:block bg-white text-xs px-3 py-1.5 rounded-xl shadow-lg border border-orange-100 whitespace-nowrap text-[#E65100] font-semibold z-50">
                                 Chúc bạn một ngày code vui vẻ! ✨
                             </div>
                         </div>
 
                         <div className="text-right hidden sm:block">
                             <p className="text-xs font-bold text-[#2C2825]">{user?.fullName || "Đặng Hoàng Trúc Vy"}</p>
-                            <p className="text-[10px] text-[#E65100] font-bold uppercase">Sinh viên • FPT University</p>
+                            <p className="text-[10px] text-[#E65100] font-bold uppercase">Trưởng nhóm • FPT University</p>
                         </div>
                         <button 
                             onClick={onLogout}
-                            className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition flex items-center space-x-1.5"
+                            className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition flex items-center space-x-1.5 cursor-pointer"
                         >
                             <span>Đăng xuất</span>
                         </button>
@@ -64,19 +56,17 @@ const MainLayout = ({ children, user, onLogout }) => {
                 {children}
             </main>
 
-            {/* FOOTER TINH TẾ */}
+            {/* FOOTER */}
             <footer className="bg-white/80 backdrop-blur-md border-t border-[#E8E2D9] py-6 mt-auto z-10">
                 <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-[#6B635B] gap-4">
                     <p>© 2026 Đại học FPT - Hệ thống Quản lý Đồ án Tốt nghiệp.</p>
                     <div className="flex space-x-6">
                         <a href="#" className="hover:text-[#E65100] transition">Quy chế đồ án</a>
                         <a href="#" className="hover:text-[#E65100] transition">Tài liệu hướng dẫn</a>
-                        <a href="#" className="hover:text-[#E65100] transition">Hỗ trợ kỹ thuật</a>
                     </div>
                 </div>
             </footer>
 
-            {/* Định nghĩa Keyframes animation vẫy tay cho Tailwind */}
             <style>{`
                 @keyframes wave {
                     0% { transform: rotate(0deg); }

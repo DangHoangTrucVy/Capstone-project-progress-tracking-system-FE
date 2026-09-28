@@ -124,7 +124,7 @@ export default function CreateGroup({ onGroupCreated }) {
     return matchesSearch && matchesCategory;
   });
 
-  const isAlreadyLeader = currentUser?.role === "GROUP_LEADER";
+  const isAlreadyLeader = ["LEADER", "GROUP_LEADER"].includes(currentUser?.role);
   const categories = [
     "Tất cả",
     "Trí tuệ nhân tạo",

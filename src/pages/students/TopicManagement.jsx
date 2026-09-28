@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function TopicManagement({ userRole = "STUDENT" }) {
+export default function TopicManagement({ userRole = "LEADER" }) {
     // State cho phía sinh viên đăng ký đề tài
     const [topicForm, setTopicForm] = useState({
         titleVi: "",
@@ -60,14 +60,14 @@ export default function TopicManagement({ userRole = "STUDENT" }) {
                 </span>
                 <h1 className="text-xl font-black">Đăng ký & Phê duyệt Đề tài Capstone</h1>
                 <p className="text-xs text-[#6B635B]">
-                    {userRole === "STUDENT" 
+                    {userRole === "LEADER" || userRole === "GROUP_LEADER"
                         ? "Trưởng nhóm nộp thông tin đề tài đồ án tốt nghiệp để Hội đồng xem xét." 
                         : "Hội đồng / Admin kiểm duyệt và phân bổ Giảng viên hướng dẫn cho các nhóm."}
                 </p>
             </div>
 
             {/* GIAO DIỆN DÀNH CHO SINH VIÊN (ĐĂNG KÝ ĐỀ TÀI) */}
-            {userRole === "STUDENT" && (
+            {["LEADER", "GROUP_LEADER"].includes(userRole) && (
                 <form onSubmit={handleRegisterTopic} className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
                     <h3 className="text-xs font-black uppercase text-[#6B635B]">Form Đăng ký Đề tài Mới</h3>
                     
