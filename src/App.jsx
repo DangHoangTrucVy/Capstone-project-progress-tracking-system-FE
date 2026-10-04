@@ -4,6 +4,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 import Login from "./auth/Login";
 import Home from "./components/Home";
+import Support from "./components/Support"; // Trang Hỗ trợ ở các bước trước
+import Privacy from "./components/Privacy"; // Trang Chính sách
+import Contact from "./components/Contact"; // Trang Liên hệ
 import StudentDashboard from "./pages/students/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
@@ -18,6 +21,9 @@ const App = () => {
         </Route>
 
         <Route path="/" element={<Home />} />
+        <Route path="/support" element={<Support />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={<Login />} />
 
         <Route element={<ProtectedRoute allowedRoles={["LEADER", "GROUP_LEADER"]} />}>
