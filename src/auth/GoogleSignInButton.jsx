@@ -44,7 +44,6 @@ const GoogleSignInButton = ({ clientId, onCredential, onError, disabled }) => {
           client_id: clientId,
           callback: (response) => callbackRef.current?.(response.credential),
           ux_mode: "popup",
-          hd: "fpt.edu.vn",
         });
         window.google.accounts.id.renderButton(containerRef.current, {
           type: "standard",

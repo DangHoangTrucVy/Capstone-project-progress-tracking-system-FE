@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { login, loginWithGoogle, getGoogleConfig, getCampuses } from "../services/authService";
 import GoogleSignInButton from "./GoogleSignInButton";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import fptBg from "../assets/fpt-bg.jpg";
 
 const CAMPUS_LABELS = {
@@ -12,7 +12,14 @@ const CAMPUS_LABELS = {
   QUY_NHON: "Quy Nhơn",
 };
 
+// Sinh viên đăng ký bằng email cá nhân: trạng thái chờ duyệt / bị từ chối (dùng cho cả mật khẩu và Google)
+const REGISTRATION_ERRORS = {
+  ACCOUNT_PENDING_APPROVAL: "Đăng ký của bạn đang chờ Admin xác nhận là sinh viên của trường. Vui lòng quay lại sau.",
+  ACCOUNT_REJECTED: null, // dùng message của backend vì có kèm lý do
+};
+
 const GOOGLE_ERRORS = {
+  REGISTRATION_REQUIRED: "Email cá nhân cần đăng ký (kèm MSSV) và được Admin duyệt trước khi đăng nhập.",
   ACCOUNT_NOT_PROVISIONED: "Tài khoản chưa được cấp quyền. Vui lòng liên hệ Admin để được tạo tài khoản.",
   WORKSPACE_REQUIRED: "Vui lòng dùng tài khoản Google của trường (@fpt.edu.vn), không dùng Gmail cá nhân.",
   CAMPUS_MISMATCH: "Tài khoản này thuộc campus khác. Vui lòng chọn đúng campus.",
@@ -97,6 +104,10 @@ const Login = () => {
       const message =
         status === 429
           ? "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ một lúc trước khi thử lại."
+          : errorCode === "ACCOUNT_PENDING_APPROVAL"
+          ? REGISTRATION_ERRORS.ACCOUNT_PENDING_APPROVAL
+          : errorCode === "ACCOUNT_REJECTED"
+          ? `Đăng ký bị từ chối. ${error.response?.data?.message || ""} Bạn có thể đăng ký lại với thông tin chính xác.`
           : errorCode === "INVALID_CREDENTIALS"
           ? "Email hoặc mật khẩu không đúng. Hãy kiểm tra thông tin đăng nhập hoặc liên hệ Admin để xác nhận tài khoản."
           : error.response?.data?.message ||
@@ -136,7 +147,9 @@ const Login = () => {
     } catch (error) {
       const errorCode = error.response?.data?.errorCode;
       showToast(
-        GOOGLE_ERRORS[errorCode] ||
+        (errorCode === "ACCOUNT_REJECTED"
+          ? `Đăng ký bị từ chối. ${error.response?.data?.message || ""}`
+          : REGISTRATION_ERRORS[errorCode] || GOOGLE_ERRORS[errorCode]) ||
           error.response?.data?.message ||
           "Đăng nhập Google thất bại. Vui lòng thử lại.",
         "error"
@@ -213,7 +226,7 @@ const Login = () => {
                 Đăng nhập hệ thống
               </h1>
               <p className="text-xs text-[#6B635B]">
-                Nhập email trường định danh <strong className="text-[#E65100]">@fpt.edu.vn</strong> để truy cập.
+                Dùng email trường <strong className="text-[#E65100]">@fpt.edu.vn</strong>, hoặc email cá nhân đã đăng ký và được duyệt.
               </p>
             </div>
 
@@ -221,13 +234,13 @@ const Login = () => {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-bold text-[#2C2825]">
-                  Email trường 
+                  Email
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="username@fpt.edu.vn"
+                  placeholder="username@fpt.edu.vn hoặc email cá nhân"
                   required
                   className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-2.5 text-xs outline-none transition focus:border-[#E65100] focus:bg-white"
                 />
@@ -300,6 +313,13 @@ const Login = () => {
                 {googleConfig ? "Đăng nhập Google chưa được cấu hình trên máy chủ." : "Đang tải..."}
               </p>
             )}
+
+            <p className="text-center text-xs text-[#6B635B]">
+              Chưa có email trường?{" "}
+              <Link to="/register" className="font-bold text-[#E65100] hover:underline">
+                Đăng ký bằng email cá nhân
+              </Link>
+            </p>
           </div>
 
           <div className="flex justify-between items-center text-[11px] text-[#9E958C] pt-4 border-t border-[#F0EBE1]">

@@ -4,6 +4,7 @@ import { getAllGroups } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import { getReportsSummary } from "../../services/progressService";
 import Profile from "../../auth/Profile";
+import RegistrationReview from "./RegistrationReview";
 
 const defaultSystemSettings = {
   semester: "Fall2026",
@@ -278,6 +279,20 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => {
+                setActiveMenu("registrations");
+                setSearchQuery("");
+              }}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+                activeMenu === "registrations"
+                  ? "bg-[#E65100] text-white shadow-md"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>📝</span>
+              <span>Duyệt đăng ký sinh viên</span>
+            </button>
+            <button
+              onClick={() => {
                 setActiveMenu("groups");
                 setSearchQuery("");
               }}
@@ -516,6 +531,9 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* --- STUDENT SIGN-UPS WITH A PERSONAL EMAIL --- */}
+          {activeMenu === "registrations" && <RegistrationReview />}
 
           {/* --- GROUPS MANAGEMENT (QUẢN LÝ NHÓM & CAN THIỆP SAU KHI KHÓA) --- */}
           {activeMenu === "groups" && (
