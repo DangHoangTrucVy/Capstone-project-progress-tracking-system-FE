@@ -8,10 +8,8 @@ const normalizeRole = (value) =>
     .replace(/[^A-Z_]/g, '');
 
 const roleGroups = {
+  STUDENT: ['STUDENT', 'LEADER', 'GROUP_LEADER'], // <-- Bổ sung STUDENT vào đây
   ADMIN: ['ADMIN', 'SYSTEM_ADMIN'],
-  LEADER: ['LEADER', 'GROUP_LEADER'],
-  INSTRUCTOR: ['INSTRUCTOR', 'LECTURER', 'TEACHER', 'REVIEWER'],
-  COUNCIL: ['COUNCIL', 'COUNCIL_MEMBER', 'COUNCILCHAIR'],
 };
 
 const acceptedRoles = new Set(

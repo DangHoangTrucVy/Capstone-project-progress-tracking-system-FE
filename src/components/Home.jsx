@@ -7,23 +7,23 @@ const Home = () => {
 
   const rolesData = [
     {
-      title: "Leader",
-      heading: "Trưởng nhóm sinh viên điều hành đồ án",
+      title: "Student & Leader",
+      heading: "Quản lý nhóm và tham gia đợt đồ án",
       features: [
-        "Nộp danh sách đề tài sơ bộ và theo dõi kết quả duyệt",
-        "Đặt lịch hẹn tư vấn 1:1 theo slot trống của giảng viên",
-        "Theo dõi tiến độ, nộp tài liệu và nhận thông báo phản hồi",
+        "Kiểm tra trạng thái đủ điều kiện và nhận cờ từ Phòng đào tạo",
+        "Tạo nhóm mới (quy mô 3–5 người) hoặc gửi đơn Apply (tối đa 3 đơn chờ)",
+        "Nhận lời mời (Invite), quản lý thành viên và xin rời/kick trước khi khóa danh sách",
       ],
-      btnText: "Đăng nhập với vai trò Leader",
+      btnText: "Đăng nhập với vai trò Student / Leader",
       link: "/login",
     },
     {
       title: "Admin",
-      heading: "Quản lý hệ thống và phân quyền",
+      heading: "Quản trị hệ thống và cấu hình đầu kỳ",
       features: [
-        "Quản lý tài khoản, role và cấu hình hệ thống",
-        "Mở/đóng cổng nộp đề tài theo từng đợt duyệt",
-        "Giám sát toàn bộ quá trình đồ án từ đầu đến bảo vệ",
+        "Import danh sách sinh viên và quản lý cờ điều kiện tham gia",
+        "Cấu hình thời hạn đơn Apply và Invite (mặc định 48 giờ)",
+        "Can thiệp chỉnh sửa danh sách nhóm và thay đổi Leader sau khi đã khóa",
       ],
       btnText: "Đăng nhập với vai trò Admin",
       link: "/login",
@@ -72,12 +72,6 @@ const Home = () => {
               Tính năng
             </a>
             <a
-              href="#cach-hoat-dong"
-              className="hover:text-[#E65100] transition-colors"
-            >
-              Cách hoạt động
-            </a>
-            <a
               href="#danh-cho-ai"
               className="hover:text-[#E65100] transition-colors"
             >
@@ -102,21 +96,19 @@ const Home = () => {
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F5EBE1] text-[#E65100] text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#E65100] animate-pulse"></span>
-              Dành cho sinh viên & giảng viên hướng dẫn
+              Quản lý sinh viên từ lập nhóm đến bảo vệ
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-black text-[#2C2825] leading-[1.15] tracking-tight">
-              Đồ án tốt nghiệp,
+              Quản lý đồ án tốt nghiệp,
               <br />
-              đúng hẹn và đúng
+              bắt đầu từ việc
               <br />
-              tiến độ
+              lập nhóm vững chắc
             </h1>
 
             <p className="text-[#6B635B] text-base leading-relaxed max-w-lg">
-              Đặt lịch hẹn với giảng viên hướng dẫn, theo dõi từng mốc đồ án và
-              nộp tài liệu — tất cả trong một nền tảng duy nhất cho Khoa Công
-              nghệ thông tin.
+              Hệ thống quản lý và theo dõi đồ án tốt nghiệp chuyên biệt cho Khoa Công nghệ thông tin: kiểm tra điều kiện đầu kỳ, tạo nhóm, quản lý đơn Apply, Invite và phân quyền minh bạch.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -138,7 +130,7 @@ const Home = () => {
                   ✓
                 </div>
                 <span className="text-xs font-bold text-[#2C2825]">
-                  Đã xác nhận lịch hẹn
+                  Đã duyệt thành viên nhóm
                 </span>
               </div>
 
@@ -160,12 +152,12 @@ const Home = () => {
                     <div
                       className="w-full h-full rounded-full flex items-center justify-center"
                       style={{
-                        background: `conic-gradient(#E65100 0% 46%, #F3EFEA 46% 100%)`,
+                        background: `conic-gradient(#E65100 0% 80%, #F3EFEA 80% 100%)`,
                       }}
                     >
                       <div className="w-15.5 h-15.5 bg-white rounded-full flex items-center justify-center shadow-inner">
                         <span className="font-extrabold text-sm text-[#2C2825]">
-                          46%
+                          5/5
                         </span>
                       </div>
                     </div>
@@ -186,18 +178,10 @@ const Home = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-20 border-t border-[#E8E2D9] mt-16 text-center">
             <div className="group cursor-default">
               <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
-                10
+                3–5
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Nhóm đồ án tham gia
-              </div>
-            </div>
-            <div className="group cursor-default">
-              <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
-                4
-              </div>
-              <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Lần duyệt đề tài tối đa
+                Quy mô thành viên nhóm
               </div>
             </div>
             <div className="group cursor-default">
@@ -205,15 +189,23 @@ const Home = () => {
                 3
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Vòng review tiến độ
+                Giới hạn đơn Apply chờ
               </div>
             </div>
             <div className="group cursor-default">
               <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
-                100%
+                48h
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Chuẩn hóa quy trình
+                Thời hạn phản hồi đơn / lời mời
+              </div>
+            </div>
+            <div className="group cursor-default">
+              <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
+                3
+              </div>
+              <div className="text-xs font-medium text-[#6B635B] mt-1">
+                Vai trò quản lý (Student/Leader/Admin)
               </div>
             </div>
           </div>
@@ -232,57 +224,53 @@ const Home = () => {
                 TÍNH NĂNG
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-[#2C2825]">
-                Mọi thứ cần cho một đồ án đúng tiến độ
+                Quản lý sinh viên đầu kỳ toàn diện
               </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">
-                  📊
+                  🚩
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Duyệt đề tài 4 lần
+                  Kiểm tra điều kiện & Cờ
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Quy trình thẩm định đề tài minh bạch qua hội đồng, thời hạn
-                  chuẩn hóa rõ ràng.
+                  Phòng đào tạo import danh sách, gắn cờ sinh viên không đủ điều kiện tham gia đầu kỳ.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">
-                  📅
+                  👥
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Đặt lịch hẹn 1:1
+                  Tạo nhóm & Sĩ số 3–5
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Chọn khung giờ trống của GVHD kèm ngân hàng câu hỏi thảo luận
-                  trước buổi họp.
+                  Sinh viên tạo nhóm làm Leader, tuyển thành viên đảm bảo quy mô từ 3 đến 5 người chính thức.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">
-                  ⏱️
+                  📨
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Cờ cảnh báo tiến độ
+                  Đơn Apply & Invite
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Giảng viên gắn cờ cảnh báo (Warning Flags) khi nhóm chậm trễ
-                  hoặc thành viên không chủ động.
+                  Quản lý tối đa 3 đơn Apply đang chờ, gửi lời mời trực tiếp và xem hồ sơ riêng tư của ứng viên.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
                 <div className="w-10 h-10 bg-[#F5EBE1] text-[#E65100] rounded-xl flex items-center justify-center font-bold text-lg">
-                  🎓
+                  ⚙️
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Hội đồng kín & Bảo vệ
+                  Quản trị viên (Admin)
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Trải qua 3 vòng review và hội đồng kín trước khi bước vào bảo
-                  vệ cuốn chiếu cuối kỳ.
+                  Cấu hình thời hạn hệ thống, can thiệp thay đổi nhân sự và xử lý các trường hợp đặc biệt sau khóa danh sách.
                 </p>
               </div>
             </div>

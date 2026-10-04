@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAllGroups, getGroupById, addGroupMember } from "../../services/groupService";
-import { getCurrentUser } from "../../services/authService";
+import { getAllGroups, getGroupById, joinGroup } from "../../services/groupService";
 
 export default function JoinGroup({ onJoined }) {
     const [groups, setGroups] = useState([]);
@@ -24,7 +23,7 @@ export default function JoinGroup({ onJoined }) {
 
                 const detailedGroups = await Promise.all(detailedGroupsPromises);
 
-                // Chỉ hiển thị nhóm còn chỗ trong giới hạn 5 thành viên.
+                // Chỉ hiển thị nhóm còn chỗ trong giới hạn tối đa 5 thành viên.
                 const validGroups = detailedGroups.filter(g => {
                     const memberCount = g.members ? g.members.length : 0;
                     return memberCount < 5;
@@ -44,12 +43,8 @@ export default function JoinGroup({ onJoined }) {
         if (!window.confirm("Bạn có chắc chắn muốn tham gia nhóm này không?")) return;
         setJoiningId(groupId);
         try {
-            const currentUser = await getCurrentUser();
-            
-            await addGroupMember(groupId, {
-                userId: currentUser.id,
-                isLeader: false
-            });
+            // Sử dụng endpoint chuẩn POST /api/v1/groups/{groupId}/join cho sinh viên tự gia nhập
+            await joinGroup(groupId);
 
             alert("Tham gia nhóm thành công!");
             localStorage.setItem("groupId", groupId);
@@ -57,13 +52,13 @@ export default function JoinGroup({ onJoined }) {
             window.location.reload();
         } catch (err) {
             if (err.response?.status === 409) {
-                alert("Bạn đã là thành viên của nhóm này rồi!");
+                alert("Bạn đã là thành viên của nhóm này rồi hoặc đã thuộc nhóm khác!");
                 localStorage.setItem("groupId", groupId);
                 if (onJoined) onJoined();
                 window.location.reload();
             } else {
                 console.error("Lỗi tham gia nhóm:", err);
-                const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại quyền hoặc API Backend.";
+                const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại điều kiện tham gia.";
                 alert(errorMsg);
             }
         } finally {
@@ -83,7 +78,7 @@ export default function JoinGroup({ onJoined }) {
                     <div>
                         <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold rounded-full">⚠️ Chưa tham gia nhóm</span>
                         <h1 className="text-xl font-black text-[#2C2825] mt-1">Vui lòng chọn nhóm đồ án</h1>
-                        <p className="text-xs text-[#6B635B]">Nhóm cần đủ đúng 5 thành viên mới đủ điều kiện làm đồ án tốt nghiệp.</p>
+                        <p className="text-xs text-[#6B635B]">Quy mô nhóm hợp lệ cần đạt từ 3 đến 5 thành viên để thực hiện đồ án tốt nghiệp.</p>
                     </div>
                     <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-red-500 font-bold text-xs rounded-xl transition cursor-pointer">
                         Đăng xuất
@@ -99,6 +94,7 @@ export default function JoinGroup({ onJoined }) {
                         <div className="space-y-3">
                             {groups.map((g) => {
                                 const count = g.members ? g.members.length : 0;
+                                const slotsLeft = 5 - count;
                                 return (
                                     <div key={g.id} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center">
                                         <div className="space-y-1">
@@ -106,8 +102,8 @@ export default function JoinGroup({ onJoined }) {
                                                 <h3 className="text-xs font-black text-[#2C2825]">{g.groupCode}</h3>
                                                 <span className="px-2 py-0.5 bg-orange-100 text-[#E65100] text-[10px] font-bold rounded-md">{g.semester}</span>
                                             </div>
-                                            <p className="text-xs font-semibold text-[#2C2825]">Đề tài: {g.topicTitle || "Chưa chọn đề tài"}</p>
-                                            <p className="text-[10px] text-[#6B635B]">Thành viên: {count}/5 người</p>
+                                            <p className="text-xs font-semibold text-[#2C2825]">Học kỳ: {g.semester || "Fall2026"}</p>
+                                            <p className="text-[10px] text-[#6B635B]">Thành viên: {count}/5 người (Còn trống {slotsLeft} chỗ)</p>
                                         </div>
                                         <button 
                                             onClick={() => handleJoin(g.id)}
@@ -122,12 +118,12 @@ export default function JoinGroup({ onJoined }) {
                         </div>
                     ) : (
                         <div className="text-center py-10 space-y-3">
-                            <p className="text-xs text-[#6B635B]">Hiện không có nhóm còn chỗ (tối đa 5 thành viên).</p>
+                            <p className="text-xs text-[#6B635B]">Hiện không có nhóm nào còn chỗ trống (tối đa 5 thành viên).</p>
                         </div>
                     )}
                 </div>
             </div>
-            <footer className="text-center text-[10px] text-[#6B635B] pb-4">Lịch Đồ Án · Khoa Công nghệ thông tin</footer>
+            <footer className="text-center text-[10px] text-[#6B635B] pb-4">Lịch Đồ Án · Khoa Công nghệ thông tin · Đại học FPT</footer>
         </div>
     );
 }

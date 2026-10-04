@@ -9,8 +9,7 @@ import Privacy from "./components/Privacy"; // Trang Chính sách
 import Contact from "./components/Contact"; // Trang Liên hệ
 import StudentDashboard from "./pages/students/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import InstructorDashboard from "./pages/instructor/InstructorDashboard";
-import CouncilDashboard from "./pages/council/CouncilDashboard";
+
 
 const App = () => {
   return (
@@ -26,18 +25,11 @@ const App = () => {
         <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={<Login />} />
 
-        <Route element={<ProtectedRoute allowedRoles={["LEADER", "GROUP_LEADER"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["STUDENT", "LEADER", "GROUP_LEADER"]} />}>
           <Route path="/leader/dashboard" element={<StudentDashboard />} />
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
         </Route>
-
-        <Route element={<ProtectedRoute allowedRoles={["INSTRUCTOR", "LECTURER", "TEACHER", "REVIEWER"]} />}>
-          <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
-          <Route path="/lecturer/dashboard" element={<InstructorDashboard />} />
-        </Route>
-
-        <Route element={<ProtectedRoute allowedRoles={["COUNCIL", "COUNCIL_MEMBER", "COUNCILCHAIR", "ADMIN"]} />}>
-          <Route path="/council/dashboard" element={<CouncilDashboard />} />
-        </Route>
+        
       </Routes>
     </BrowserRouter>
   );
