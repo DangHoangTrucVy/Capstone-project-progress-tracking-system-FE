@@ -1,7 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { login } from "../services/authService";
+import React, { useState, useEffect, useCallback } from "react";
+import { login, loginWithGoogle, getGoogleConfig, getCampuses } from "../services/authService";
+import GoogleSignInButton from "./GoogleSignInButton";
 import { useNavigate } from "react-router-dom";
 import fptBg from "../assets/fpt-bg.jpg";
+
+const CAMPUS_LABELS = {
+  HA_NOI: "Hà Nội",
+  HO_CHI_MINH: "TP. Hồ Chí Minh",
+  DA_NANG: "Đà Nẵng",
+  CAN_THO: "Cần Thơ",
+  QUY_NHON: "Quy Nhơn",
+};
+
+const GOOGLE_ERRORS = {
+  ACCOUNT_NOT_PROVISIONED: "Tài khoản chưa được cấp quyền. Vui lòng liên hệ Admin để được tạo tài khoản.",
+  WORKSPACE_REQUIRED: "Vui lòng dùng tài khoản Google của trường (@fpt.edu.vn), không dùng Gmail cá nhân.",
+  CAMPUS_MISMATCH: "Tài khoản này thuộc campus khác. Vui lòng chọn đúng campus.",
+  GOOGLE_NOT_CONFIGURED: "Máy chủ chưa cấu hình đăng nhập Google.",
+  GOOGLE_UNAVAILABLE: "Không kết nối được Google lúc này, vui lòng thử lại.",
+  GOOGLE_SIGN_IN_FAILED: "Xác thực Google thất bại, vui lòng thử lại.",
+};
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -16,7 +34,20 @@ const Login = () => {
     type: "success",
   });
 
+  const [googleConfig, setGoogleConfig] = useState(null);
+  const [campuses, setCampuses] = useState(Object.keys(CAMPUS_LABELS));
+  const [campus, setCampus] = useState(() => localStorage.getItem("campus") || "");
+
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getGoogleConfig()
+      .then(setGoogleConfig)
+      .catch(() => setGoogleConfig({ enabled: false }));
+    getCampuses()
+      .then((list) => Array.isArray(list) && list.length && setCampuses(list))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
@@ -52,11 +83,7 @@ const Login = () => {
         password: password,
       });
 
-      const userRole = result.user?.role || result.role;
-
-      localStorage.setItem("accessToken", result.accessToken);
-      localStorage.setItem("user", JSON.stringify(result.user));
-      localStorage.setItem("role", userRole);
+      finishLogin(result);
 
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", normalizedEmail);
@@ -64,11 +91,6 @@ const Login = () => {
         localStorage.removeItem("rememberedEmail");
       }
 
-      showToast("Đăng nhập thành công! Đang chuyển hướng...", "success");
-
-      setTimeout(() => {
-        navigateBasedOnRole(userRole);
-      }, 1500);
     } catch (error) {
       const status = error.response?.status;
       const errorCode = error.response?.data?.errorCode;
@@ -84,6 +106,47 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // Lưu phiên đăng nhập (dùng chung cho mật khẩu và Google) rồi chuyển trang theo role
+  const finishLogin = (result) => {
+    const userRole = result.user?.role || result.role;
+
+    localStorage.setItem("accessToken", result.accessToken);
+    localStorage.setItem("user", JSON.stringify(result.user));
+    localStorage.setItem("role", userRole);
+
+    showToast("Đăng nhập thành công! Đang chuyển hướng...", "success");
+
+    setTimeout(() => {
+      navigateBasedOnRole(userRole);
+    }, 1500);
+  };
+
+  // Google trả về ID token; backend kiểm tra token, domain trường và tài khoản đã được Admin cấp
+  const handleGoogleCredential = async (idToken) => {
+    if (!campus) {
+      showToast("Vui lòng chọn campus trước khi đăng nhập bằng Google.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await loginWithGoogle({ idToken, campus });
+      localStorage.setItem("campus", campus);
+      finishLogin(result);
+    } catch (error) {
+      const errorCode = error.response?.data?.errorCode;
+      showToast(
+        GOOGLE_ERRORS[errorCode] ||
+          error.response?.data?.message ||
+          "Đăng nhập Google thất bại. Vui lòng thử lại.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = useCallback((message) => showToast(message, "error"), []);
 
   const navigateBasedOnRole = (userRole) => {
     const normalizedRole = String(userRole || "")
@@ -208,20 +271,35 @@ const Login = () => {
               <div className="grow border-t border-[#E8E2D9]"></div>
             </div>
 
-            {/* Nút đăng nhập Google Workspace phụ ở dưới */}
-            <button
-              type="button"
-              onClick={() => showToast("Chức năng xác thực Google OAuth2 đang được backend tích hợp.", "success")}
-              className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#E8E2D9] bg-white py-3 text-xs font-bold text-[#2C2825] shadow-sm transition-all hover:bg-gray-50 cursor-pointer active:scale-95"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.95H1.2v3.15C3.16 21.32 7.23 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.25c-.25-.72-.38-1.49-.38-2.25s.13-1.53.38-2.25V6.6H1.2C.44 8.13 0 9.87 0 12s.44 3.87 1.2 5.4l4.08-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.23 0 3.16 2.68 1.2 6.6l4.08 3.15c.95-2.84 3.6-4.95 6.72-4.95z"/>
-              </svg>
-              Đăng nhập bằng Google 
-            </button>
+            {/* Đăng nhập Google Workspace: chọn campus rồi bấm nút Google */}
+            {googleConfig?.enabled ? (
+              <div className="space-y-2">
+                <select
+                  value={campus}
+                  onChange={(e) => setCampus(e.target.value)}
+                  className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-2.5 text-xs outline-none transition focus:border-[#E65100] focus:bg-white cursor-pointer"
+                >
+                  <option value="" disabled>
+                    Chọn campus để đăng nhập bằng Google
+                  </option>
+                  {campuses.map((c) => (
+                    <option key={c} value={c}>
+                      {CAMPUS_LABELS[c] || c}
+                    </option>
+                  ))}
+                </select>
+                <GoogleSignInButton
+                  clientId={googleConfig.clientId}
+                  onCredential={handleGoogleCredential}
+                  onError={handleGoogleError}
+                  disabled={loading || !campus}
+                />
+              </div>
+            ) : (
+              <p className="text-center text-[11px] text-[#9E958C]">
+                {googleConfig ? "Đăng nhập Google chưa được cấu hình trên máy chủ." : "Đang tải..."}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-between items-center text-[11px] text-[#9E958C] pt-4 border-t border-[#F0EBE1]">
