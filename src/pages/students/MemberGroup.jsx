@@ -46,7 +46,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
             alert("Thêm thành viên thành công!");
         } catch (err) {
             console.error("Lỗi thêm thành viên:", err);
-            alert(err.response?.data?.message || "Thêm thành viên thất bại. Vui lòng kiểm tra lại ID/MSSV.");
+            alert(err.response?.data?.message || "Thêm thành viên thất bại. Vui lòng kiểm tra lại MSSV.");
         } finally {
             setLoading(false);
         }
@@ -69,15 +69,27 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
         }
     };
 
+    const memberCount = groupData?.members?.length || 0;
+    const isValidSize = memberCount >= 3 && memberCount <= 5;
+
     return (
         <div className="space-y-6 animate-fadeIn">
-            <h2 className="text-lg font-black text-[#2C2825]">Thành viên nhóm ({groupData?.members?.length || 0}/5 người)</h2>
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
+                <div>
+                    <h2 className="text-lg font-black text-[#2C2825]">Thành viên nhóm ({memberCount}/5 người)</h2>
+                    <p className="text-xs text-[#6B635B] mt-1">Yêu cầu quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.</p>
+                </div>
+                <div>
+                    <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${isValidSize ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+                        {isValidSize ? "✓ Sĩ số hợp lệ" : "⚠️ Cần từ 3–5 thành viên"}
+                    </span>
+                </div>
+            </div>
+
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] space-y-6 shadow-sm">
-                
-                {/* Thông tin Mã nhóm / Mã mời */}
                 <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200 flex justify-between items-center">
                     <div>
-                        <p className="text-[10px] font-bold text-orange-600 uppercase">Mã nhóm / Mã mời</p>
+                        <p className="text-[10px] font-bold text-orange-600 uppercase">Mã nhóm</p>
                         <h4 className="text-sm font-black text-[#2C2825]">{groupData?.groupCode || "Đang tải..."}</h4>
                     </div>
                     <button 
@@ -92,9 +104,8 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                     </button>
                 </div>
 
-                {/* Danh sách thành viên */}
                 <div className="space-y-3">
-                    <h3 className="text-xs font-black uppercase text-[#6B635B]">Danh sách hiện tại (cần đúng 5 người để làm đồ án tốt nghiệp)</h3>
+                    <h3 className="text-xs font-black uppercase text-[#6B635B]">Danh sách thành viên hiện tại</h3>
                     {groupData?.members && groupData.members.length > 0 ? (
                         groupData.members.map((m) => (
                             <div key={m.id || m.userId} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center">
@@ -104,7 +115,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                                 </div>
                                 <div className="flex items-center space-x-3">
                                     <span className={`px-3 py-1 text-[10px] font-bold rounded-full ${m.isLeader ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-600"}`}>
-                                        {m.isLeader ? "👑 Trưởng nhóm" : "👤 Thành viên"}
+                                        {m.isLeader ? "👑 Trưởng nhóm (Leader)" : "👤 Thành viên"}
                                     </span>
                                     {isLeader && !m.isLeader && (
                                         <button 
@@ -112,7 +123,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                                             onClick={() => handleRemoveMember(m.id || m.userId)} 
                                             className="text-red-500 font-bold text-xs hover:underline bg-red-50 px-2.5 py-1 rounded-lg cursor-pointer"
                                         >
-                                            Xóa
+                                            Xóa 
                                         </button>
                                     )}
                                 </div>
@@ -123,11 +134,10 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                     )}
                 </div>
 
-                {/* KHU VỰC THÊM THÀNH VIÊN */}
                 {isLeader ? (
-                    (groupData?.members?.length || 0) < 5 ? (
+                    memberCount < 5 ? (
                         <form onSubmit={handleAddMember} className="pt-4 border-t border-[#E8E2D9] space-y-3">
-                            <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên bằng MSSV</label>
+                            <label className="block text-xs font-bold text-[#2C2825]">Thêm thành viên trực tiếp bằng MSSV</label>
                             <div className="flex space-x-2">
                                 <input 
                                     type="text" 
@@ -138,12 +148,12 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                                     className="flex-1 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]" 
                                 />
                                 <button type="submit" disabled={loading} className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50 transition cursor-pointer">
-                                    {loading ? "Đang thêm..." : "Thêm"}
+                                    {loading ? "Đang thêm..." : "Thêm thành viên"}
                                 </button>
                             </div>
                         </form>
                     ) : (
-                        <p className="text-xs text-amber-600 font-bold text-center pt-2">Nhóm đã đạt tối đa 5 thành viên.</p>
+                        <p className="text-xs text-amber-600 font-bold text-center pt-2">Nhóm đã đạt sĩ số tối đa (5 thành viên).</p>
                     )
                 ) : (
                     <div className="pt-4 border-t border-[#E8E2D9] text-center">
@@ -152,7 +162,6 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                         </p>
                     </div>
                 )}
-
             </div>
         </div>
     );

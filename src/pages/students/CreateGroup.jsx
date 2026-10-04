@@ -11,17 +11,13 @@ export default function CreateGroup({ onGroupCreated }) {
   const [subTab, setSubTab] = useState("create");
   const [currentUser, setCurrentUser] = useState(null);
 
-  // State cho form Tạo nhóm
   const [groupCode, setGroupCode] = useState("");
   const semesterOptions = ["Fall2026", "Spring2027", "Summer2027", "Fall2027"];
   const [semester, setSemester] = useState("Fall2026");
 
-  // State cho danh sách nhóm và tìm kiếm/lọc
   const [validGroups, setValidGroups] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Tất cả");
   const [inviteCode, setInviteCode] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [joiningId, setJoiningId] = useState(null);
 
@@ -44,7 +40,7 @@ export default function CreateGroup({ onGroupCreated }) {
         });
 
         const detailedGroups = await Promise.all(detailedGroupsPromises);
-        // Chỉ hiển thị nhóm còn chỗ trong giới hạn 5 thành viên.
+        // Chỉ hiển thị nhóm chưa đạt tối đa 5 thành viên
         setValidGroups(
           detailedGroups.filter((g) => (g.members ? g.members.length : 0) < 5),
         );
@@ -69,7 +65,7 @@ export default function CreateGroup({ onGroupCreated }) {
       if (response && response.id) {
         localStorage.setItem("groupId", response.id);
       }
-      alert("Tạo nhóm thành công! Bạn đã trở thành Trưởng nhóm.");
+      alert("Tạo nhóm thành công! Bạn đã trở thành Trưởng nhóm (Leader).");
       if (onGroupCreated) onGroupCreated();
     } catch (error) {
       console.error("Lỗi tạo nhóm:", error);
@@ -88,7 +84,6 @@ export default function CreateGroup({ onGroupCreated }) {
     setJoiningId(groupId);
     try {
       await joinGroup(groupId);
-
       alert("Tham gia nhóm thành công!");
       localStorage.setItem("groupId", groupId);
       if (onGroupCreated) onGroupCreated();
@@ -109,32 +104,22 @@ export default function CreateGroup({ onGroupCreated }) {
     if (found) {
       handleJoinGroup(found.id);
     } else {
-      alert("Không tìm thấy nhóm với mã mời này hoặc nhóm đã đầy!");
+      alert("Không tìm thấy nhóm với mã mời này hoặc nhóm đã đủ 5 thành viên!");
     }
   };
 
-  // Lọc danh sách nhóm theo tìm kiếm và category
   const filteredGroups = validGroups.filter((g) => {
-    const matchesSearch =
+    return (
       g.groupCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (g.topicTitle &&
-        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory =
-      selectedCategory === "Tất cả" || g.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
   });
 
   const isAlreadyLeader = ["LEADER", "GROUP_LEADER"].includes(currentUser?.role);
-  const categories = [
-    "Tất cả",
-    "Trí tuệ nhân tạo",
-    "Công nghệ phần mềm",
-    "An toàn thông tin",
-  ];
 
   return (
     <main className="max-w-6xl mx-auto py-10 px-6 space-y-8 animate-fadeIn">
-      {/* Header switcher */}
       <div className="flex justify-center">
         <div className="bg-[#F3EFEA] p-1.5 rounded-2xl max-w-md w-full grid grid-cols-2 gap-2 shadow-inner">
           <button
@@ -169,7 +154,7 @@ export default function CreateGroup({ onGroupCreated }) {
               Bạn đã là Trưởng nhóm của một nhóm khác!
             </p>
             <p className="text-xs text-[#6B635B]">
-              Không thể khởi tạo thêm nhóm mới trong học kỳ này.
+              Mỗi sinh viên không làm Leader nhiều nhóm trong cùng đợt luận án.
             </p>
           </div>
         ) : (
@@ -185,7 +170,7 @@ export default function CreateGroup({ onGroupCreated }) {
                       type="text"
                       value={groupCode}
                       onChange={(e) => setGroupCode(e.target.value)}
-                      placeholder="VD: G2026-02"
+                      placeholder="VD: G2026-01"
                       required
                       className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                     />
@@ -217,7 +202,7 @@ export default function CreateGroup({ onGroupCreated }) {
                     {loading ? "Đang xử lý..." : "Xác nhận tạo nhóm ngay"}
                   </span>
                   <span className="text-[10px] font-normal normal-case opacity-90">
-                    (Khi tạo nhóm, bạn sẽ trở thành Trưởng nhóm)
+                    (Bạn sẽ trở thành Trưởng nhóm chính thức đầu tiên)
                   </span>
                 </button>
               </form>
@@ -226,20 +211,19 @@ export default function CreateGroup({ onGroupCreated }) {
               <div className="bg-white p-6 rounded-4xl border border-[#E8E2D9] shadow-sm space-y-3">
                 <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
                   <span>💡</span>
-                  <span>Lưu ý quan trọng</span>
+                  <span>Quy chế lập nhóm</span>
                 </div>
                 <ul className="space-y-2 text-[11px] text-[#6B635B] list-disc pl-4 leading-relaxed">
                   <li>
-                    Mỗi sinh viên chỉ được tham gia duy nhất 01 nhóm trong học
-                    kỳ.
+                    Quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.
                   </li>
                   <li>
-                    Nhóm cần đủ đúng 5 thành viên mới đủ điều kiện đăng ký và
-                    thực hiện các công việc đồ án. Sau khi tạo nhóm, Leader có
-                    thể chọn đề tài ở mục Tổng quan và mời thêm thành viên.
+                    Mỗi sinh viên chỉ thuộc một nhóm chính thức tại một thời
+                    điểm trong cùng đợt luận án.
                   </li>
                   <li>
-                    Sau khi tạo nhóm, bạn có thể thêm/xóa thành viên thủ công.
+                    Leader có quyền xét duyệt đơn hoặc gửi lời mời (Invite) trực
+                    tiếp cho thành viên.
                   </li>
                 </ul>
               </div>
@@ -247,9 +231,7 @@ export default function CreateGroup({ onGroupCreated }) {
           </div>
         )
       ) : (
-        /* GIAO DIỆN THAM GIA NHÓM */
         <div className="space-y-8">
-          {/* Hộp nhập mã mời nhanh */}
           <div className="bg-white p-8 rounded-4xl border border-[#E8E2D9] shadow-sm max-w-4xl mx-auto space-y-4">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#E65100] flex items-center justify-center font-black">
@@ -257,10 +239,10 @@ export default function CreateGroup({ onGroupCreated }) {
               </div>
               <div>
                 <h3 className="text-sm font-black text-[#2C2825]">
-                  Tham gia bằng Mã nhóm / Mã mời
+                  Tham gia bằng Mã nhóm
                 </h3>
                 <p className="text-xs text-[#6B635B]">
-                  Nhập mã nhóm từ Trưởng nhóm để gia nhập ngay lập tức.
+                  Nhập mã nhóm từ Trưởng nhóm để gia nhập trực tiếp.
                 </p>
               </div>
             </div>
@@ -282,15 +264,15 @@ export default function CreateGroup({ onGroupCreated }) {
             </form>
           </div>
 
-          {/* Danh sách nhóm đang tìm kiếm thành viên */}
           <div className="space-y-6 max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h3 className="text-base font-black text-[#2C2825]">
-                  Danh sách nhóm trống ({filteredGroups.length} nhóm)
+                  Danh sách nhóm đang tuyển thành viên ({filteredGroups.length}{" "}
+                  nhóm)
                 </h3>
                 <p className="text-xs text-[#6B635B]">
-                  Chọn nhóm phù hợp và bấm tham gia để vào nhóm ngay.
+                  Chọn nhóm phù hợp và bấm tham gia (sĩ số tối đa 5 người).
                 </p>
               </div>
               <div className="w-full md:w-72">
@@ -298,82 +280,49 @@ export default function CreateGroup({ onGroupCreated }) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Tìm theo mã nhóm, đề tài..."
+                  placeholder="🔍 Tìm theo mã nhóm..."
                   className="w-full px-4 py-2.5 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                 />
               </div>
             </div>
 
-            {/* Bộ lọc Thể loại */}
-            <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition shrink-0 cursor-pointer ${
-                    selectedCategory === cat
-                      ? "bg-[#2C2825] text-white shadow-sm"
-                      : "bg-white text-[#6B635B] border border-[#E8E2D9]"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Khung chứa Grid Card Nhóm */}
             {filteredGroups.length > 0 ? (
-              <div className="max-h-130 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredGroups.map((g) => {
-                    const memberCount = g.members ? g.members.length : 0;
-                    const slotsLeft = 5 - memberCount;
-                    return (
-                      <div
-                        key={g.id}
-                        className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                      >
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[10px] font-black rounded-lg">
-                              {g.groupCode}
-                            </span>
-                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-lg">
-                              Còn {slotsLeft} chỗ
-                            </span>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-black text-[#2C2825] line-clamp-2">
-                              {g.topicTitle || "Đề tài chưa cập nhật"}
-                            </h4>
-                            <p className="text-[11px] text-[#6B635B] mt-1">
-                              GVHD:{" "}
-                              <strong className="text-[#2C2825]">
-                                {g.supervisorName || "Chưa phân công"}
-                              </strong>
-                            </p>
-                          </div>
-                          <div className="text-[11px] text-[#6B635B] pt-2 border-t border-[#F0EBE1]">
-                            <span>Thành viên hiện tại: </span>
-                            <strong className="text-[#2C2825]">
-                              {memberCount}/5 người
-                            </strong>
-                          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredGroups.map((g) => {
+                  const memberCount = g.members ? g.members.length : 0;
+                  const slotsLeft = 5 - memberCount;
+                  return (
+                    <div
+                      key={g.id}
+                      className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[10px] font-black rounded-lg">
+                            {g.groupCode}
+                          </span>
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-lg">
+                            Còn {slotsLeft} chỗ (Tối đa 5)
+                          </span>
                         </div>
-
-                        <button
-                          onClick={() => handleJoinGroup(g.id)}
-                          disabled={joiningId === g.id}
-                          className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
-                        >
-                          {joiningId === g.id
-                            ? "Đang xử lý..."
-                            : "Tham gia ngay"}
-                        </button>
+                        <div className="text-[11px] text-[#6B635B] pt-2 border-t border-[#F0EBE1]">
+                          <span>Thành viên hiện tại: </span>
+                          <strong className="text-[#2C2825]">
+                            {memberCount}/5 người
+                          </strong>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      <button
+                        onClick={() => handleJoinGroup(g.id)}
+                        disabled={joiningId === g.id}
+                        className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {joiningId === g.id ? "Đang xử lý..." : "Tham gia ngay"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-16 bg-white rounded-3xl border border-[#E8E2D9] space-y-2">
@@ -381,8 +330,7 @@ export default function CreateGroup({ onGroupCreated }) {
                   Không tìm thấy nhóm phù hợp
                 </p>
                 <p className="text-[11px] text-[#6B635B]">
-                  Thử thay đổi từ khóa tìm kiếm hoặc tự tạo nhóm mới cho riêng
-                  bạn.
+                  Hãy tự tạo nhóm mới để bắt đầu tuyển thành viên.
                 </p>
               </div>
             )}

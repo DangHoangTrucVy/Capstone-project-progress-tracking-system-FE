@@ -96,13 +96,9 @@ const Login = () => {
     } else if (["LEADER", "GROUP_LEADER"].includes(normalizedRole)) {
       navigate("/leader/dashboard");
     } else if (
-      ["INSTRUCTOR", "LECTURER", "TEACHER", "REVIEWER"].includes(normalizedRole)
+      ["STUDENT"].includes(normalizedRole)
     ) {
-      navigate("/instructor/dashboard");
-    } else if (
-      ["COUNCIL", "COUNCIL_MEMBER", "COUNCILCHAIR"].includes(normalizedRole)
-    ) {
-      navigate("/council/dashboard");
+      navigate("/student/dashboard");
     } else {
       navigate("/");
     }
