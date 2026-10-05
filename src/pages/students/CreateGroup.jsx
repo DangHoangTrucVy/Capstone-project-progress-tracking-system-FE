@@ -1,55 +1,24 @@
 import React, { useState, useEffect } from "react";
-import {
-  createGroup,
-  getAllGroups,
-  getGroupById,
-  joinGroup,
-} from "../../services/groupService";
+import { createGroup } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 
 export default function CreateGroup({ onGroupCreated }) {
-  const [subTab, setSubTab] = useState("create");
   const [currentUser, setCurrentUser] = useState(null);
-
   const [groupCode, setGroupCode] = useState("");
   const semesterOptions = ["Fall2026", "Spring2027", "Summer2027", "Fall2027"];
   const [semester, setSemester] = useState("Fall2026");
-
-  const [validGroups, setValidGroups] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [joiningId, setJoiningId] = useState(null);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchUser = async () => {
       try {
         const userRes = await getCurrentUser();
         setCurrentUser(userRes);
-
-        const groupsRes = await getAllGroups();
-        const groupList = groupsRes?.content || groupsRes || [];
-
-        const detailedGroupsPromises = groupList.map(async (g) => {
-          try {
-            const detail = await getGroupById(g.id);
-            return detail || g;
-          } catch (err) {
-            return g;
-          }
-        });
-
-        const detailedGroups = await Promise.all(detailedGroupsPromises);
-        // Chỉ hiển thị nhóm chưa đạt tối đa 5 thành viên
-        setValidGroups(
-          detailedGroups.filter((g) => (g.members ? g.members.length : 0) < 5),
-        );
       } catch (error) {
-        console.error("Lỗi tải dữ liệu ban đầu:", error);
+        console.error("Lỗi tải thông tin user:", error);
       }
     };
-
-    fetchInitialData();
+    fetchUser();
   }, []);
 
   const handleCreateGroupSubmit = async (e) => {
@@ -64,6 +33,8 @@ export default function CreateGroup({ onGroupCreated }) {
       const response = await createGroup(groupPayload);
       if (response && response.id) {
         localStorage.setItem("groupId", response.id);
+      } else if (response && response.data?.id) {
+        localStorage.setItem("groupId", response.data.id);
       }
       alert("Tạo nhóm thành công! Bạn đã trở thành Trưởng nhóm (Leader).");
       if (onGroupCreated) onGroupCreated();
@@ -78,262 +49,85 @@ export default function CreateGroup({ onGroupCreated }) {
     }
   };
 
-  const handleJoinGroup = async (groupId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn tham gia nhóm này không?"))
-      return;
-    setJoiningId(groupId);
-    try {
-      await joinGroup(groupId);
-      alert("Tham gia nhóm thành công!");
-      localStorage.setItem("groupId", groupId);
-      if (onGroupCreated) onGroupCreated();
-    } catch (err) {
-      console.error("Lỗi tham gia nhóm:", err);
-      alert(err.response?.data?.message || "Không thể tham gia nhóm này.");
-    } finally {
-      setJoiningId(null);
-    }
-  };
-
-  const handleJoinByCode = (e) => {
-    e.preventDefault();
-    if (!inviteCode.trim()) return;
-    const found = validGroups.find(
-      (g) => g.groupCode.toLowerCase() === inviteCode.trim().toLowerCase(),
-    );
-    if (found) {
-      handleJoinGroup(found.id);
-    } else {
-      alert("Không tìm thấy nhóm với mã mời này hoặc nhóm đã đủ 5 thành viên!");
-    }
-  };
-
-  const filteredGroups = validGroups.filter((g) => {
-    return (
-      g.groupCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (g.topicTitle &&
-        g.topicTitle.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  });
-
   const isAlreadyLeader = ["LEADER", "GROUP_LEADER"].includes(currentUser?.role);
 
   return (
-    <main className="max-w-6xl mx-auto py-10 px-6 space-y-8 animate-fadeIn">
-      <div className="flex justify-center">
-        <div className="bg-[#F3EFEA] p-1.5 rounded-2xl max-w-md w-full grid grid-cols-2 gap-2 shadow-inner">
-          <button
-            type="button"
-            onClick={() => setSubTab("create")}
-            className={`py-3 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer ${
-              subTab === "create"
-                ? "bg-white text-[#2C2825] shadow-md scale-[1.02]"
-                : "text-[#6B635B]"
-            }`}
-          >
-            🚀 Tạo nhóm mới
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab("join")}
-            className={`py-3 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer ${
-              subTab === "join"
-                ? "bg-white text-[#2C2825] shadow-md scale-[1.02]"
-                : "text-[#6B635B]"
-            }`}
-          >
-            👥 Tham gia nhóm có sẵn
-          </button>
+    <main className="max-w-6xl mx-auto py-4 px-6 space-y-8 animate-fadeIn">
+      {isAlreadyLeader ? (
+        <div className="max-w-xl mx-auto text-center py-12 space-y-3 bg-white rounded-3xl border border-[#E8E2D9] shadow-sm p-8">
+          <p className="text-sm font-bold text-amber-600">
+            Bạn đã là Trưởng nhóm của một nhóm khác!
+          </p>
+          <p className="text-xs text-[#6B635B]">
+            Mỗi sinh viên không làm Leader nhiều nhóm trong cùng đợt luận án.
+          </p>
         </div>
-      </div>
-
-      {subTab === "create" ? (
-        isAlreadyLeader ? (
-          <div className="max-w-xl mx-auto text-center py-12 space-y-3 bg-white rounded-3xl border border-[#E8E2D9] shadow-sm p-8">
-            <p className="text-sm font-bold text-amber-600">
-              Bạn đã là Trưởng nhóm của một nhóm khác!
-            </p>
-            <p className="text-xs text-[#6B635B]">
-              Mỗi sinh viên không làm Leader nhiều nhóm trong cùng đợt luận án.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start max-w-5xl mx-auto">
-            <div className="lg:col-span-2 bg-white p-8 md:p-10 rounded-4xl border border-[#E8E2D9] shadow-lg shadow-stone-200/40">
-              <form onSubmit={handleCreateGroupSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-[#2C2825] uppercase">
-                      Mã nhóm *
-                    </label>
-                    <input
-                      type="text"
-                      value={groupCode}
-                      onChange={(e) => setGroupCode(e.target.value)}
-                      placeholder="VD: G2026-01"
-                      required
-                      className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-[#2C2825] uppercase">
-                      Học kỳ *
-                    </label>
-                    <select
-                      value={semester}
-                      onChange={(e) => setSemester(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                    >
-                      {semesterOptions.map((sem) => (
-                        <option key={sem} value={sem}>
-                          {sem}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 px-6 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-black tracking-wider uppercase rounded-xl shadow-md transition-all flex flex-col items-center justify-center space-y-0.5 cursor-pointer"
-                >
-                  <span>
-                    {loading ? "Đang xử lý..." : "Xác nhận tạo nhóm ngay"}
-                  </span>
-                  <span className="text-[10px] font-normal normal-case opacity-90">
-                    (Bạn sẽ trở thành Trưởng nhóm chính thức đầu tiên)
-                  </span>
-                </button>
-              </form>
-            </div>
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-4xl border border-[#E8E2D9] shadow-sm space-y-3">
-                <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
-                  <span>💡</span>
-                  <span>Quy chế lập nhóm</span>
-                </div>
-                <ul className="space-y-2 text-[11px] text-[#6B635B] list-disc pl-4 leading-relaxed">
-                  <li>
-                    Quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.
-                  </li>
-                  <li>
-                    Mỗi sinh viên chỉ thuộc một nhóm chính thức tại một thời
-                    điểm trong cùng đợt luận án.
-                  </li>
-                  <li>
-                    Leader có quyền xét duyệt đơn hoặc gửi lời mời (Invite) trực
-                    tiếp cho thành viên.
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )
       ) : (
-        <div className="space-y-8">
-          <div className="bg-white p-8 rounded-4xl border border-[#E8E2D9] shadow-sm max-w-4xl mx-auto space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#E65100] flex items-center justify-center font-black">
-                🔑
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start max-w-5xl mx-auto">
+          <div className="lg:col-span-2 bg-white p-8 md:p-10 rounded-4xl border border-[#E8E2D9] shadow-lg shadow-stone-200/40">
+            <form onSubmit={handleCreateGroupSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-[#2C2825] uppercase">
+                    Mã nhóm *
+                  </label>
+                  <input
+                    type="text"
+                    value={groupCode}
+                    onChange={(e) => setGroupCode(e.target.value)}
+                    placeholder="VD: G2026-01"
+                    required
+                    className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-[#2C2825] uppercase">
+                    Học kỳ *
+                  </label>
+                  <select
+                    value={semester}
+                    onChange={(e) => setSemester(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
+                  >
+                    {semesterOptions.map((sem) => (
+                      <option key={sem} value={sem}>
+                        {sem}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-black text-[#2C2825]">
-                  Tham gia bằng Mã nhóm
-                </h3>
-                <p className="text-xs text-[#6B635B]">
-                  Nhập mã nhóm từ Trưởng nhóm để gia nhập trực tiếp.
-                </p>
-              </div>
-            </div>
-            <form onSubmit={handleJoinByCode} className="flex gap-3">
-              <input
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Nhập mã nhóm (VD: G2026-01)..."
-                className="flex-1 px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                required
-              />
               <button
                 type="submit"
-                className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+                disabled={loading}
+                className="w-full py-4 px-6 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-black tracking-wider uppercase rounded-xl shadow-md transition-all flex flex-col items-center justify-center space-y-0.5 cursor-pointer"
               >
-                Tham gia ngay →
+                <span>
+                  {loading ? "Đang xử lý..." : "Xác nhận tạo nhóm ngay"}
+                </span>
+                <span className="text-[10px] font-normal normal-case opacity-90">
+                  (Bạn sẽ trở thành Trưởng nhóm chính thức đầu tiên)
+                </span>
               </button>
             </form>
           </div>
-
-          <div className="space-y-6 max-w-6xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h3 className="text-base font-black text-[#2C2825]">
-                  Danh sách nhóm đang tuyển thành viên ({filteredGroups.length}{" "}
-                  nhóm)
-                </h3>
-                <p className="text-xs text-[#6B635B]">
-                  Chọn nhóm phù hợp và bấm tham gia (sĩ số tối đa 5 người).
-                </p>
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-4xl border border-[#E8E2D9] shadow-sm space-y-3">
+              <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
+                <span>💡</span>
+                <span>Quy chế lập nhóm</span>
               </div>
-              <div className="w-full md:w-72">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Tìm theo mã nhóm..."
-                  className="w-full px-4 py-2.5 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-                />
-              </div>
+              <ul className="space-y-2 text-[11px] text-[#6B635B] list-disc pl-4 leading-relaxed">
+                <li>
+                  Quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.
+                </li>
+                <li>
+                  Mỗi sinh viên chỉ thuộc một nhóm chính thức tại một thời
+                  điểm trong cùng đợt luận án.
+                </li>
+              </ul>
             </div>
-
-            {filteredGroups.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredGroups.map((g) => {
-                  const memberCount = g.members ? g.members.length : 0;
-                  const slotsLeft = 5 - memberCount;
-                  return (
-                    <div
-                      key={g.id}
-                      className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[10px] font-black rounded-lg">
-                            {g.groupCode}
-                          </span>
-                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-lg">
-                            Còn {slotsLeft} chỗ (Tối đa 5)
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-[#6B635B] pt-2 border-t border-[#F0EBE1]">
-                          <span>Thành viên hiện tại: </span>
-                          <strong className="text-[#2C2825]">
-                            {memberCount}/5 người
-                          </strong>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleJoinGroup(g.id)}
-                        disabled={joiningId === g.id}
-                        className="w-full py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
-                      >
-                        {joiningId === g.id ? "Đang xử lý..." : "Tham gia ngay"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-white rounded-3xl border border-[#E8E2D9] space-y-2">
-                <p className="text-xs font-bold text-[#2C2825]">
-                  Không tìm thấy nhóm phù hợp
-                </p>
-                <p className="text-[11px] text-[#6B635B]">
-                  Hãy tự tạo nhóm mới để bắt đầu tuyển thành viên.
-                </p>
-              </div>
-            )}
           </div>
         </div>
       )}
