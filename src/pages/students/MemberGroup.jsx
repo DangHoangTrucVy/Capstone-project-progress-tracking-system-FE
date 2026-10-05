@@ -36,7 +36,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
         setLoading(true);
         try {
             const payload = {
-                userId: memberInput.trim(),
+                studentCode: memberInput.trim(),
                 isLeader: false
             };
             await addGroupMember(groupId, payload);
@@ -111,7 +111,9 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                             <div key={m.id || m.userId} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center">
                                 <div>
                                     <h4 className="text-xs font-bold text-[#2C2825]">{m.userFullName || m.fullName || "Thành viên"}</h4>
-                                    <p className="text-[10px] text-[#6B635B]">{m.userEmail || m.email || m.userId}</p>
+                                    <p className="text-[10px] text-[#6B635B]">
+                                        {m.studentCode ? `${m.studentCode} • ` : ""}{m.userEmail || m.email || m.userId}
+                                    </p>
                                 </div>
                                 <div className="flex items-center space-x-3">
                                     <span className={`px-3 py-1 text-[10px] font-bold rounded-full ${m.isLeader ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-600"}`}>
