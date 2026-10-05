@@ -18,7 +18,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
 
     useEffect(() => {
         fetchGroupDetails();
-    }, [groupId]);
+    }, [groupId, onGroupUpdated]);
 
     const handleAddMember = async (e) => {
         e.preventDefault();
@@ -36,7 +36,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
         setLoading(true);
         try {
             const payload = {
-                userId: memberInput.trim(),
+                studentCode: memberInput.trim(),
                 isLeader: false
             };
             await addGroupMember(groupId, payload);
