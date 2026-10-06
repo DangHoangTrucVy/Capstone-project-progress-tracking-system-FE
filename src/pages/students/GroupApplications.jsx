@@ -6,6 +6,7 @@ import {
   getGroupInvites,
   inviteToGroup,
   revokeInvite,
+  addGroupMember,
 } from "../../services/groupService";
 
 export default function GroupApplications({ groupId, onGroupUpdated }) {
@@ -32,7 +33,6 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
         getGroupInvites(groupId).catch(() => []),
       ]);
       const appList = appsRes?.content || appsRes || [];
-      // Chỉ hiển thị các đơn đang chờ xét duyệt (PENDING)
       setApplications(
         appList.filter((app) => !app.status || app.status === "PENDING"),
       );
@@ -48,58 +48,24 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
     fetchData();
   }, [groupId]);
 
-  const handleApprove = async (appId, studentInfo) => {
+  const handleApprove = async (appId) => {
     if (!window.confirm("Bạn có chắc chắn muốn duyệt sinh viên này vào nhóm?"))
       return;
     try {
-      // 1. Duyệt đơn apply trước
+      // Chỉ gọi duy nhất API duyệt đơn apply của backend
       await approveApplication(appId);
 
-      // 2. Lấy các thông tin định danh của sinh viên
-      const sId = studentInfo?.id || studentInfo?.userId;
-      const sCode = studentInfo?.studentCode;
-      const sEmail = studentInfo?.email;
+      alert("Đã duyệt sinh viên vào nhóm thành công!");
 
-      // Thử gọi addGroupMember với các định dạng payload phổ biến
-      let added = false;
-      const payloadsToTry = [
-        { studentCode: sCode || sId },
-        { userId: sId || sCode },
-        { email: sEmail },
-        { studentId: sId },
-      ];
-
-      for (const payload of payloadsToTry) {
-        if (!Object.values(payload)[0]) continue;
-        try {
-          await addGroupMember(groupId, payload);
-          added = true;
-          break;
-        } catch (e) {
-          // Thử tiếp payload tiếp theo nếu payload này thất bại
-        }
-      }
-
-      if (!added && sId) {
-        // Fallback cuối: gọi trực tiếp bằng ID trên URL nếu service hỗ trợ
-        try {
-          await api.post(`/api/v1/groups/${groupId}/members`, {
-            userId: sId,
-            studentCode: sId,
-          });
-        } catch (e) {}
-      }
-
-      alert("Đã duyệt thành công và thêm thành viên vào nhóm!");
-
-      // Lọc bỏ đơn vừa duyệt khỏi danh sách chờ
+      // Lọc bỏ đơn vừa duyệt khỏi danh sách chờ trên giao diện Leader
       setApplications((prev) => prev.filter((app) => app.id !== appId));
 
-      await fetchData();
-
+      // Gọi callback cập nhật lại giao diện nhóm ngay lập tức
       if (typeof onGroupUpdated === "function") {
         await onGroupUpdated();
       }
+
+      await fetchData();
     } catch (err) {
       console.error("Lỗi duyệt đơn:", err);
       alert(
@@ -126,8 +92,17 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
     e.preventDefault();
     if (!inviteStudentId.trim()) return;
     try {
-      await inviteToGroup(groupId, { studentCode: inviteStudentId.trim() });
-      alert("Đã gửi lời mời thành công!");
+      const inputVal = inviteStudentId.trim();
+      // Truyền đồng thời các định dạng key phổ biến để backend chắc chắn nhận diện được
+      const payload = {
+        studentCode: inputVal,
+        email: inputVal,
+        userId: inputVal,
+      };
+
+      await inviteToGroup(groupId, payload);
+
+      alert("Đã gửi lời mời thành công đến sinh viên!");
       setInviteStudentId("");
       fetchData();
     } catch (err) {
@@ -159,7 +134,7 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
 
   return (
     <div className="space-y-6 animate-fadeIn text-[#2C2825]">
-      {/* 1. Phần Trưởng nhóm mời thành viên trực tiếp */}
+      {/* 1. Phần Trưởng nhóm gửi lời mời sinh viên vào nhóm */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <h3 className="text-xs font-black uppercase text-[#6B635B]">
           Mời thành viên vào nhóm bằng MSSV
@@ -169,7 +144,7 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
             type="text"
             value={inviteStudentId}
             onChange={(e) => setInviteStudentId(e.target.value)}
-            placeholder="Nhập MSSV cần mời..."
+            placeholder="Vui lòng nhập MSSV"
             className="flex-1 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
             required
           />
@@ -187,23 +162,36 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
               Các lời mời đã gửi:
             </p>
             <div className="space-y-2">
-              {invites.map((inv) => (
-                <div
-                  key={inv.id}
-                  className="p-3 bg-[#FBF9F5] rounded-xl border flex justify-between items-center text-xs"
-                >
-                  <span>
-                    MSSV/Email: {inv.studentEmail || inv.userId} — Trạng thái:{" "}
-                    <strong className="text-orange-600">{inv.status}</strong>
-                  </span>
-                  <button
-                    onClick={() => handleRevokeInvite(inv.id)}
-                    className="text-red-500 font-bold hover:underline cursor-pointer"
+              {invites.map((inv) => {
+                // Bóc tách linh hoạt các trường thông tin định danh từ backend
+                const studentIdentifier = 
+                  inv.studentCode || 
+                  inv.email || 
+                  inv.studentEmail || 
+                  inv.userEmail || 
+                  inv.userId || 
+                  inv.student?.email || 
+                  inv.student?.studentCode || 
+                  "Không rõ MSSV";
+
+                return (
+                  <div
+                    key={inv.id}
+                    className="p-3 bg-[#FBF9F5] rounded-xl border flex justify-between items-center text-xs"
                   >
-                    Thu hồi
-                  </button>
-                </div>
-              ))}
+                    <span>
+                      Email: <strong className="text-[#2C2825]">{studentIdentifier}</strong> — Trạng thái:{" "}
+                      <strong className="text-orange-600">{inv.status}</strong>
+                    </span>
+                    <button
+                      onClick={() => handleRevokeInvite(inv.id)}
+                      className="text-red-500 font-bold hover:underline cursor-pointer"
+                    >
+                      Thu hồi
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
