@@ -6,7 +6,7 @@ import StudentProfileAndApply from "./StudentProfileAndApply";
 import GroupApplications from "./GroupApplications";
 import GroupManagementPanel from "./GroupManagementPanel";
 import Profile from "../../auth/Profile";
-import { getAllGroups, getGroupById } from "../../services/groupService";
+import { getAllGroups, getGroupById, getMyApplications } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 
 export default function StudentDashboard() {
@@ -20,41 +20,50 @@ export default function StudentDashboard() {
       const userRes = await getCurrentUser();
       setCurrentUser(userRes);
 
-      // 1. Quét ngay danh sách nhóm từ API để lấy chính xác ID và groupCode
       try {
         const groupsRes = await getAllGroups();
         const groupList = groupsRes?.content || groupsRes || [];
         
         if (groupList.length > 0) {
-          // Tìm nhóm do user làm leader hoặc user là thành viên, nếu không thấy và là leader thì lấy nhóm đầu tiên
-          let targetGroup = groupList.find(g => 
-            g.leaderId === userRes?.id || 
-            g.leader?.id === userRes?.id || 
-            g.leader?.email === userRes?.email ||
-            g.leaderEmail === userRes?.email ||
-            (g.members && g.members.some(m => m.userId === userRes?.id || m.id === userRes?.id || m.email === userRes?.email))
-          );
+          let foundGroup = null;
 
-          if (!targetGroup && ["LEADER", "GROUP_LEADER"].includes(userRes?.role)) {
-            targetGroup = groupList[0]; // Lấy nhóm đầu tiên có sẵn trên hệ thống (ví dụ: SWD392)
+          // Duyệt qua từng nhóm trong danh sách và gọi getGroupById để kiểm tra chi tiết thành viên/leader
+          for (const g of groupList) {
+            try {
+              const detailedGroup = await getGroupById(g.id);
+              const members = detailedGroup?.members || [];
+              
+              const isLeader = 
+                String(detailedGroup.leaderId || detailedGroup.leader?.id || detailedGroup.leaderUser?.id) === String(userRes?.id) ||
+                members.some(m => (String(m.userId || m.id || m.studentId) === String(userRes?.id)) && m.isLeader === true);
+
+              const isMember = members.some(m => 
+                String(m.userId || m.id || m.studentId) === String(userRes?.id) ||
+                (m.email && userRes?.email && m.email.toLowerCase() === userRes.email.toLowerCase())
+              );
+
+              if (isLeader || isMember) {
+                foundGroup = detailedGroup;
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
           }
 
-          if (targetGroup && targetGroup.id) {
-            localStorage.setItem("groupId", targetGroup.id);
-            // Sửa lại: Phải gọi getGroupById để lấy đầy đủ danh sách members chi tiết
-            const detailed = await getGroupById(targetGroup.id).catch(() => targetGroup);
-            setGroupData(detailed);
+          if (foundGroup) {
+            setGroupData(foundGroup);
             setHasGroup(true);
             return;
           }
         }
       } catch (err) {
-        console.warn("Không thể quét danh sách nhóm:", err);
+        console.warn("Lỗi tải danh sách nhóm:", err);
       }
 
       setHasGroup(false);
     } catch (err) {
-      console.warn("Lỗi kiểm tra nhóm:", err);
+      console.warn("Lỗi xác thực:", err);
       setHasGroup(false);
     }
   };
