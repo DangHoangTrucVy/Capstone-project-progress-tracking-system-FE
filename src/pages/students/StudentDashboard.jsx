@@ -6,7 +6,12 @@ import StudentProfileAndApply from "./StudentProfileAndApply";
 import GroupApplications from "./GroupApplications";
 import GroupManagementPanel from "./GroupManagementPanel";
 import Profile from "../../auth/Profile";
-import { getAllGroups, getGroupById, getMyApplications } from "../../services/groupService";
+import {
+  getAllGroups,
+  getGroupById,
+  getMyApplications,
+  getMyInvites,
+} from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 
 export default function StudentDashboard() {
@@ -16,30 +21,52 @@ export default function StudentDashboard() {
   const [groupData, setGroupData] = useState(null);
 
   const checkUserGroup = async () => {
-    try {
-      const userRes = await getCurrentUser();
-      setCurrentUser(userRes);
+  try {
+    const userRes = await getCurrentUser();
+    setCurrentUser(userRes);
 
+    const role = String(userRes?.role || "").toUpperCase();
+
+    // =====================================================
+    // 👑 LEADER
+    // GIỮ LOGIC CŨ CỦA LEADER
+    // =====================================================
+    if (role === "LEADER" || role === "GROUP_LEADER") {
       try {
         const groupsRes = await getAllGroups();
         const groupList = groupsRes?.content || groupsRes || [];
-        
+
         if (groupList.length > 0) {
           let foundGroup = null;
 
-          // Duyệt qua từng nhóm trong danh sách và gọi getGroupById để kiểm tra chi tiết thành viên/leader
           for (const g of groupList) {
             try {
               const detailedGroup = await getGroupById(g.id);
               const members = detailedGroup?.members || [];
-              
-              const isLeader = 
-                String(detailedGroup.leaderId || detailedGroup.leader?.id || detailedGroup.leaderUser?.id) === String(userRes?.id) ||
-                members.some(m => (String(m.userId || m.id || m.studentId) === String(userRes?.id)) && m.isLeader === true);
 
-              const isMember = members.some(m => 
-                String(m.userId || m.id || m.studentId) === String(userRes?.id) ||
-                (m.email && userRes?.email && m.email.toLowerCase() === userRes.email.toLowerCase())
+              const isLeader =
+                String(
+                  detailedGroup?.leaderId ||
+                  detailedGroup?.leader?.id ||
+                  detailedGroup?.leaderUser?.id
+                ) === String(userRes?.id) ||
+                members.some(
+                  (m) =>
+                    String(
+                      m?.userId || m?.id || m?.studentId
+                    ) === String(userRes?.id) &&
+                    m?.isLeader === true
+                );
+
+              const isMember = members.some(
+                (m) =>
+                  String(
+                    m?.userId || m?.id || m?.studentId
+                  ) === String(userRes?.id) ||
+                  (m?.email &&
+                    userRes?.email &&
+                    m.email.toLowerCase() ===
+                      userRes.email.toLowerCase())
               );
 
               if (isLeader || isMember) {
@@ -54,19 +81,127 @@ export default function StudentDashboard() {
           if (foundGroup) {
             setGroupData(foundGroup);
             setHasGroup(true);
+            setActiveTab("overview");
             return;
           }
         }
       } catch (err) {
-        console.warn("Lỗi tải danh sách nhóm:", err);
+        console.warn("Lỗi tải group của Leader:", err);
       }
 
+      setGroupData(null);
       setHasGroup(false);
-    } catch (err) {
-      console.warn("Lỗi xác thực:", err);
-      setHasGroup(false);
+      return;
     }
-  };
+
+    // =====================================================
+    // 👤 STUDENT / MEMBER
+    // =====================================================
+
+    // 1. Kiểm tra Student đã được Leader APPROVE qua Apply
+    const applicationsRes = await getMyApplications();
+
+    const applications =
+      applicationsRes?.content ||
+      applicationsRes?.items ||
+      applicationsRes ||
+      [];
+
+    const approvedApplication = Array.isArray(applications)
+      ? applications.find(
+          (app) =>
+            ["APPROVED", "ACCEPTED"].includes(
+              String(
+                app?.status || app?.applicationStatus || ""
+              ).toUpperCase()
+            ) &&
+            (app?.groupId || app?.group?.id)
+        )
+      : null;
+
+    if (approvedApplication) {
+      const groupId =
+        approvedApplication.groupId ||
+        approvedApplication.group?.id;
+
+      try {
+        const group = await getGroupById(groupId);
+
+        setGroupData(group);
+        setHasGroup(true);
+
+        // ⭐ Vào thẳng Group Dashboard
+        setActiveTab("overview");
+
+        return;
+      } catch (err) {
+        console.warn(
+          "Không lấy được group sau khi Leader approve:",
+          err?.response?.data || err
+        );
+      }
+    }
+
+    // =====================================================
+    // 2. Kiểm tra Student vào bằng INVITE → ACCEPT
+    // =====================================================
+
+    const invitesRes = await getMyInvites();
+
+    const invites =
+      invitesRes?.content ||
+      invitesRes?.items ||
+      invitesRes ||
+      [];
+
+    const acceptedInvite = Array.isArray(invites)
+      ? invites.find(
+          (inv) =>
+            String(inv?.status || "").toUpperCase() ===
+              "ACCEPTED" &&
+            inv?.groupId
+        )
+      : null;
+
+    if (acceptedInvite?.groupId) {
+      try {
+        const group = await getGroupById(
+          acceptedInvite.groupId
+        );
+
+        setGroupData(group);
+        setHasGroup(true);
+        setActiveTab("overview");
+
+        return;
+      } catch (err) {
+        console.warn(
+          "Không lấy được group sau khi Accept Invite:",
+          err?.response?.data || err
+        );
+      }
+    }
+
+    // =====================================================
+    // 3. Student chưa thuộc nhóm
+    // =====================================================
+
+    setGroupData(null);
+    setHasGroup(false);
+
+    // Quan trọng: Student chưa có group mới được dùng
+    // Create / Find Group
+    setActiveTab("create");
+  } catch (err) {
+    console.error(
+      "Lỗi kiểm tra group:",
+      err?.response?.data || err
+    );
+
+    setGroupData(null);
+    setHasGroup(false);
+  }
+};
 
   useEffect(() => {
     checkUserGroup();
@@ -164,7 +299,7 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {hasGroup || isLeader ?(
+          {hasGroup || isLeader ? (
             <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
               <button
                 onClick={() => setActiveTab("overview")}
@@ -410,13 +545,27 @@ export default function StudentDashboard() {
                       >
                         📝 Profile & Apply nhóm
                       </button>
-                   
                     </div>
                   </div>
 
                   {activeTab === "profile_apply" ? (
                     <StudentProfileAndApply
-                      onJoinedGroup={() => checkUserGroup()}
+                      onJoinedGroup={async (groupId) => {
+                        try {
+                          const group = await getGroupById(groupId);
+
+                          setGroupData(group);
+                          setHasGroup(true);
+
+                          // Quan trọng: chuyển sang dashboard nhóm
+                          setActiveTab("overview");
+                        } catch (err) {
+                          console.error(
+                            "Không thể tải group sau khi Accept:",
+                            err?.response?.data || err,
+                          );
+                        }
+                      }}
                     />
                   ) : (
                     <CreateGroup onGroupCreated={() => checkUserGroup()} />
