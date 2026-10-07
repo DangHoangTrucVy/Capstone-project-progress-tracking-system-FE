@@ -37,18 +37,20 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
       );
 
       const groupList = groupsRes?.content || groupsRes || [];
-      
+
       // Lọc trực tiếp từ danh sách nhóm công khai và hỗ trợ lấy số lượng thành viên linh hoạt
-      setGroups(groupList.filter((g) => {
-        const count = 
-          g.memberCount ?? 
-          g.numberOfMembers ?? 
-          g.currentMembers ?? 
-          g.totalMembers ?? 
-          (Array.isArray(g.members) ? g.members.length : 0) ?? 
-          (Array.isArray(g.studentIds) ? g.studentIds.length : 0);
-        return count < 5;
-      }));
+      setGroups(
+        groupList.filter((g) => {
+          const count =
+            g.memberCount ??
+            g.numberOfMembers ??
+            g.currentMembers ??
+            g.totalMembers ??
+            (Array.isArray(g.members) ? g.members.length : 0) ??
+            (Array.isArray(g.studentIds) ? g.studentIds.length : 0);
+          return count < 5;
+        }),
+      );
 
       setMyApps(appsRes?.content || appsRes || []);
       setMyInvites(invitesRes?.content || invitesRes || []);
@@ -106,17 +108,22 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     }
   };
 
-  const handleAcceptInvite = async (inviteId, groupId) => {
-    try {
-      await acceptInvite(inviteId);
-      alert("Đã chấp nhận lời mời vào nhóm!");
-      localStorage.setItem("groupId", groupId);
-      if (onJoinedGroup) onJoinedGroup();
-      window.location.reload();
-    } catch (err) {
-      alert("Không thể chấp nhận lời mời.");
+const handleAcceptInvite = async (inviteId, groupId) => {
+  try {
+    await acceptInvite(inviteId);
+
+    alert("Đã chấp nhận lời mời vào nhóm!");
+
+    // Chuyển thẳng sang Group Dashboard
+    if (onJoinedGroup) {
+      await onJoinedGroup(groupId);
     }
-  };
+  } catch (err) {
+    console.error("Accept invite error:", err?.response?.data || err);
+
+    alert("Không thể chấp nhận lời mời.");
+  }
+};
 
   const handleDeclineInvite = async (inviteId) => {
     try {
@@ -239,17 +246,39 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                   </p>
                   <p className="text-[11px] text-[#6B635B]">
                     Trạng thái:{" "}
-                    <strong className="text-orange-600">
+                    <strong
+                      className={
+                        String(app.status).toUpperCase() === "REJECTED"
+                          ? "text-red-600"
+                          : "text-orange-600"
+                      }
+                    >
                       {app.status || "PENDING"}
                     </strong>
                   </p>
+
+                  {/* Hiển thị lý do nếu đơn bị từ chối */}
+                  {String(app.status).toUpperCase() === "REJECTED" &&
+                    (app.reason || app.message) && (
+                      <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                        <p className="text-[11px] font-black text-red-700 mb-1">
+                          ❌ Lý do từ chối
+                        </p>
+
+                        <p className="text-[11px] text-red-600 leading-relaxed">
+                          {app.reason || app.message}
+                        </p>
+                      </div>
+                    )}
                 </div>
-                <button
-                  onClick={() => handleWithdraw(app.id)}
-                  className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg cursor-pointer hover:bg-red-100"
-                >
-                  Rút đơn
-                </button>
+                {String(app.status).toUpperCase() === "PENDING" && (
+                  <button
+                    onClick={() => handleWithdraw(app.id)}
+                    className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg cursor-pointer hover:bg-red-100"
+                  >
+                    Rút đơn
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -267,12 +296,12 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {groups.map((g) => {
-            const memberCount = 
-              g.memberCount ?? 
-              g.numberOfMembers ?? 
-              g.currentMembers ?? 
-              g.totalMembers ?? 
-              (Array.isArray(g.members) ? g.members.length : 0) ?? 
+            const memberCount =
+              g.memberCount ??
+              g.numberOfMembers ??
+              g.currentMembers ??
+              g.totalMembers ??
+              (Array.isArray(g.members) ? g.members.length : 0) ??
               (Array.isArray(g.studentIds) ? g.studentIds.length : 0);
 
             return (
@@ -283,7 +312,10 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                 <div>
                   <p className="font-black text-sm">{g.groupCode}</p>
                   <p className="text-[11px] text-[#6B635B]">
-                    Thành viên: <strong className="text-[#2C2825]">{memberCount}/5 người</strong>
+                    Thành viên:{" "}
+                    <strong className="text-[#2C2825]">
+                      {memberCount}/5 người
+                    </strong>
                   </p>
                 </div>
                 <button

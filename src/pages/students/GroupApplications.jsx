@@ -95,11 +95,12 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
       const inputVal = inviteStudentId.trim();
       // Truyền đồng thời các định dạng key phổ biến để backend chắc chắn nhận diện được
       const payload = {
-        studentCode: inputVal,
-        email: inputVal,
-        userId: inputVal,
+        identifier: inputVal,
+        // studentCode: inputVal,
+        // email: inputVal,
+        // userId: inputVal,
       };
-
+      console.log("INVITE PAYLOAD:", payload);
       await inviteToGroup(groupId, payload);
 
       alert("Đã gửi lời mời thành công đến sinh viên!");
