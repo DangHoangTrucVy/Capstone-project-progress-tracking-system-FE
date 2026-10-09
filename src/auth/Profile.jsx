@@ -105,7 +105,7 @@ export default function Profile() {
                         </div>
                         <div className="grid grid-cols-3 py-3 border-b border-[#E8E2D9]">
                             <span className="font-bold text-[#6B635B]">MSSV:</span>
-                            <span className="col-span-2 font-extrabold text-[#ff2d25]">{user?.studentCode }</span>
+                            <span className="col-span-2 font-extrabold text-[#ff2d25]">{user?.studentCode || "N/A"}</span>
                         </div>
                         <div className="grid grid-cols-3 py-3 border-b border-[#E8E2D9]">
                             <span className="font-bold text-[#6B635B]">Vai trò :</span>

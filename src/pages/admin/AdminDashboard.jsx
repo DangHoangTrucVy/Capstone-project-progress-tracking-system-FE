@@ -285,50 +285,48 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  
-const handleToggleEligibility = async (u) => {
-  const targetId = u.id || u.studentCode;
+  const handleToggleEligibility = async (u) => {
+    const targetId = u.id || u.studentCode;
 
-  if (!targetId) {
-    showToast("Không tìm thấy ID sinh viên.", "error");
-    return;
-  }
+    if (!targetId) {
+      showToast("Không tìm thấy ID sinh viên.", "error");
+      return;
+    }
 
-  const currentStatus = u.eligible !== false;
-  const newStatus = !currentStatus;
+    const currentStatus = u.eligible !== false;
+    const newStatus = !currentStatus;
 
-  const confirmed = window.confirm(
-    newStatus
-      ? `Gỡ cờ không đủ điều kiện cho ${u.fullName || u.email}?`
-      : `Đánh cờ không đủ điều kiện cho ${u.fullName || u.email}?\n\n` +
-          "Nếu sinh viên này đang là Leader, Backend sẽ tự chọn thành viên ACTIVE khác làm Leader và cập nhật vai trò.",
-  );
-
-  if (!confirmed) return;
-
-  try {
-    // Chỉ cập nhật cờ. Backend chịu trách nhiệm xử lý thành viên và Leader.
-    await updateStudentEligibility(targetId, {
-      eligible: newStatus,
-    });
-
-    // Tải lại nhóm, thành viên, vai trò và danh sách cờ từ Backend.
-    await fetchAdminData();
-
-    showToast(
+    const confirmed = window.confirm(
       newStatus
-        ? `Đã gỡ cờ điều kiện cho ${u.fullName || u.email}.`
-        : `Đã đánh cờ không đủ điều kiện cho ${u.fullName || u.email}. Nếu đây là Leader, hệ thống sẽ áp dụng cơ chế tự động chuyển Leader của Backend.`,
+        ? `Gỡ cờ không đủ điều kiện cho ${u.fullName || u.email}?`
+        : `Đánh cờ không đủ điều kiện cho ${u.fullName || u.email}?\n\n` +
+            "Nếu sinh viên này đang là Leader, Backend sẽ tự chọn thành viên ACTIVE khác làm Leader và cập nhật vai trò.",
     );
-  } catch (error) {
-    showToast(
-      error.response?.data?.message ||
-        "Cập nhật trạng thái đủ điều kiện thất bại.",
-      "error",
-    );
-  }
-};
 
+    if (!confirmed) return;
+
+    try {
+      // Chỉ cập nhật cờ. Backend chịu trách nhiệm xử lý thành viên và Leader.
+      await updateStudentEligibility(targetId, {
+        eligible: newStatus,
+      });
+
+      // Tải lại nhóm, thành viên, vai trò và danh sách cờ từ Backend.
+      await fetchAdminData();
+
+      showToast(
+        newStatus
+          ? `Đã gỡ cờ điều kiện cho ${u.fullName || u.email}.`
+          : `Đã đánh cờ không đủ điều kiện cho ${u.fullName || u.email}. Nếu đây là Leader, hệ thống sẽ áp dụng cơ chế tự động chuyển Leader của Backend.`,
+      );
+    } catch (error) {
+      showToast(
+        error.response?.data?.message ||
+          "Cập nhật trạng thái đủ điều kiện thất bại.",
+        "error",
+      );
+    }
+  };
 
   const fetchReportsSummary = async () => {
     setReportsLoading(true);
@@ -1011,7 +1009,12 @@ const handleToggleEligibility = async (u) => {
                               Toàn bộ hệ thống hiện đang có{" "}
                               <strong>{groups.length} nhóm</strong> đăng ký hoạt
                               động trong học kỳ này. Admin có thể kiểm tra chi
-                              tiết tại tab <em>Danh sách nhóm</em>.
+                              tiết tại tab{" "}
+                              <em>
+                                {" "}
+                                <strong>Danh sách nhóm</strong>
+                              </em>
+                              .
                             </p>
                           </div>
                         </>
@@ -1021,7 +1024,7 @@ const handleToggleEligibility = async (u) => {
                 </div>
               </div>
 
-              <div className="space-y-4 pt-2">
+              {/* <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between gap-4">
                   <h2 className="text-sm font-black text-[#2C2825]">
                     📑 Chỉ số hoạt động Backend
@@ -1061,7 +1064,7 @@ const handleToggleEligibility = async (u) => {
                     kỳ.
                   </p>
                 )}
-              </div>
+              </div> */}
             </section>
           )}
 
