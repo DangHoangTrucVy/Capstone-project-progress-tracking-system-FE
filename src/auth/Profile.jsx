@@ -104,7 +104,11 @@ export default function Profile() {
                             <span className="col-span-2 font-extrabold text-emerald-600">{user?.status || "ACTIVE"}</span>
                         </div>
                         <div className="grid grid-cols-3 py-3 border-b border-[#E8E2D9]">
-                            <span className="font-bold text-[#6B635B]">Vai trò (Role):</span>
+                            <span className="font-bold text-[#6B635B]">MSSV:</span>
+                            <span className="col-span-2 font-extrabold text-[#ff2d25]">{user?.studentCode }</span>
+                        </div>
+                        <div className="grid grid-cols-3 py-3 border-b border-[#E8E2D9]">
+                            <span className="font-bold text-[#6B635B]">Vai trò :</span>
                             <span className="col-span-2 font-extrabold text-[#E65100]">{user?.role}</span>
                         </div>
                         <div className="grid grid-cols-3 py-3">

@@ -13,6 +13,7 @@ import {
   getMyInvites,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
+import NotificationBell from "../../components/NotificationBell";
 
 export default function StudentDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -254,10 +255,10 @@ export default function StudentDashboard() {
             </div>
             <div>
               <h2 className="font-extrabold text-sm tracking-tight text-[#2C2825]">
-                Lịch Đồ Án
+                Quản Lý Sinh Viên
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                Khoa Công nghệ thông tin
+                Hệ thống quản lý đồ án
               </p>
             </div>
           </div>
@@ -293,8 +294,8 @@ export default function StudentDashboard() {
                 {!hasGroup
                   ? "Chưa tham gia"
                   : isLeader
-                    ? "👑 Leader"
-                    : "👤 Member"}
+                    ? "👑 Nhóm trưởng"
+                    : "👤 Thành viên"}
               </span>
             </div>
           </div>
@@ -437,6 +438,8 @@ export default function StudentDashboard() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <NotificationBell />
+            
             <div className="text-right hidden sm:block pl-2 border-l border-[#E8E2D9]">
               <p className="font-extrabold text-[#2C2825] text-xs">
                 {currentUser?.fullName || "Đang tải..."}
@@ -453,7 +456,7 @@ export default function StudentDashboard() {
                     : "bg-orange-50 text-[#E65100] border border-orange-200"
               }`}
             >
-              {!hasGroup ? "🎓 STUDENT" : isLeader ? "👑 LEADER" : "👤 MEMBER"}
+              {!hasGroup ? "🎓 STUDENT" : isLeader ? "👑 Nhóm trưởng" : "👤Thành viên"}
             </span>
           </div>
         </header>

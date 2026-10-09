@@ -74,6 +74,17 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
     }
   };
 
+  const getInviteStatusLabel = (status) => {
+    const statusMap = {
+      PENDING: "Đang chờ phản hồi",
+      ACCEPTED: "Đã chấp nhận",
+      WITHDRAWN: "Đã thu hồi",
+      REJECTED: "Đã từ chối",
+    };
+
+    return statusMap[status] || status || "Không xác định";
+  };
+
   const handleRejectSubmit = async (e) => {
     e.preventDefault();
     if (!rejectReason.trim() || !rejectingApp) return;
@@ -96,7 +107,7 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
       // Truyền đồng thời các định dạng key phổ biến để backend chắc chắn nhận diện được
       const payload = {
         identifier: inputVal,
-        // studentCode: inputVal,
+        studentCode: inputVal,
         // email: inputVal,
         // userId: inputVal,
       };
@@ -165,14 +176,14 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
             <div className="space-y-2">
               {invites.map((inv) => {
                 // Bóc tách linh hoạt các trường thông tin định danh từ backend
-                const studentIdentifier = 
-                  inv.studentCode || 
-                  inv.email || 
-                  inv.studentEmail || 
-                  inv.userEmail || 
-                  inv.userId || 
-                  inv.student?.email || 
-                  inv.student?.studentCode || 
+                const studentIdentifier =
+                  inv.studentCode ||
+                  inv.email ||
+                  inv.studentEmail ||
+                  inv.userEmail ||
+                  inv.userId ||
+                  inv.student?.email ||
+                  inv.student?.studentCode ||
                   "Không rõ MSSV";
 
                 return (
@@ -181,15 +192,34 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
                     className="p-3 bg-[#FBF9F5] rounded-xl border flex justify-between items-center text-xs"
                   >
                     <span>
-                      Email: <strong className="text-[#2C2825]">{studentIdentifier}</strong> — Trạng thái:{" "}
-                      <strong className="text-orange-600">{inv.status}</strong>
+                      Email:{" "}
+                      <strong className="text-[#2C2825]">
+                        {studentIdentifier}
+                      </strong>{" "}
+                      — Trạng thái:{" "}
+                      <strong
+                        className={
+                          inv.status === "PENDING"
+                            ? "text-amber-600"
+                            : inv.status === "ACCEPTED"
+                              ? "text-emerald-600"
+                              : inv.status === "WITHDRAWN"
+                                ? "text-gray-500"
+                                : "text-red-600"
+                        }
+                      >
+                        {getInviteStatusLabel(inv.status)}
+                      </strong>
                     </span>
-                    <button
-                      onClick={() => handleRevokeInvite(inv.id)}
-                      className="text-red-500 font-bold hover:underline cursor-pointer"
-                    >
-                      Thu hồi
-                    </button>
+                    {inv.status === "PENDING" && (
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeInvite(inv.id)}
+                        className="text-red-500 font-bold hover:underline cursor-pointer"
+                      >
+                        Thu hồi
+                      </button>
+                    )}
                   </div>
                 );
               })}
