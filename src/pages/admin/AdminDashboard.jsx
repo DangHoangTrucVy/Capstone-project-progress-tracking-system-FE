@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { getUsers, createUser, updateUser } from "../../services/userService";
-import { getAllGroups, getGroupById } from "../../services/groupService";
+import NotificationBell from "../../components/NotificationBell";
+import {
+  getAllGroups,
+  getGroupById,
+  replaceGroupLeader,
+} from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import { getReportsSummary } from "../../services/progressService";
 import {
@@ -45,6 +50,85 @@ export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState("monitoring");
   const [loading, setLoading] = useState(true);
+
+  const [leaderModalOpen, setLeaderModalOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [newLeaderId, setNewLeaderId] = useState("");
+  const [changingLeader, setChangingLeader] = useState(false);
+
+  const openLeaderModal = async (group) => {
+    try {
+      const detail = await getGroupById(group.id);
+      setSelectedGroup(detail || group);
+      setNewLeaderId("");
+      setLeaderModalOpen(true);
+    } catch (error) {
+      showToast(
+        error.response?.data?.message || "Không thể tải thông tin nhóm.",
+        "error",
+      );
+    }
+  };
+
+  const handleReplaceLeader = async (event) => {
+    event.preventDefault();
+
+    if (!selectedGroup || !newLeaderId) {
+      showToast("Vui lòng chọn Leader mới.", "error");
+      return;
+    }
+
+    const members = selectedGroup.members || [];
+
+    const nextLeader = members.find(
+      (member) =>
+        String(member.userId) === String(newLeaderId) &&
+        member.status === "ACTIVE" &&
+        !member.isLeader,
+    );
+
+    if (!nextLeader) {
+      showToast(
+        "Thành viên được chọn không còn hoạt động hoặc không hợp lệ.",
+        "error",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Đổi Leader nhóm ${selectedGroup.groupCode} sang ${nextLeader.userFullName}?\n\n` +
+        "Hệ thống sẽ cập nhật vai trò Leader. Việc rời nhóm của Leader cũ được xử lý theo luồng xin rời nhóm.",
+    );
+
+    if (!confirmed) return;
+
+    setChangingLeader(true);
+
+    try {
+      // Chỉ đổi Leader; không tự xóa Leader cũ ở frontend.
+      await replaceGroupLeader(selectedGroup.id, {
+        userId: nextLeader.userId,
+      });
+
+      setLeaderModalOpen(false);
+      setSelectedGroup(null);
+      setNewLeaderId("");
+
+      // Lấy lại dữ liệu mới nhất từ Backend.
+      await fetchAdminData();
+
+      showToast(
+        `Đã đổi Leader nhóm ${selectedGroup.groupCode} thành ${nextLeader.userFullName}.`,
+      );
+    } catch (error) {
+      showToast(
+        error.response?.data?.message || "Đổi Leader thất bại.",
+        "error",
+      );
+    } finally {
+      setChangingLeader(false);
+    }
+  };
 
   // State cho Toast Notification tự động tắt
   const [toast, setToast] = useState({
@@ -132,7 +216,10 @@ export default function AdminDashboard() {
         const ineligibleRes = await getIneligibleStudents().catch(() => []);
         setIneligibleUsers(ineligibleRes?.content || ineligibleRes || []);
       } catch (err) {
-        console.warn("Không thể tải danh sách sinh viên không đủ điều kiện:", err);
+        console.warn(
+          "Không thể tải danh sách sinh viên không đủ điều kiện:",
+          err,
+        );
       }
 
       const leaderIdentifiers = new Set();
@@ -198,22 +285,50 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  const handleToggleEligibility = async (u) => {
-    const targetId = u.id || u.studentCode || u.email;
-    const currentStatus = u.eligible !== false;
-    const newStatus = !currentStatus;
+  
+const handleToggleEligibility = async (u) => {
+  const targetId = u.id || u.studentCode;
 
-    try {
-      await updateStudentEligibility(targetId, { eligible: newStatus });
-      showToast(`Đã cập nhật trạng thái cờ cho sinh viên ${u.fullName}!`);
-      fetchAdminData(); // Đồng bộ lại dữ liệu toàn hệ thống sau khi update
-    } catch (err) {
-      showToast(
-        err.response?.data?.message || "Cập nhật cờ điều kiện thất bại.",
-        "error",
-      );
-    }
-  };
+  if (!targetId) {
+    showToast("Không tìm thấy ID sinh viên.", "error");
+    return;
+  }
+
+  const currentStatus = u.eligible !== false;
+  const newStatus = !currentStatus;
+
+  const confirmed = window.confirm(
+    newStatus
+      ? `Gỡ cờ không đủ điều kiện cho ${u.fullName || u.email}?`
+      : `Đánh cờ không đủ điều kiện cho ${u.fullName || u.email}?\n\n` +
+          "Nếu sinh viên này đang là Leader, Backend sẽ tự chọn thành viên ACTIVE khác làm Leader và cập nhật vai trò.",
+  );
+
+  if (!confirmed) return;
+
+  try {
+    // Chỉ cập nhật cờ. Backend chịu trách nhiệm xử lý thành viên và Leader.
+    await updateStudentEligibility(targetId, {
+      eligible: newStatus,
+    });
+
+    // Tải lại nhóm, thành viên, vai trò và danh sách cờ từ Backend.
+    await fetchAdminData();
+
+    showToast(
+      newStatus
+        ? `Đã gỡ cờ điều kiện cho ${u.fullName || u.email}.`
+        : `Đã đánh cờ không đủ điều kiện cho ${u.fullName || u.email}. Nếu đây là Leader, hệ thống sẽ áp dụng cơ chế tự động chuyển Leader của Backend.`,
+    );
+  } catch (error) {
+    showToast(
+      error.response?.data?.message ||
+        "Cập nhật trạng thái đủ điều kiện thất bại.",
+      "error",
+    );
+  }
+};
+
 
   const fetchReportsSummary = async () => {
     setReportsLoading(true);
@@ -440,9 +555,7 @@ export default function AdminDashboard() {
           (u) =>
             !searchQuery ||
             (u.fullName &&
-              u.fullName
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase())) ||
+              u.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (u.email &&
               u.email.toLowerCase().includes(searchQuery.toLowerCase())),
         )
@@ -493,12 +606,26 @@ export default function AdminDashboard() {
       <aside className="w-64 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0 h-screen">
         <div className="space-y-8">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#E65100] rounded-xl flex items-center justify-center text-white font-black shadow-sm">
-              🛡️️
+            <div className="w-9 h-9 rounded-full bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-200">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8.5 12 2.3 2.3 4.7-4.7" />
+              </svg>
             </div>
+
             <div>
               <h2 className="font-black text-sm text-[#2C2825]">
-                Quản Trị Đầu Kỳ
+                Quản Lý Sinh Viên
               </h2>
               <p className="text-[10px] text-[#6B635B]">
                 Hệ thống Quản lý Đồ án
@@ -673,9 +800,14 @@ export default function AdminDashboard() {
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
         <header className="h-16 bg-white border-b border-[#E8E2D9] px-6 flex justify-between items-center text-xs font-semibold text-[#6B635B] shrink-0">
           <span>Quản Trị Hệ Thống — {activeMenu.toUpperCase()}</span>
-          <span className="text-[#E65100] font-bold">
-            Xin chào, {user?.fullName || "Admin"}
-          </span>
+
+          <div className="flex items-center gap-4">
+            <NotificationBell />
+
+            <span className="text-[#E65100] font-bold">
+              Xin chào, {user?.fullName || "Admin"}
+            </span>
+          </div>
         </header>
 
         <div className="w-full flex-1 flex flex-col">
@@ -1284,11 +1416,8 @@ export default function AdminDashboard() {
                             </td>
                             <td className="p-4 text-right">
                               <button
-                                onClick={() =>
-                                  showToast(
-                                    `Quản lý can thiệp cho nhóm ${g.groupCode}`,
-                                  )
-                                }
+                                type="button"
+                                onClick={() => openLeaderModal(g)}
                                 className="px-3.5 py-1.5 bg-white border border-[#E8E2D9] hover:bg-gray-100 font-bold rounded-xl text-xs cursor-pointer"
                               >
                                 ⚙️ Sửa / Đổi Leader
@@ -1544,6 +1673,92 @@ export default function AdminDashboard() {
                 className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Đang lưu..." : "Lưu tài khoản"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {leaderModalOpen && selectedGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form
+            onSubmit={handleReplaceLeader}
+            className="w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-lg font-black text-[#2C2825]">
+                  Đổi Leader nhóm {selectedGroup.groupCode}
+                </h3>
+                <p className="mt-1 text-xs text-[#6B635B]">
+                  Chọn một thành viên đang hoạt động làm Leader mới.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLeaderModalOpen(false)}
+                disabled={changingLeader}
+                className="font-bold text-gray-400 hover:text-black"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-orange-50 p-4 text-sm">
+              <p className="font-bold text-[#E65100]">Leader hiện tại</p>
+              <p className="mt-1">
+                {selectedGroup.members?.find((member) => member.isLeader)
+                  ?.userFullName || "Chưa xác định"}
+              </p>
+            </div>
+
+            <label className="block space-y-2 text-sm font-bold">
+              Leader mới
+              <select
+                value={newLeaderId}
+                onChange={(event) => setNewLeaderId(event.target.value)}
+                required
+                className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal"
+              >
+                <option value="">-- Chọn thành viên --</option>
+                {(selectedGroup.members || [])
+                  .filter(
+                    (member) =>
+                      member.status === "ACTIVE" &&
+                      !member.isLeader &&
+                      member.userId,
+                  )
+                  .map((member) => (
+                    <option key={member.id} value={member.userId}>
+                      {member.userFullName} ({member.userEmail})
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              Admin chọn một thành viên đang hoạt động làm Leader mới. Việc
+              Leader cũ rời nhóm sẽ được xử lý theo quy trình xin rời nhóm,
+              không tự động xóa thành viên trong thao tác đổi Leader.
+            </div>
+
+            <div className="flex justify-end gap-3 border-t pt-4">
+              <button
+                type="button"
+                onClick={() => setLeaderModalOpen(false)}
+                disabled={changingLeader}
+                className="rounded-xl bg-gray-100 px-5 py-2.5 text-xs font-bold"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="submit"
+                disabled={changingLeader || !newLeaderId}
+                className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {changingLeader ? "Đang xử lý..." : "Xác nhận đổi Leader"}
               </button>
             </div>
           </form>

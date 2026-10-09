@@ -40,7 +40,7 @@ export default function Overview({ groupData, isLeader }) {
             </div>
             <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-1">
               <span className="text-[10px] text-[#6B635B] font-bold">Vai trò của bạn</span>
-              <p className="text-sm font-black text-[#E65100]">{isLeader ? "👑 Trưởng nhóm (Leader)" : "👤 Thành viên (Member)"}</p>
+              <p className="text-sm font-black text-[#E65100]">{isLeader ? "👑 Trưởng nhóm " : "👤 Thành viên "}</p>
             </div>
             <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-1">
               <span className="text-[10px] text-[#6B635B] font-bold">Trạng thái hệ thống</span>
@@ -53,8 +53,8 @@ export default function Overview({ groupData, isLeader }) {
           <p className="font-black text-[#E65100]">Lưu ý quan trọng giai đoạn đầu kỳ:</p>
           <ul className="list-disc pl-4 space-y-1 text-[#6B635B]">
             <li>Mỗi sinh viên chỉ thuộc tối đa một nhóm chính thức tại một thời điểm trong cùng đợt luận án.</li>
-            <li>Trưởng nhóm (Leader) có quyền xét duyệt đơn apply hoặc gửi lời mời trực tiếp cho các thành viên.</li>
-            <li>Hãy đảm bảo nhóm đạt từ 3 đến 5 thành viên trước thời điểm khóa danh sách (Locked) của Admin.</li>
+            <li>Trưởng nhóm có quyền xét duyệt đơn gửi yêu cầu hoặc gửi lời mời trực tiếp cho các thành viên.</li>
+            <li>Hãy đảm bảo nhóm đạt từ 3 đến 5 thành viên trước thời điểm khóa danh sách của Admin.</li>
           </ul>
         </div>
       </div>

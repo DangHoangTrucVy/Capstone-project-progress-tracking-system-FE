@@ -323,7 +323,7 @@ export default function MemberGroup({
                     }`}
                   >
                     {m.isLeader
-                      ? "👑 Trưởng nhóm (Leader)"
+                      ? "👑 Trưởng nhóm "
                       : "👤 Thành viên"}
                   </span>
 

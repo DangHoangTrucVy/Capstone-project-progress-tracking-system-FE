@@ -30,7 +30,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
 
   // Leader khóa nhóm (Locked)
   const handleLockGroup = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn khóa nhóm (Locked)? Thành viên sẽ không thể tự ý rời nhóm nếu không được duyệt.")) return;
+    if (!window.confirm("Bạn có chắc chắn muốn khóa nhóm ? Thành viên sẽ không thể tự ý rời nhóm nếu không được duyệt.")) return;
     try {
       await lockGroup(groupData.id);
       alert("Đã khóa nhóm thành công!");
@@ -42,7 +42,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
 
   // Leader mở khóa nhóm (Unlock)
   const handleUnlockGroup = async () => {
-    if (!window.confirm("Bạn có muốn mở khóa nhóm (Unlock) không?")) return;
+    if (!window.confirm("Bạn có muốn mở khóa nhóm không?")) return;
     try {
       await unlockGroup(groupData.id);
       alert("Đã mở khóa nhóm thành công!");
@@ -71,7 +71,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
     setLoading(true);
     try {
       await requestLeaveGroup(groupData.id, { reason: leaveReason.trim() });
-      alert("Đã gửi yêu cầu xin rời nhóm tới Trưởng nhóm / Moderator thành công!");
+      alert("Đã gửi yêu cầu xin rời nhóm tới Trưởng nhóm / Người quản lý thành công!");
       setLeaveReason("");
     } catch (err) {
       alert(err.response?.data?.message || "Gửi yêu cầu rời nhóm thất bại.");
@@ -111,56 +111,151 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       {/* 1. Khu vực điều khiển trạng thái dành cho Leader */}
       {isLeader && (
         <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-          <h3 className="text-xs font-black uppercase text-[#6B635B]">Quản lý trạng thái nhóm (Leader Control)</h3>
+          <h3 className="text-xs font-black uppercase text-[#6B635B]">Quản lý trạng thái nhóm </h3>
           <div className="flex flex-wrap gap-3">
             <button 
               onClick={handleLockGroup} 
               className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition"
             >
-              🔒 Khóa nhóm (Locked)
+              🔒 Khóa nhóm 
             </button>
             <button 
               onClick={handleUnlockGroup} 
               className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-[#2C2825] text-xs font-bold rounded-xl cursor-pointer transition"
             >
-              🔓 Mở khóa (Unlock)
+              🔓 Mở khóa 
             </button>
             <button 
               onClick={handleFinalizeGroup} 
               className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition"
             >
-              🏁 Chốt danh sách (Finalize)
+              🏁 Chốt danh sách
             </button>
           </div>
         </div>
       )}
 
-      {/* 2. Danh sách đơn xin rời nhóm chờ Leader xét duyệt (Chỉ Leader thấy) */}
-      {isLeader && leaveRequests.length > 0 && (
-        <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-          <h3 className="text-xs font-black uppercase text-[#6B635B]">Yêu cầu xin rời nhóm từ thành viên ({leaveRequests.length})</h3>
-          <div className="space-y-3">
-            {leaveRequests.map((req) => (
-              <div key={req.id} className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200 flex justify-between items-center text-xs">
+      
+{/* Lịch sử yêu cầu rời nhóm */}
+{isLeader && (
+  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
+    <h3 className="text-xs font-black uppercase text-[#6B635B]">
+      Lịch sử yêu cầu rời nhóm ({leaveRequests.length})
+    </h3>
+
+    {leaveRequests.length === 0 ? (
+      <p className="text-sm text-[#8A8178]">
+        Chưa có yêu cầu rời nhóm nào.
+      </p>
+    ) : (
+      <div className="space-y-3">
+        {leaveRequests.map((req) => {
+          const status = String(
+            req.status || req.state || ""
+          ).toUpperCase();
+
+          const isPending = [
+            "PENDING",
+            "WAITING",
+            "SUBMITTED",
+          ].includes(status);
+
+          const isApproved = [
+            "APPROVED",
+            "ACCEPTED",
+          ].includes(status);
+
+          const isRejected = [
+            "REJECTED",
+            "DECLINED",
+          ].includes(status);
+
+          return (
+            <div
+              key={req.id}
+              className="p-4 rounded-2xl border border-[#E8E2D9] bg-[#FBF9F5] space-y-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <p className="font-bold">Thành viên: {req.studentName || req.studentId}</p>
-                  <p className="text-[#6B635B]">Lý do: {req.reason}</p>
+                  <p className="text-sm font-bold text-[#2C2825]">
+                    {req.userFullName ||
+                      req.student?.fullName ||
+                      req.studentId ||
+                      "Sinh viên"}
+                  </p>
+
+                  <p className="text-xs text-[#6B635B]">
+                    Lý do: {req.reason || "Không có lý do"}
+                  </p>
+
+                  {req.createdAt && (
+                    <p className="text-xs text-[#8A8178]">
+                      Ngày gửi:{" "}
+                      {new Date(req.createdAt).toLocaleString("vi-VN")}
+                    </p>
+                  )}
+
+                  {req.decidedAt && (
+                    <p className="text-xs text-[#8A8178]">
+                      Ngày phản hồi:{" "}
+                      {new Date(req.decidedAt).toLocaleString("vi-VN")}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => handleApproveLeave(req.id)} className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg cursor-pointer">Cho phép</button>
-                  <button onClick={() => handleRejectLeave(req.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg cursor-pointer">Từ chối</button>
-                </div>
+
+                <span
+                  className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                    isPending
+                      ? "bg-amber-100 text-amber-700"
+                      : isApproved
+                        ? "bg-emerald-100 text-emerald-700"
+                        : isRejected
+                          ? "bg-red-100 text-red-700"
+                          : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {isPending
+                    ? "Đang chờ duyệt"
+                    : isApproved
+                      ? "Đã chấp nhận"
+                      : isRejected
+                        ? "Đã từ chối"
+                        : status || "Chưa xác định"}
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+
+              {isPending && (
+                <div className="flex gap-2 border-t border-[#E8E2D9] pt-3">
+                  <button
+                    type="button"
+                    onClick={() => handleApproveLeave(req.id)}
+                    className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg"
+                  >
+                    Cho phép
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRejectLeave(req.id)}
+                    className="px-3 py-2 bg-red-50 text-red-600 text-xs font-bold rounded-lg"
+                  >
+                    Từ chối
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+)}
 
       {/* 3. Form xin rời nhóm dành cho Thành viên hoặc Leader muốn xin rời */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div>
           <h3 className="text-xs font-black uppercase text-[#6B635B]">Gửi yêu cầu xin rời nhóm</h3>
-          <p className="text-[11px] text-[#6B635B]">Nếu nhóm đang ở trạng thái Locked, yêu cầu của bạn cần được Trưởng nhóm hoặc Moderator phê duyệt.</p>
+          <p className="text-[11px] text-[#6B635B]">Nếu nhóm đang ở trạng thái <strong >  🔒 Khóa nhóm</strong>, yêu cầu của bạn cần được Trưởng nhóm hoặc Người quản lý phê duyệt.</p>
         </div>
         <form onSubmit={handleRequestLeave} className="space-y-3">
           <textarea
