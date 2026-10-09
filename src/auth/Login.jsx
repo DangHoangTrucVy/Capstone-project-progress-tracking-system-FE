@@ -334,10 +334,10 @@ const Login = () => {
 
           <div className="space-y-2 z-10">
             <span className="px-3 py-1 bg-white/20 text-white text-[10px] font-bold rounded-lg uppercase tracking-wider inline-block">
-              Hệ thống quản lý Capstone
+              Hệ thống quản lý Đồ án
             </span>
             <h2 className="text-xl sm:text-2xl font-black leading-snug tracking-tight">
-              Lịch trình & Các mốc thời gian học kỳ
+              Quản Lý Sinh Viên
             </h2>
           </div>
 
@@ -347,8 +347,8 @@ const Login = () => {
                 1
               </div>
               <div>
-                <h4 className="font-extrabold text-xs">Đăng ký & Duyệt đề tài</h4>
-                <p className="text-[11px] text-orange-100">Nộp tối đa 4 lần • Thẩm định 14 ngày (Lần 1)</p>
+                <h4 className="font-extrabold text-xs">Quản lý điều kiện sinh viên</h4>
+                <p className="text-[11px] text-orange-100">Import danh sách đầu kỳ · Kiểm tra điều kiện · Quản lý cờ không đủ điều kiện</p>
               </div>
             </div>
 
@@ -357,8 +357,8 @@ const Login = () => {
                 2
               </div>
               <div>
-                <h4 className="font-extrabold text-xs">Đặt lịch & Tư vấn 1:1</h4>
-                <p className="text-[11px] text-orange-100">Đặt trước 24h • Gửi câu hỏi Pre-meeting cho GVHD</p>
+                <h4 className="font-extrabold text-xs">Tạo nhóm & quản lý thành viên</h4>
+                <p className="text-[11px] text-orange-100">Tạo nhóm · Phân công Leader · Quy mô hợp lệ từ 3–5 thành viên</p>
               </div>
             </div>
 
@@ -367,8 +367,8 @@ const Login = () => {
                 3
               </div>
               <div>
-                <h4 className="font-extrabold text-xs">Review 1, 2 & Hội đồng kín</h4>
-                <p className="text-[11px] text-orange-100">Đánh giá tiến độ và phân loại hướng bảo vệ</p>
+                <h4 className="font-extrabold text-xs">Tuyển thành viên vào nhóm</h4>
+                <p className="text-[11px] text-orange-100">Apply vào nhóm · Gửi lời mời · Duyệt hoặc từ chối · Chấp nhận hoặc thu hồi</p>
               </div>
             </div>
 
@@ -377,8 +377,8 @@ const Login = () => {
                 4
               </div>
               <div>
-                <h4 className="font-extrabold text-xs">Bảo vệ trước Hội đồng</h4>
-                <p className="text-[11px] text-orange-100">Xếp lịch cuốn chiếu • Công bố kết quả chính thức</p>
+                <h4 className="font-extrabold text-xs">Quản lý thay đổi nhóm</h4>
+                <p className="text-[11px] text-orange-100">Xin rời nhóm · Xóa thành viên · Thay đổi Leader · Admin can thiệp khi cần</p>
               </div>
             </div>
           </div>
