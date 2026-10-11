@@ -165,6 +165,9 @@ export const rejectLeaveRequest = async (requestId, data) => (await api.post(`/l
 
 // 3. Xuất Excel báo cáo (QT15)
 export const exportGroupsExcel = async (semester) => {
-    const response = await api.get(`/reports/export?semester=${semester}`, { responseType: 'blob' });
+    const response = await api.get('/reports/export', {
+        params: { semester },
+        responseType: 'blob',
+    });
     return response.data;
 };

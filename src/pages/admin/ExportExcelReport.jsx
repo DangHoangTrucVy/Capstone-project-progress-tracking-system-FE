@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import api from "../../services/api";
+import { useState } from "react";
+import { downloadGroupsReport } from "../../utils/downloadGroupsReport";
 
 export default function ExportExcelReport() {
   const [semester, setSemester] = useState("Fall2026");
@@ -7,36 +7,13 @@ export default function ExportExcelReport() {
 
   const handleExportExcel = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
-      // Gọi API xuất báo cáo Excel theo chuẩn QT15
-      const response = await api.get(`/reports/export?semester=${semester}`, {
-        responseType: "blob",
-      });
-
-      // Tạo đường dẫn tải file ẩn
-      const blob = new Blob([response.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-
-      // Đặt tên file theo chuẩn: Danh_sach_ghep_nhom_<Ky>_<yyyyMMdd_HHmmss>.xlsx
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
-      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "");
-      link.setAttribute(download, `Danh_sach_ghep_nhom_${semester}_${dateStr}_${timeStr}.xlsx`);
-      
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      alert("Xuất file Excel báo cáo thành công!");
+      await downloadGroupsReport(semester);
+      alert("Đã tải báo cáo Excel thành công!");
     } catch (err) {
-      console.error("Lỗi xuất Excel:", err);
-      alert("Không thể xuất file báo cáo. Vui lòng kiểm tra lại kết nối hoặc dữ liệu.");
+      alert(err.message);
     } finally {
       setLoading(false);
     }

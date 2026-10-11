@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   lockGroup, 
   unlockGroup, 
@@ -14,7 +14,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchLeaveRequests = async () => {
+  const fetchLeaveRequests = useCallback(async () => {
     if (!groupData?.id || !isLeader) return;
     try {
       const res = await getGroupLeaveRequests(groupData.id);
@@ -22,11 +22,11 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
     } catch (err) {
       console.error("Lỗi tải danh sách yêu cầu rời nhóm:", err);
     }
-  };
+  }, [groupData, isLeader]);
 
   useEffect(() => {
     fetchLeaveRequests();
-  }, [groupData, isLeader]);
+  }, [fetchLeaveRequests]);
 
   // Leader khóa nhóm (Locked)
   const handleLockGroup = async () => {
@@ -67,11 +67,16 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
   // Thành viên gửi yêu cầu xin rời nhóm (Đặc biệt khi nhóm ở trạng thái Locked)
   const handleRequestLeave = async (e) => {
     e.preventDefault();
-    if (!leaveReason.trim()) return;
+    if (loading || !groupData?.id || !leaveReason.trim()) return;
+    // The current BE rejects leaders here; only an Admin can replace them.
+    if (isLeader) {
+      alert("Leader cần liên hệ Admin để đổi trưởng nhóm trước khi xin rời nhóm. Backend hiện chưa hỗ trợ gửi yêu cầu này từ Leader.");
+      return;
+    }
     setLoading(true);
     try {
       await requestLeaveGroup(groupData.id, { reason: leaveReason.trim() });
-      alert("Đã gửi yêu cầu xin rời nhóm tới Trưởng nhóm / Người quản lý thành công!");
+      alert("Đã gửi yêu cầu xin rời nhóm tới Trưởng nhóm thành công!");
       setLeaveReason("");
     } catch (err) {
       alert(err.response?.data?.message || "Gửi yêu cầu rời nhóm thất bại.");
@@ -224,7 +229,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
                 </span>
               </div>
 
-              {isPending && (
+              {isPending && req.userId !== groupData?.leaderId && !groupData?.members?.some((member) => member.isLeader && String(member.userId) === String(req.userId)) && (
                 <div className="flex gap-2 border-t border-[#E8E2D9] pt-3">
                   <button
                     type="button"
@@ -255,11 +260,19 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div>
           <h3 className="text-xs font-black uppercase text-[#6B635B]">Gửi yêu cầu xin rời nhóm</h3>
-          <p className="text-[11px] text-[#6B635B]">Nếu nhóm đang ở trạng thái <strong >  🔒 Khóa nhóm</strong>, yêu cầu của bạn cần được Trưởng nhóm hoặc Người quản lý phê duyệt.</p>
+          <p className="text-[11px] text-[#6B635B]">
+            {isLeader
+              ? "Leader cần liên hệ Admin để đổi trưởng nhóm trước khi xin rời nhóm. Chức năng gửi yêu cầu đến Admin đang chờ Backend hỗ trợ."
+              : "Yêu cầu rời nhóm được gửi tới Trưởng nhóm khi nhóm chưa khóa và còn trong thời hạn lập nhóm. Nếu nhóm đã khóa, vui lòng liên hệ giảng viên hướng dẫn hoặc Admin."}
+          </p>
         </div>
         <form onSubmit={handleRequestLeave} className="space-y-3">
           <textarea
             rows={3}
+            name="reason"
+            aria-label="Lý do xin rời nhóm"
+            maxLength={1000}
+            disabled={loading || isLeader || !groupData?.id}
             value={leaveReason}
             onChange={(e) => setLeaveReason(e.target.value)}
             placeholder="Nhập lý do bạn muốn rời nhóm..."
@@ -268,7 +281,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
           />
           <button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || isLeader || !groupData?.id || !leaveReason.trim()}
             className="px-6 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
           >
             {loading ? "Đang gửi..." : "Gửi đơn xin rời nhóm"}

@@ -6,13 +6,13 @@ import {
   getGroupInvites,
   inviteToGroup,
   revokeInvite,
-  addGroupMember,
 } from "../../services/groupService";
 
 export default function GroupApplications({ groupId, onGroupUpdated }) {
   const [applications, setApplications] = useState([]);
   const [invites, setInvites] = useState([]);
   const [inviteStudentId, setInviteStudentId] = useState("");
+  const [inviting, setInviting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [rejectingApp, setRejectingApp] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -101,17 +101,12 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
 
   const handleInviteSubmit = async (e) => {
     e.preventDefault();
-    if (!inviteStudentId.trim()) return;
+    if (inviting || !groupId || !inviteStudentId.trim()) return;
+    setInviting(true);
     try {
-      const inputVal = inviteStudentId.trim();
-      // Truyền đồng thời các định dạng key phổ biến để backend chắc chắn nhận diện được
       const payload = {
-        identifier: inputVal,
-        studentCode: inputVal,
-        // email: inputVal,
-        // userId: inputVal,
+        studentCode: inviteStudentId.trim().toUpperCase(),
       };
-      console.log("INVITE PAYLOAD:", payload);
       await inviteToGroup(groupId, payload);
 
       alert("Đã gửi lời mời thành công đến sinh viên!");
@@ -122,6 +117,8 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
         err.response?.data?.message ||
           "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV.",
       );
+    } finally {
+      setInviting(false);
     }
   };
 
@@ -153,6 +150,9 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
         </h3>
         <form onSubmit={handleInviteSubmit} className="flex gap-3">
           <input
+            name="studentCode"
+            aria-label="Mã số sinh viên được mời"
+            disabled={inviting}
             type="text"
             value={inviteStudentId}
             onChange={(e) => setInviteStudentId(e.target.value)}
@@ -162,9 +162,10 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
           />
           <button
             type="submit"
+            disabled={inviting || !groupId || !inviteStudentId.trim()}
             className="px-5 py-2.5 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md cursor-pointer hover:bg-[#D84315]"
           >
-            Gửi lời mời
+            {inviting ? "Đang gửi..." : "Gửi lời mời"}
           </button>
         </form>
 

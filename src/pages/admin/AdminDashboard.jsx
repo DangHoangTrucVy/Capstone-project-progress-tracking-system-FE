@@ -15,7 +15,7 @@ import {
   getIneligibleStudents,
 } from "../../services/eligibilityService";
 import { getRegistrations } from "../../services/registrationService";
-import api from "../../services/api";
+import { downloadGroupsReport } from "../../utils/downloadGroupsReport";
 import Profile from "../../auth/Profile";
 import RegistrationReview from "./RegistrationReview";
 import {
@@ -476,42 +476,13 @@ export default function AdminDashboard() {
 
   const handleExportExcel = async (e) => {
     e.preventDefault();
+    if (exportingExcel) return;
     setExportingExcel(true);
     try {
-      const response = await api.get(
-        `/reports/export?semester=${exportSemester}`,
-        {
-          responseType: "blob",
-        },
-      );
-
-      const blob = new Blob([response.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
-      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, "");
-      link.setAttribute(
-        "download",
-        `Danh_sach_ghep_nhom_${exportSemester}_${dateStr}_${timeStr}.xlsx`,
-      );
-
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      showToast("Xuất file Excel báo cáo thành công!");
+      await downloadGroupsReport(exportSemester);
+      showToast("Đã tải báo cáo Excel thành công!");
     } catch (err) {
-      console.error("Lỗi xuất Excel:", err);
-      showToast(
-        "Không thể xuất file báo cáo. Vui lòng kiểm tra lại kết nối.",
-        "error",
-      );
+      showToast(err.message, "error");
     } finally {
       setExportingExcel(false);
     }
