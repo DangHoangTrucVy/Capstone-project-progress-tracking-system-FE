@@ -79,7 +79,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   };
 
   const handleApply = async (groupId) => {
-    if (myApps.length >= 3) {
+    if (myApps.filter(app => app.status === 'PENDING').length >= 3) {
       alert("Bạn chỉ được phép gửi tối đa 3 đơn Apply cùng một lúc!");
       return;
     }
@@ -206,7 +206,7 @@ const handleAcceptInvite = async (inviteId, groupId) => {
                     Trưởng nhóm đã gửi lời mời bạn tham gia.
                   </p>
                 </div>
-                <div className="flex gap-2">
+                {inv.status === 'PENDING' ? <div className="flex gap-2">
                   <button
                     onClick={() => handleAcceptInvite(inv.id, inv.groupId)}
                     className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer"
@@ -219,7 +219,7 @@ const handleAcceptInvite = async (inviteId, groupId) => {
                   >
                     Từ chối
                   </button>
-                </div>
+                </div> : <span>{inv.status}</span>}
               </div>
             ))}
           </div>
@@ -230,7 +230,7 @@ const handleAcceptInvite = async (inviteId, groupId) => {
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-xs font-black uppercase text-[#6B635B]">
-            Đơn Apply của tôi ({myApps.length}/3 đơn đang chờ)
+            Đơn Apply của tôi ({myApps.filter(app => app.status === 'PENDING').length}/3 đơn đang chờ)
           </h3>
         </div>
         {myApps.length > 0 ? (

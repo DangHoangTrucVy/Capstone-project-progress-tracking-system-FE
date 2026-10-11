@@ -160,8 +160,10 @@ export const setFormationDeadline = async (semester, data) => {
 // 2. Yêu cầu rời nhóm / Xử lý rời nhóm
 export const requestLeaveGroup = async (groupId, data) => (await api.post(`/groups/${groupId}/leave-requests`, data)).data;
 export const getGroupLeaveRequests = async (groupId) => (await api.get(`/groups/${groupId}/leave-requests`)).data;
-export const approveLeaveRequest = async (requestId) => (await api.post(`/leave-requests/${requestId}/approve`)).data;
+export const approveLeaveRequest = async (requestId, data = {}) => (await api.post(`/leave-requests/${requestId}/approve`, data)).data;
 export const rejectLeaveRequest = async (requestId, data) => (await api.post(`/leave-requests/${requestId}/reject`, data)).data;
+export const getLeaveRequests = async (params) => (await api.get('/leave-requests', { params })).data;
+export const getGroupMembers = async (groupId) => (await api.get(`/groups/${groupId}/members`)).data;
 
 // 3. Xuất Excel báo cáo (QT15)
 export const exportGroupsExcel = async (semester) => {
@@ -169,5 +171,5 @@ export const exportGroupsExcel = async (semester) => {
         params: { semester },
         responseType: 'blob',
     });
-    return response.data;
+    return response;
 };

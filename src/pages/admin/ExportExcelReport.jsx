@@ -40,6 +40,7 @@ export default function ExportExcelReport() {
               onChange={(e) => setSemester(e.target.value)}
               className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
             >
+              <option value="">Tất cả học kỳ</option>
               <option value="Fall2026">Fall 2026</option>
               <option value="Spring2027">Spring 2027</option>
               <option value="Summer2027">Summer 2027</option>
@@ -50,9 +51,9 @@ export default function ExportExcelReport() {
           <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200 text-xs space-y-2 text-[#6B635B]">
             <p className="font-black text-[#E65100]">Quy tắc định dạng dữ liệu trong file xuất:</p>
             <ul className="list-disc pl-4 space-y-1">
-              <li><strong>Sheet Danh_sach_nhom:</strong> Gồm mã nhóm, tên nhóm, sĩ số, trạng thái nhóm, thông tin thành viên (MSSV, họ tên, email, SĐT, vai trò Leader/Member).</li>
+              <li><strong>Sheet Danh_sach_nhom:</strong> Gồm mã nhóm, tên nhóm, sĩ số, trạng thái nhóm, thông tin thành viên (MSSV, họ tên, email, vai trò Leader/Member).</li>
               <li><strong>Sheet Chua_co_nhom:</strong> Gồm danh sách sinh viên chưa có nhóm, trạng thái điều kiện và lý do chưa có nhóm.</li>
-              <li>MSSV và SĐT được lưu dưới dạng văn bản để giữ nguyên số 0 ở đầu; không gộp ô trong bảng dữ liệu.</li>
+              <li>MSSV được lưu dưới dạng văn bản để giữ nguyên số 0 ở đầu; không gộp ô trong bảng dữ liệu.</li>
             </ul>
           </div>
 

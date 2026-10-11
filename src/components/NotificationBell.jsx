@@ -1,3 +1,6 @@
+  const isRead = (item) =>
+    item.readAt != null || item.read === true || item.isRead === true;
+
 import { useCallback, useEffect, useState } from "react";
 import {
   getNotifications,
@@ -6,7 +9,7 @@ import {
   markAllNotificationsAsRead,
 } from "../services/notificationService";
 
-export default function NotificationBell() {
+export default function NotificationBell({ onOpenLeaderRequest }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -55,11 +58,11 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    loadNotifications();
+    const initial = setTimeout(loadNotifications, 0);
 
     // Cập nhật định kỳ nếu chưa kết nối SSE.
     const timer = setInterval(loadNotifications, 30000);
-    return () => clearInterval(timer);
+    return () => { clearTimeout(initial); clearInterval(timer); };
   }, [loadNotifications]);
 
   const handleMarkRead = async (notification) => {
@@ -103,6 +106,7 @@ export default function NotificationBell() {
       case "ELIGIBILITY_CHANGED":
         return "⚠️";
       case "LEADER_CHANGE_REQUESTED":
+      case "LEADER_LEAVE_REQUESTED":
         return "📩";
       case "LEADER_CHANGED":
         return "👑";
@@ -125,6 +129,8 @@ export default function NotificationBell() {
         return "Không đủ điều kiện";
       case "LEADER_CHANGE_REQUESTED":
         return "Đơn xin rời chức vụ Leader";
+      case "LEADER_LEAVE_REQUESTED":
+        return "Leader xin rời nhóm";
       case "LEADER_CHANGED":
         return "Thay đổi Leader";
       default:
@@ -132,8 +138,7 @@ export default function NotificationBell() {
     }
   };
 
-  const isRead = (item) =>
-    item.readAt != null || item.read === true || item.isRead === true;
+
 
   return (
     <div className="relative">
@@ -250,6 +255,8 @@ export default function NotificationBell() {
                         <p className="mt-1 warp-break-words text-sm text-[#2C2825]">
                           {getMessage(item)}
                         </p>
+                        {item.details && <p className="mt-1 text-sm text-[#6B635B]">Lý do: {item.details}</p>}
+                        {item.type === 'LEADER_LEAVE_REQUESTED' && onOpenLeaderRequest && <button type="button" className="mt-2 text-sm text-[#E65100] underline" onClick={() => { onOpenLeaderRequest(item.entityId); setIsOpen(false); if (!isRead(item)) handleMarkRead(item); }}>Xem yêu cầu rời nhóm</button>}
 
                         {item.createdAt && (
                           <p className="mt-1 text-xs text-[#8A8178]">

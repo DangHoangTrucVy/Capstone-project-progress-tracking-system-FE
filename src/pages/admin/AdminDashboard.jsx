@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getUsers, createUser, updateUser } from "../../services/userService";
 import NotificationBell from "../../components/NotificationBell";
 import {
@@ -9,8 +9,6 @@ import {
 import { getCurrentUser } from "../../services/authService";
 import { getReportsSummary } from "../../services/progressService";
 import {
-  importEligibilityJson,
-  importEligibilityFile,
   updateStudentEligibility,
   getIneligibleStudents,
 } from "../../services/eligibilityService";
@@ -18,6 +16,8 @@ import { getRegistrations } from "../../services/registrationService";
 import { downloadGroupsReport } from "../../utils/downloadGroupsReport";
 import Profile from "../../auth/Profile";
 import RegistrationReview from "./RegistrationReview";
+import EligibilityPanel from "./EligibilityPanel";
+import LeaderLeaveRequests from "./LeaderLeaveRequests";
 import {
   PieChart,
   Pie,
@@ -49,6 +49,7 @@ const getManagedRole = (role) => {
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState("monitoring");
+  const [selectedLeaveId, setSelectedLeaveId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [leaderModalOpen, setLeaderModalOpen] = useState(false);
@@ -152,12 +153,6 @@ export default function AdminDashboard() {
   const [reportsLoading, setReportsLoading] = useState(false);
 
   // State cho phần Eligibility Import
-  const [jsonInput, setJsonInput] = useState("");
-  const [eligibilityFile, setEligibilityFile] = useState(null);
-  const [eligibilityUserId, setEligibilityUserId] = useState("");
-  const [eligibleStatus, setEligibleStatus] = useState(true);
-  const [eligibilityLoading, setEligibilityLoading] = useState(false);
-
   // State cho phần Xuất Excel (QT15)
   const [exportSemester, setExportSemester] = useState("Fall2026");
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -417,63 +412,6 @@ export default function AdminDashboard() {
     setSystemSettings((current) => ({ ...current, [key]: value }));
   };
 
-  const handleJsonSubmit = async (e) => {
-    e.preventDefault();
-    if (!jsonInput.trim()) return;
-    setEligibilityLoading(true);
-    try {
-      const parsedData = JSON.parse(jsonInput);
-      await importEligibilityJson(parsedData);
-      showToast("Import danh sách sinh viên đủ điều kiện (JSON) thành công!");
-      setJsonInput("");
-      fetchAdminData();
-    } catch (err) {
-      showToast("Lỗi: Định dạng JSON không hợp lệ hoặc lỗi kết nối.", "error");
-    } finally {
-      setEligibilityLoading(false);
-    }
-  };
-
-  const handleFileSubmit = async (e) => {
-    e.preventDefault();
-    if (!eligibilityFile) return;
-    setEligibilityLoading(true);
-    const formData = new FormData();
-    formData.append("file", eligibilityFile);
-
-    try {
-      await importEligibilityFile(formData);
-      showToast("Import file danh sách sinh viên thành công!");
-      setEligibilityFile(null);
-      fetchAdminData();
-    } catch (err) {
-      showToast(
-        err.response?.data?.message || "Import file thất bại.",
-        "error",
-      );
-    } finally {
-      setEligibilityLoading(false);
-    }
-  };
-
-  const handleUpdateEligibilityStatus = async (e) => {
-    e.preventDefault();
-    if (!eligibilityUserId.trim()) return;
-    setEligibilityLoading(true);
-    try {
-      await updateStudentEligibility(eligibilityUserId.trim(), {
-        eligible: eligibleStatus,
-      });
-      showToast("Cập nhật trạng thái cờ điều kiện sinh viên thành công!");
-      setEligibilityUserId("");
-      fetchAdminData();
-    } catch (err) {
-      showToast("Cập nhật thất bại.", "error");
-    } finally {
-      setEligibilityLoading(false);
-    }
-  };
-
   const handleExportExcel = async (e) => {
     e.preventDefault();
     if (exportingExcel) return;
@@ -667,6 +605,7 @@ export default function AdminDashboard() {
               <span>📝</span>
               <span>Duyệt đăng ký sinh viên</span>
             </button>
+            <button onClick={() => { setSelectedLeaveId(null); setActiveMenu("leader-leave"); }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-orange-50">Yêu cầu rời nhóm của Leader</button>
             <button
               onClick={() => {
                 setActiveMenu("groups");
@@ -771,7 +710,7 @@ export default function AdminDashboard() {
           <span>Quản Trị Hệ Thống — {activeMenu.toUpperCase()}</span>
 
           <div className="flex items-center gap-4">
-            <NotificationBell />
+            <NotificationBell onOpenLeaderRequest={(id) => { setSelectedLeaveId(id); setActiveMenu("leader-leave"); }} />
 
             <span className="text-[#E65100] font-bold">
               Xin chào, {user?.fullName || "Admin"}
@@ -1039,113 +978,8 @@ export default function AdminDashboard() {
             </section>
           )}
 
-          {/* --- ELIGIBILITY IMPORT --- */}
-          {activeMenu === "eligibility" && (
-            <div className="p-8 space-y-6 max-w-4xl">
-              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl space-y-2">
-                <h1 className="text-xl font-black text-[#2C2825]">
-                  Quản lý danh sách đủ điều kiện
-                </h1>
-                <p className="text-xs text-[#6B635B]">
-                  Admin thực hiện import danh sách sinh viên từ kỳ trước hoặc
-                  gắn/gỡ cờ điều kiện tham gia đợt đồ án.
-                </p>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-                <h3 className="text-xs font-black uppercase text-[#6B635B]">
-                  Import từ File (CSV / Excel)
-                </h3>
-                <form onSubmit={handleFileSubmit} className="space-y-3">
-                  <input
-                    type="file"
-                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                    onChange={(e) => setEligibilityFile(e.target.files[0])}
-                    className="w-full text-xs text-[#6B635B] file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-[#E65100] hover:file:bg-orange-100 cursor-pointer"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    disabled={eligibilityLoading}
-                    className="px-6 py-2.5 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer disabled:opacity-50"
-                  >
-                    {eligibilityLoading
-                      ? "Đang xử lý..."
-                      : "Tải lên file danh sách"}
-                  </button>
-                </form>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-                <h3 className="text-xs font-black uppercase text-[#6B635B]">
-                  Import dữ liệu JSON trực tiếp
-                </h3>
-                <form onSubmit={handleJsonSubmit} className="space-y-3">
-                  <textarea
-                    rows={5}
-                    value={jsonInput}
-                    onChange={(e) => setJsonInput(e.target.value)}
-                    placeholder='Dán đoạn JSON danh sách sinh viên (VD: [{"studentCode": "SE12345", ...}])'
-                    className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100] font-mono"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    disabled={eligibilityLoading}
-                    className="px-6 py-2.5 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer disabled:opacity-50"
-                  >
-                    {eligibilityLoading ? "Đang xử lý..." : "Import JSON"}
-                  </button>
-                </form>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-                <h3 className="text-xs font-black uppercase text-[#6B635B]">
-                  Gắn / Gỡ cờ điều kiện cá nhân
-                </h3>
-                <form
-                  onSubmit={handleUpdateEligibilityStatus}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end"
-                >
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold">
-                      Mã sinh viên / User ID
-                    </label>
-                    <input
-                      type="text"
-                      value={eligibilityUserId}
-                      onChange={(e) => setEligibilityUserId(e.target.value)}
-                      placeholder="Nhập ID sinh viên..."
-                      className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold">
-                      Trạng thái điều kiện
-                    </label>
-                    <select
-                      value={eligibleStatus}
-                      onChange={(e) =>
-                        setEligibleStatus(e.target.value === "true")
-                      }
-                      className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
-                    >
-                      <option value="true">Đủ điều kiện </option>
-                      <option value="false">Không đủ điều kiện</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={eligibilityLoading}
-                    className="px-6 py-3 bg-[#E65100] text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer disabled:opacity-50"
-                  >
-                    Cập nhật trạng thái
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
+          {activeMenu === "eligibility" && <EligibilityPanel onChanged={fetchAdminData} />}
+          {activeMenu === "leader-leave" && <LeaderLeaveRequests key={selectedLeaveId || "inbox"} selectedId={selectedLeaveId} onChanged={fetchAdminData} />}
 
           {/* --- ACCOUNTS & CONDITION FLAGS --- */}
           {activeMenu === "accounts" && (
@@ -1443,6 +1277,7 @@ export default function AdminDashboard() {
                       onChange={(e) => setExportSemester(e.target.value)}
                       className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
                     >
+              <option value="">Tất cả học kỳ</option>
                       <option value="Fall2026">Fall 2026</option>
                       <option value="Spring2027">Spring 2027</option>
                       <option value="Summer2027">Summer 2027</option>
@@ -1458,7 +1293,7 @@ export default function AdminDashboard() {
                       <li>
                         <strong>Sheet Danh_sach_nhom:</strong> Gồm mã nhóm, tên
                         nhóm, sĩ số, trạng thái nhóm, thông tin thành viên
-                        (MSSV, họ tên, email, SĐT, vai trò Leader/Member).
+                        (MSSV, họ tên, email, vai trò Leader/Member).
                       </li>
                       <li>
                         <strong>Sheet Chua_co_nhom:</strong> Gồm danh sách sinh
@@ -1466,7 +1301,7 @@ export default function AdminDashboard() {
                         nhóm.
                       </li>
                       <li>
-                        MSSV và SĐT được lưu dưới dạng văn bản để giữ nguyên số
+                        MSSV được lưu dưới dạng văn bản để giữ nguyên số
                         0 ở đầu; không gộp ô trong bảng dữ liệu.
                       </li>
                     </ul>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { apiError } from '../../utils/apiError';
 import {
   getGroupApplications,
   approveApplication,
@@ -114,8 +115,7 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
       fetchData();
     } catch (err) {
       alert(
-        err.response?.data?.message ||
-          "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV.",
+        apiError(err, "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV."),
       );
     } finally {
       setInviting(false);
@@ -178,6 +178,7 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
               {invites.map((inv) => {
                 // Bóc tách linh hoạt các trường thông tin định danh từ backend
                 const studentIdentifier =
+                  inv.student?.studentCode ||
                   inv.studentCode ||
                   inv.email ||
                   inv.studentEmail ||
@@ -193,7 +194,7 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
                     className="p-3 bg-[#FBF9F5] rounded-xl border flex justify-between items-center text-xs"
                   >
                     <span>
-                      Email:{" "}
+                      MSSV:{" "}
                       <strong className="text-[#2C2825]">
                         {studentIdentifier}
                       </strong>{" "}

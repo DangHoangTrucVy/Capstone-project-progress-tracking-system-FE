@@ -15,10 +15,13 @@ export const importEligibilityJson = async (data) => {
 // POST /api/v1/eligibility/import/file
 export const importEligibilityFile = async (formData) => {
     const response = await api.post("/eligibility/import/file", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { "Content-Type": undefined },
     });
     return response.data;
 };
+
+export const getImportedStudents = async (params) =>
+    (await api.get('/eligibility/students', { params })).data;
 
 // GET /api/v1/eligibility/me
 export const getMyEligibilityStatus = async () => {

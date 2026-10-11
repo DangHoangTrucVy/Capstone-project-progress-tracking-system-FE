@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import process from 'node:process'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -10,7 +11,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://capstone-project-progress-tracking-system-be-production-afa9.up.railway.app',
+        target: process.env.VITE_API_PROXY_TARGET || 'https://capstone-project-progress-tracking-system-be-production-afa9.up.railway.app',
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {

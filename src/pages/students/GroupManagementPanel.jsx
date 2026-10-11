@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiError } from '../../utils/apiError';
 import { 
   lockGroup, 
   unlockGroup, 
@@ -9,23 +10,27 @@ import {
   rejectLeaveRequest 
 } from "../../services/groupService";
 
-export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdated }) {
+export default function GroupManagementPanel({ groupData, isLeader, currentUserId, onGroupUpdated }) {
   const [leaveReason, setLeaveReason] = useState("");
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const hasPendingRequest = leaveRequests.some(r => r.status === 'PENDING' && String(r.userId) === String(currentUserId));
 
   const fetchLeaveRequests = useCallback(async () => {
-    if (!groupData?.id || !isLeader) return;
+    if (!groupData?.id) return;
     try {
       const res = await getGroupLeaveRequests(groupData.id);
       setLeaveRequests(res?.content || res || []);
     } catch (err) {
-      console.error("Lỗi tải danh sách yêu cầu rời nhóm:", err);
+      setError(err.response?.data?.message || 'Không tải được yêu cầu rời nhóm.');
     }
-  }, [groupData, isLeader]);
+  }, [groupData]);
 
   useEffect(() => {
-    fetchLeaveRequests();
+    const initial = setTimeout(fetchLeaveRequests, 0);
+    const timer = setInterval(fetchLeaveRequests, 30000);
+    return () => { clearTimeout(initial); clearInterval(timer); };
   }, [fetchLeaveRequests]);
 
   // Leader khóa nhóm (Locked)
@@ -36,7 +41,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       alert("Đã khóa nhóm thành công!");
       if (onGroupUpdated) onGroupUpdated();
     } catch (err) {
-      alert("Không thể khóa nhóm.");
+      alert(apiError(err));
     }
   };
 
@@ -48,7 +53,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       alert("Đã mở khóa nhóm thành công!");
       if (onGroupUpdated) onGroupUpdated();
     } catch (err) {
-      alert("Không thể mở khóa nhóm.");
+      alert(apiError(err));
     }
   };
 
@@ -60,26 +65,22 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       alert("Đã Finalize nhóm thành công!");
       if (onGroupUpdated) onGroupUpdated();
     } catch (err) {
-      alert("Không thể Finalize nhóm.");
+      alert(apiError(err));
     }
   };
 
   // Thành viên gửi yêu cầu xin rời nhóm (Đặc biệt khi nhóm ở trạng thái Locked)
   const handleRequestLeave = async (e) => {
     e.preventDefault();
-    if (loading || !groupData?.id || !leaveReason.trim()) return;
-    // The current BE rejects leaders here; only an Admin can replace them.
-    if (isLeader) {
-      alert("Leader cần liên hệ Admin để đổi trưởng nhóm trước khi xin rời nhóm. Backend hiện chưa hỗ trợ gửi yêu cầu này từ Leader.");
-      return;
-    }
+    if (loading || hasPendingRequest || !groupData?.id || (isLeader && !leaveReason.trim()) || leaveReason.trim().length > 1000) return;
     setLoading(true);
     try {
       await requestLeaveGroup(groupData.id, { reason: leaveReason.trim() });
-      alert("Đã gửi yêu cầu xin rời nhóm tới Trưởng nhóm thành công!");
+      alert(isLeader ? "Đã gửi yêu cầu tới Admin. Bạn vẫn là Leader trong lúc chờ duyệt." : "Đã gửi yêu cầu xin rời nhóm tới Trưởng nhóm thành công!");
       setLeaveReason("");
+      await fetchLeaveRequests();
     } catch (err) {
-      alert(err.response?.data?.message || "Gửi yêu cầu rời nhóm thất bại.");
+      alert(apiError(err));
     } finally {
       setLoading(false);
     }
@@ -94,7 +95,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       fetchLeaveRequests();
       if (onGroupUpdated) onGroupUpdated();
     } catch (err) {
-      alert("Thực hiện thất bại.");
+      alert(apiError(err));
     }
   };
 
@@ -107,12 +108,15 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
       alert("Đã từ chối đơn xin rời nhóm.");
       fetchLeaveRequests();
     } catch (err) {
-      alert("Thực hiện thất bại.");
+      alert(apiError(err));
     }
   };
 
   return (
     <div className="space-y-6 text-[#2C2825]">
+      {error && <p role="alert" className="text-red-700">{error}</p>}
+      <button type="button" onClick={fetchLeaveRequests}>Làm mới yêu cầu</button>
+      {hasPendingRequest && <p role="status" className="text-amber-700">Bạn có yêu cầu rời nhóm đang chờ xử lý.</p>}
       {/* 1. Khu vực điều khiển trạng thái dành cho Leader */}
       {isLeader && (
         <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
@@ -142,7 +146,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
 
       
 {/* Lịch sử yêu cầu rời nhóm */}
-{isLeader && (
+{groupData?.id && (
   <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
     <h3 className="text-xs font-black uppercase text-[#6B635B]">
       Lịch sử yêu cầu rời nhóm ({leaveRequests.length})
@@ -192,6 +196,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
                   <p className="text-xs text-[#6B635B]">
                     Lý do: {req.reason || "Không có lý do"}
                   </p>
+                  <p className="text-xs">{req.leaderRequest ? 'Yêu cầu của Leader — Admin xử lý' : 'Yêu cầu của thành viên'}</p>
 
                   {req.createdAt && (
                     <p className="text-xs text-[#8A8178]">
@@ -229,7 +234,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
                 </span>
               </div>
 
-              {isPending && req.userId !== groupData?.leaderId && !groupData?.members?.some((member) => member.isLeader && String(member.userId) === String(req.userId)) && (
+              {isLeader && isPending && !req.leaderRequest && (
                 <div className="flex gap-2 border-t border-[#E8E2D9] pt-3">
                   <button
                     type="button"
@@ -262,7 +267,7 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
           <h3 className="text-xs font-black uppercase text-[#6B635B]">Gửi yêu cầu xin rời nhóm</h3>
           <p className="text-[11px] text-[#6B635B]">
             {isLeader
-              ? "Leader cần liên hệ Admin để đổi trưởng nhóm trước khi xin rời nhóm. Chức năng gửi yêu cầu đến Admin đang chờ Backend hỗ trợ."
+              ? "Yêu cầu của Leader được chuyển tới Admin và giảng viên hướng dẫn. Bạn vẫn là Leader cho tới khi Admin duyệt yêu cầu và thay Leader."
               : "Yêu cầu rời nhóm được gửi tới Trưởng nhóm khi nhóm chưa khóa và còn trong thời hạn lập nhóm. Nếu nhóm đã khóa, vui lòng liên hệ giảng viên hướng dẫn hoặc Admin."}
           </p>
         </div>
@@ -272,16 +277,16 @@ export default function GroupManagementPanel({ groupData, isLeader, onGroupUpdat
             name="reason"
             aria-label="Lý do xin rời nhóm"
             maxLength={1000}
-            disabled={loading || isLeader || !groupData?.id}
+            disabled={loading || hasPendingRequest || !groupData?.id}
             value={leaveReason}
             onChange={(e) => setLeaveReason(e.target.value)}
             placeholder="Nhập lý do bạn muốn rời nhóm..."
             className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
-            required
+            required={isLeader}
           />
           <button 
             type="submit" 
-            disabled={loading || isLeader || !groupData?.id || !leaveReason.trim()}
+            disabled={loading || hasPendingRequest || !groupData?.id || (isLeader && !leaveReason.trim())}
             className="px-6 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
           >
             {loading ? "Đang gửi..." : "Gửi đơn xin rời nhóm"}
