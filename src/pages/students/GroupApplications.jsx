@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { apiError } from '../../utils/apiError';
+import { apiError } from "../../utils/apiError";
 import {
   getGroupApplications,
   approveApplication,
@@ -17,6 +17,8 @@ export default function GroupApplications({ groupId }) {
   const [loading, setLoading] = useState(true);
   const [rejectingApp, setRejectingApp] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [dialog, setDialog] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
   const fetchData = async () => {
     if (
@@ -49,28 +51,35 @@ export default function GroupApplications({ groupId }) {
     fetchData();
   }, [groupId]);
 
-  const handleApprove = async (appId) => {
-    if (!window.confirm("Duyệt đơn và gửi lời mời tham gia nhóm cho sinh viên này?"))
-      return;
-    try {
-      // YC10: duyệt đơn trả về Invite; sinh viên chưa trở thành thành viên.
-      const invite = await approveApplication(appId);
+  const handleApprove = (appId) => {
+    setDialog({
+      title: "Xác nhận duyệt đơn",
+      message:
+        "Bạn có chắc chắn muốn duyệt đơn và gửi lời mời tham gia nhóm cho sinh viên này không?",
+      confirmText: "Duyệt đơn",
+      action: async () => {
+        const invite = await approveApplication(appId);
 
-      alert("Đã gửi lời mời, sinh viên cần chấp nhận để vào nhóm.");
+        setApplications((prev) => prev.filter((app) => app.id !== appId));
 
-      // Lọc bỏ đơn vừa duyệt khỏi danh sách chờ trên giao diện Leader
-      setApplications((prev) => prev.filter((app) => app.id !== appId));
+        if (invite?.id) {
+          setInvites((prev) => [
+            invite,
+            ...prev.filter((item) => item.id !== invite.id),
+          ]);
+        }
 
-      // BE có thể dùng lại lời mời có sẵn, không thêm bản sao trên giao diện.
-      setInvites((prev) => [invite, ...prev.filter((item) => item.id !== invite.id)]);
+        await fetchData();
 
-      await fetchData();
-    } catch (err) {
-      console.error("Lỗi duyệt đơn:", err);
-      alert(
-        err.response?.data?.message || "Duyệt đơn thất bại do lỗi hệ thống.",
-      );
-    }
+        setDialog({
+          title: "Thành công",
+          message:
+            "Đã gửi lời mời. Sinh viên cần chấp nhận lời mời để vào nhóm.",
+          confirmText: "OK",
+          action: null,
+        });
+      },
+    });
   };
 
   const getInviteStatusLabel = (status) => {
@@ -84,51 +93,115 @@ export default function GroupApplications({ groupId }) {
     return statusMap[status] || status || "Không xác định";
   };
 
+  const formatInviteTime = (invite) => {
+    const rawTime =
+      invite.createdAt ??
+      invite.invitedAt ??
+      invite.createdDate ??
+      invite.created_at;
+
+    if (!rawTime) return "Chưa có thông tin thời gian";
+
+    const date = new Date(rawTime);
+
+    if (Number.isNaN(date.getTime())) {
+      return "Chưa có thông tin thời gian";
+    }
+
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const handleRejectSubmit = async (e) => {
     e.preventDefault();
+
     if (!rejectReason.trim() || !rejectingApp) return;
+
+    setProcessing(true);
+
     try {
-      await rejectApplication(rejectingApp.id, { reason: rejectReason.trim() });
-      alert("Đã từ chối đơn apply.");
+      await rejectApplication(rejectingApp.id, {
+        reason: rejectReason.trim(),
+      });
+
       setRejectingApp(null);
       setRejectReason("");
-      fetchData();
+      await fetchData();
+
+      setDialog({
+        title: "Thành công",
+        message: "Đã từ chối đơn Apply.",
+        confirmText: "OK",
+        action: null,
+      });
     } catch (err) {
-      alert("Từ chối đơn thất bại.");
+      setDialog({
+        title: "Có lỗi xảy ra",
+        message: apiError(err, "Từ chối đơn thất bại."),
+        confirmText: "OK",
+        action: null,
+      });
+    } finally {
+      setProcessing(false);
     }
   };
 
   const handleInviteSubmit = async (e) => {
     e.preventDefault();
-    if (inviting || !groupId || !inviteStudentId.trim()) return;
-    setInviting(true);
-    try {
-      const payload = {
-        studentCode: inviteStudentId.trim().toUpperCase(),
-      };
-      await inviteToGroup(groupId, payload);
 
-      alert("Đã gửi lời mời thành công đến sinh viên!");
-      setInviteStudentId("");
-      fetchData();
-    } catch (err) {
-      alert(
-        apiError(err, "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV."),
-      );
-    } finally {
-      setInviting(false);
-    }
+    if (inviting || !groupId || !inviteStudentId.trim()) return;
+
+    setDialog({
+      title: "Xác nhận gửi lời mời",
+      message: `Bạn có muốn gửi lời mời đến sinh viên có MSSV ${inviteStudentId.trim().toUpperCase()} không?`,
+      confirmText: "Gửi lời mời",
+      action: async () => {
+        setInviting(true);
+
+        try {
+          await inviteToGroup(groupId, {
+            studentCode: inviteStudentId.trim().toUpperCase(),
+          });
+
+          setInviteStudentId("");
+          await fetchData();
+
+          setDialog({
+            title: "Thành công",
+            message: "Đã gửi lời mời thành công đến sinh viên!",
+            confirmText: "OK",
+            action: null,
+          });
+        } finally {
+          setInviting(false);
+        }
+      },
+    });
   };
 
-  const handleRevokeInvite = async (inviteId) => {
-    if (!window.confirm("Bạn có muốn thu hồi lời mời này không?")) return;
-    try {
-      await revokeInvite(inviteId);
-      alert("Đã thu hồi lời mời.");
-      fetchData();
-    } catch (err) {
-      alert("Thu hồi thất bại.");
-    }
+  const handleRevokeInvite = (inviteId) => {
+    setDialog({
+      title: "Xác nhận thu hồi lời mời",
+      message: "Bạn có chắc chắn muốn thu hồi lời mời này không?",
+      confirmText: "Thu hồi",
+      danger: true,
+      action: async () => {
+        await revokeInvite(inviteId);
+        await fetchData();
+
+        setDialog({
+          title: "Thành công",
+          message: "Đã thu hồi lời mời.",
+          confirmText: "OK",
+          action: null,
+        });
+      },
+    });
   };
 
   if (loading) {
@@ -189,35 +262,45 @@ export default function GroupApplications({ groupId }) {
                 return (
                   <div
                     key={inv.id}
-                    className="p-3 bg-[#FBF9F5] rounded-xl border flex justify-between items-center text-xs"
+                    className="flex flex-col gap-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] p-4 text-xs transition hover:border-[#D9B59F] sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <span>
-                      MSSV:{" "}
-                      <strong className="text-[#2C2825]">
-                        {studentIdentifier}
-                      </strong>{" "}
-                      — Trạng thái:{" "}
-                      <strong
-                        className={
-                          inv.status === "PENDING"
-                            ? "text-amber-600"
-                            : inv.status === "ACCEPTED"
-                              ? "text-emerald-600"
-                              : inv.status === "WITHDRAWN"
-                                ? "text-gray-500"
-                                : "text-red-600"
-                        }
-                      >
-                        {getInviteStatusLabel(inv.status)}
-                      </strong>
-                    </span>
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[#6B635B]">MSSV:</span>
+                        <strong className="text-[#2C2825]">
+                          {studentIdentifier}
+                        </strong>
+
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            inv.status === "PENDING"
+                              ? "bg-amber-50 text-amber-700"
+                              : inv.status === "ACCEPTED"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : inv.status === "WITHDRAWN"
+                                  ? "bg-gray-100 text-gray-600"
+                                  : "bg-red-50 text-red-700"
+                          }`}
+                        >
+                          {getInviteStatusLabel(inv.status)}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-[#81776E]">
+                        <span>Thời gian gửi:</span>
+                        <span className="font-medium text-[#514940]">
+                          {formatInviteTime(inv)}
+                        </span>
+                      </div>
+                    </div>
+
                     {inv.status === "PENDING" && (
                       <button
                         type="button"
                         onClick={() => handleRevokeInvite(inv.id)}
-                        className="text-red-500 font-bold hover:underline cursor-pointer"
+                        className="shrink-0 self-start rounded-lg border border-red-200 bg-white px-3 py-2 font-bold text-red-600 transition hover:bg-red-50 sm:self-center"
                       >
-                        Thu hồi
+                        Thu hồi lời mời
                       </button>
                     )}
                   </div>
@@ -227,7 +310,6 @@ export default function GroupApplications({ groupId }) {
           </div>
         )}
       </div>
-
       {/* 2. Danh sách đơn Apply chờ xét duyệt */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <h3 className="text-xs font-black uppercase text-[#6B635B]">
@@ -306,7 +388,6 @@ export default function GroupApplications({ groupId }) {
           </p>
         )}
       </div>
-
       {/* Modal từ chối đơn */}
       {rejectingApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -346,6 +427,84 @@ export default function GroupApplications({ groupId }) {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {dialog && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-base font-black text-[#2C2825]">
+                {dialog.title}
+              </h3>
+
+              <button
+                type="button"
+                aria-label="Đóng thông báo"
+                disabled={processing}
+                onClick={() => setDialog(null)}
+                className="text-2xl leading-none text-[#6B635B] hover:text-black"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm leading-6 text-[#6B635B]">
+              {dialog.message}
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {dialog.action && (
+                <button
+                  type="button"
+                  disabled={processing}
+                  onClick={() => setDialog(null)}
+                  className="rounded-xl border border-[#E8E2D9] px-4 py-2.5 text-sm font-bold text-[#6B635B] hover:bg-[#F8F6F0]"
+                >
+                  Hủy bỏ
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={processing}
+                onClick={async () => {
+                  if (!dialog.action) {
+                    setDialog(null);
+                    return;
+                  }
+
+                  const action = dialog.action;
+                  setProcessing(true);
+                  setDialog(null);
+
+                  try {
+                    await action();
+                  } catch (err) {
+                    setDialog({
+                      title: "Có lỗi xảy ra",
+                      message: apiError(err, "Thao tác thất bại."),
+                      confirmText: "OK",
+                      action: null,
+                    });
+                  } finally {
+                    setProcessing(false);
+                  }
+                }}
+                className={`rounded-xl px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 ${
+                  dialog.danger
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-[#E65100] hover:bg-[#D84315]"
+                }`}
+              >
+                {processing ? "Đang xử lý..." : dialog.confirmText || "OK"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
