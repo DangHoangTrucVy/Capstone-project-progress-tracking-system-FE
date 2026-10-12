@@ -1,27 +1,45 @@
-import react from '@vitejs/plugin-react'
-import process from 'node:process'
-import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
+// import react from '@vitejs/plugin-react'
+// import process from 'node:process'
+// import { defineConfig } from 'vite'
+// import tailwindcss from '@tailwindcss/vite'
+
+// export default defineConfig({
+//   plugins: [
+//     react(),
+//     tailwindcss(), // Thêm dòng này
+//   ],
+//   server: {
+//     proxy: {
+//       '/api': {
+//         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080',
+//         changeOrigin: true,
+//         secure: false,
+//         configure: (proxy, _options) => {
+//           proxy.on('proxyReq', (proxyReq, req, _res) => {
+//             // Xóa Origin & Referer để bypass CORS check của Spring Security
+//             proxyReq.removeHeader('origin');
+//             proxyReq.removeHeader('referer');
+//           });
+//         },
+//       },
+//     },
+//   },
+// })
+
+import react from "@vitejs/plugin-react";
+import process from "node:process";
+import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(), // Thêm dòng này
-  ],
+  plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': {
-        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080',
+      "/api": {
+        target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
-        configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            // Xóa Origin & Referer để bypass CORS check của Spring Security
-            proxyReq.removeHeader('origin');
-            proxyReq.removeHeader('referer');
-          });
-        },
       },
     },
   },
-})
+});
