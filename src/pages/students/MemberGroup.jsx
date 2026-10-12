@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   getGroupById,
-  addGroupMember,
+  inviteToGroup,
   removeGroupMember,
 } from "../../services/groupService";
 import { getIneligibleStudents } from "../../services/eligibilityService";
@@ -123,15 +123,15 @@ export default function MemberGroup({
   // =====================================================
   // THÊM MEMBER
   // =====================================================
-  const handleAddMember = async (e) => {
+  const handleInviteMember = async (e) => {
     e.preventDefault();
 
     if (!isLeader) {
-      alert("Chỉ có Trưởng nhóm mới có quyền thêm thành viên!");
+      alert("Chỉ có Trưởng nhóm mới có quyền mời sinh viên!");
       return;
     }
 
-    if (!memberInput.trim()) return;
+    if (loading || !groupId || !memberInput.trim()) return;
 
     if (activeMembers.length >= 5) {
       alert(
@@ -144,27 +144,20 @@ export default function MemberGroup({
 
     try {
       const payload = {
-        studentCode: memberInput.trim(),
-        isLeader: false,
+        studentCode: memberInput.trim().toUpperCase(),
       };
 
-      await addGroupMember(groupId, payload);
+      await inviteToGroup(groupId, payload);
 
       setMemberInput("");
 
-      await fetchGroupDetails();
-
-      if (onGroupUpdated) {
-        await onGroupUpdated();
-      }
-
-      alert("Thêm thành viên thành công!");
+      alert("Đã gửi lời mời, sinh viên cần chấp nhận để vào nhóm.");
     } catch (err) {
-      console.error("Lỗi thêm thành viên:", err);
+      console.error("Lỗi gửi lời mời:", err);
 
       alert(
         err.response?.data?.message ||
-          "Thêm thành viên thất bại. Vui lòng kiểm tra lại MSSV."
+          "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV."
       );
     } finally {
       setLoading(false);
@@ -247,6 +240,19 @@ export default function MemberGroup({
           </span>
         </div>
       </div>
+
+      {isLeader && (
+        <form onSubmit={handleInviteMember} className="bg-white p-6 rounded-3xl border border-[#E8E2D9] space-y-3">
+          <label htmlFor="member-invite-code" className="block text-sm font-bold">Mời sinh viên bằng MSSV</label>
+          <div className="flex gap-3 flex-wrap">
+            <input id="member-invite-code" value={memberInput} onChange={(e) => setMemberInput(e.target.value)} required disabled={loading} placeholder="Nhập MSSV" className="border rounded-xl px-4 py-2 flex-1" />
+            <button type="submit" disabled={loading || !groupId || !memberInput.trim() || memberCount >= 5} className="bg-[#E65100] text-white rounded-xl px-4 py-2 disabled:opacity-50">
+              {loading ? "Đang gửi..." : "Gửi lời mời"}
+            </button>
+          </div>
+          <p className="text-xs text-[#6B635B]">Sinh viên chỉ được tính vào sĩ số sau khi chấp nhận lời mời. Hệ thống kiểm tra lại sức chứa khi chấp nhận.</p>
+        </form>
+      )}
 
       {/* DANH SÁCH */}
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] space-y-6 shadow-sm">

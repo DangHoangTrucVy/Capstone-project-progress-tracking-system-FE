@@ -370,7 +370,7 @@ export default function StudentDashboard() {
                 />
               )}
               {activeTab === "applications" && isLeader && (
-                <GroupApplications groupId={groupData?.id} onGroupUpdated={checkUserGroup} />
+                <GroupApplications groupId={groupData?.id} />
               )}
               {activeTab === "management" && (
                 <GroupManagementPanel

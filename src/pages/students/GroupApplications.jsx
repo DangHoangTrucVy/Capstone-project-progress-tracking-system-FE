@@ -9,7 +9,7 @@ import {
   revokeInvite,
 } from "../../services/groupService";
 
-export default function GroupApplications({ groupId, onGroupUpdated }) {
+export default function GroupApplications({ groupId }) {
   const [applications, setApplications] = useState([]);
   const [invites, setInvites] = useState([]);
   const [inviteStudentId, setInviteStudentId] = useState("");
@@ -50,21 +50,19 @@ export default function GroupApplications({ groupId, onGroupUpdated }) {
   }, [groupId]);
 
   const handleApprove = async (appId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn duyệt sinh viên này vào nhóm?"))
+    if (!window.confirm("Duyệt đơn và gửi lời mời tham gia nhóm cho sinh viên này?"))
       return;
     try {
-      // Chỉ gọi duy nhất API duyệt đơn apply của backend
-      await approveApplication(appId);
+      // YC10: duyệt đơn trả về Invite; sinh viên chưa trở thành thành viên.
+      const invite = await approveApplication(appId);
 
-      alert("Đã duyệt sinh viên vào nhóm thành công!");
+      alert("Đã gửi lời mời, sinh viên cần chấp nhận để vào nhóm.");
 
       // Lọc bỏ đơn vừa duyệt khỏi danh sách chờ trên giao diện Leader
       setApplications((prev) => prev.filter((app) => app.id !== appId));
 
-      // Gọi callback cập nhật lại giao diện nhóm ngay lập tức
-      if (typeof onGroupUpdated === "function") {
-        await onGroupUpdated();
-      }
+      // BE có thể dùng lại lời mời có sẵn, không thêm bản sao trên giao diện.
+      setInvites((prev) => [invite, ...prev.filter((item) => item.id !== invite.id)]);
 
       await fetchData();
     } catch (err) {

@@ -42,6 +42,18 @@ test('Invite and leader decisions use the documented request contracts', async (
   assert.deepEqual(calls.pop(), { method: 'put', args: ['/groups/G1/leader', { userId: 'U2' }] });
 });
 
+test('Approving an application returns the pending invite, including a reused invite', async context => {
+  const invite = { id: 'I1', type: 'INVITE', status: 'PENDING', sourceApplicationId: 'A1' };
+  const requests = [];
+  context.mock.method(api, 'post', async (...args) => {
+    requests.push(args);
+    return { data: invite };
+  });
+  assert.equal(await group.approveApplication('A1'), invite);
+  assert.equal(await group.approveApplication('A1'), invite);
+  assert.deepEqual(requests, [['/applications/A1/approve'], ['/applications/A1/approve']]);
+});
+
 test('Import and document uploads retain FormData and let the browser set the boundary', async () => {
   const data = new FormData(); data.append('file', new Blob(['email,name']), 'students.csv');
   await eligibility.importEligibilityFile(data);
