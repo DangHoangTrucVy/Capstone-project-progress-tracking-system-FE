@@ -16,3 +16,13 @@ export const rejectRegistration = async (id, reason) => {
     const response = await api.post(`/registrations/${id}/reject`, { reason });
     return response.data;
 };
+
+export const getPendingRegistrationCount = async () => {
+  const page = await getRegistrations({
+    status: "PENDING_APPROVAL",
+    page: 0,
+    size: 1,
+  });
+
+  return page.totalElements ?? 0;
+};

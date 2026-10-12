@@ -5,8 +5,6 @@ import CreateGroup from "./CreateGroup";
 import StudentProfileAndApply from "./StudentProfileAndApply";
 import GroupApplications from "./GroupApplications";
 import GroupManagementPanel from "./GroupManagementPanel";
-import ScheduleGroup from './ScheduleGroup';
-import GroupDocuments from './GroupDocuments';
 import Profile from "../../auth/Profile";
 import {
   getAllGroups,
@@ -22,41 +20,69 @@ export default function StudentDashboard() {
   const [hasGroup, setHasGroup] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [groupData, setGroupData] = useState(null);
-  const [groupError, setGroupError] = useState('');
+  const [groupError, setGroupError] = useState("");
 
   const checkUserGroup = async () => {
     try {
       const user = await getCurrentUser();
       setCurrentUser(user);
-      localStorage.setItem('role', user.role);
-      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem("role", user.role);
+      localStorage.setItem("user", JSON.stringify(user));
       const ids = new Set();
-      const cached = localStorage.getItem('groupId');
+      const cached = localStorage.getItem("groupId");
       if (cached) ids.add(cached);
       const groups = await getAllGroups({ page: 0, size: 100 });
       const list = Array.isArray(groups) ? groups : groups.content || [];
-      list.forEach(g => ids.add(g.id));
+      list.forEach((g) => ids.add(g.id));
       for (let page = 1; page < (groups.totalPages || 0); page++) {
         const next = await getAllGroups({ page, size: 100 });
-        (next.content || []).forEach(g => ids.add(g.id));
+        (next.content || []).forEach((g) => ids.add(g.id));
       }
-      if (!['LEADER', 'GROUP_LEADER'].includes(user.role)) {
-        const [apps, invites] = await Promise.all([getMyApplications(), getMyInvites()]);
-        for (const item of [...(Array.isArray(apps) ? apps : apps.content || []), ...(Array.isArray(invites) ? invites : invites.content || [])]) {
-          if (['APPROVED', 'ACCEPTED'].includes(item.status) && (item.groupId || item.group?.id)) ids.add(item.groupId || item.group.id);
+      if (!["LEADER", "GROUP_LEADER"].includes(user.role)) {
+        const [apps, invites] = await Promise.all([
+          getMyApplications(),
+          getMyInvites(),
+        ]);
+        for (const item of [
+          ...(Array.isArray(apps) ? apps : apps.content || []),
+          ...(Array.isArray(invites) ? invites : invites.content || []),
+        ]) {
+          if (
+            ["APPROVED", "ACCEPTED"].includes(item.status) &&
+            (item.groupId || item.group?.id)
+          )
+            ids.add(item.groupId || item.group.id);
         }
       }
       for (const id of ids) {
         let group;
-        try { group = await getGroupById(id); }
-        catch (error) { if ([403, 404].includes(error.response?.status)) continue; throw error; }
-        if (!group.members?.some(m => String(m.userId) === String(user.id) && m.status === 'ACTIVE')) continue;
-        setGroupData(group); setHasGroup(true); localStorage.setItem('groupId', group.id);
-        setActiveTab(tab => ['create', 'profile_apply'].includes(tab) ? 'overview' : tab);
-        setGroupError(''); return;
+        try {
+          group = await getGroupById(id);
+        } catch (error) {
+          if ([403, 404].includes(error.response?.status)) continue;
+          throw error;
+        }
+        if (
+          !group.members?.some(
+            (m) =>
+              String(m.userId) === String(user.id) && m.status === "ACTIVE",
+          )
+        )
+          continue;
+        setGroupData(group);
+        setHasGroup(true);
+        localStorage.setItem("groupId", group.id);
+        setActiveTab((tab) =>
+          ["create", "profile_apply"].includes(tab) ? "overview" : tab,
+        );
+        setGroupError("");
+        return;
       }
-      localStorage.removeItem('groupId');
-      setGroupData(null); setHasGroup(false); setActiveTab('create'); setGroupError('');
+      localStorage.removeItem("groupId");
+      setGroupData(null);
+      setHasGroup(false);
+      setActiveTab("create");
+      setGroupError("");
     } catch (error) {
       setGroupError(error.response?.data?.message || error.message);
     }
@@ -64,8 +90,11 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const timer = setTimeout(checkUserGroup, 0);
-    window.addEventListener('focus', checkUserGroup);
-    return () => { clearTimeout(timer); window.removeEventListener('focus', checkUserGroup); };
+    window.addEventListener("focus", checkUserGroup);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", checkUserGroup);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -73,7 +102,13 @@ export default function StudentDashboard() {
     window.location.href = "/login";
   };
 
-  if (groupError) return <div role="alert" className="p-8"><p>{groupError}</p><button onClick={checkUserGroup}>Thử lại</button></div>;
+  if (groupError)
+    return (
+      <div role="alert" className="p-8">
+        <p>{groupError}</p>
+        <button onClick={checkUserGroup}>Thử lại</button>
+      </div>
+    );
 
   if (hasGroup === null) {
     return (
@@ -162,8 +197,6 @@ export default function StudentDashboard() {
 
           {hasGroup || isLeader ? (
             <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
-              <button onClick={() => setActiveTab('schedule')} className="w-full text-left px-4 py-3 rounded-2xl hover:bg-orange-50">📅 Lịch gặp GVHD</button>
-              <button onClick={() => setActiveTab('documents')} className="w-full text-left px-4 py-3 rounded-2xl hover:bg-orange-50">📄 Tài liệu nhóm</button>
               <button
                 onClick={() => setActiveTab("overview")}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
@@ -300,9 +333,11 @@ export default function StudentDashboard() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <button onClick={checkUserGroup} className="text-[#E65100]">Làm mới nhóm</button>
+            <button onClick={checkUserGroup} className="text-[#E65100]">
+              Làm mới nhóm
+            </button>
             <NotificationBell />
-            
+
             <div className="text-right hidden sm:block pl-2 border-l border-[#E8E2D9]">
               <p className="font-extrabold text-[#2C2825] text-xs">
                 {currentUser?.fullName || "Đang tải..."}
@@ -319,40 +354,41 @@ export default function StudentDashboard() {
                     : "bg-orange-50 text-[#E65100] border border-orange-200"
               }`}
             >
-              {!hasGroup ? "🎓 STUDENT" : isLeader ? "👑 Nhóm trưởng" : "👤Thành viên"}
+              {!hasGroup
+                ? "🎓 STUDENT"
+                : isLeader
+                  ? "👑 Nhóm trưởng"
+                  : "👤Thành viên"}
             </span>
           </div>
         </header>
 
+        {/* Banner cảnh báo sĩ số nhóm */}
+        <div
+          className={`mb-6  p-5 shadow-sm ${isValidTeamSize ? "bg-emerald-50/60 border-emerald-200 text-emerald-900" : "bg-amber-50/60 border-amber-200 text-amber-900"}`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider">
+                Trạng thái sĩ số nhóm
+              </p>
+              <h2 className="mt-1 text-sm font-black">
+                {isValidTeamSize
+                  ? `Nhóm đã đạt sĩ số hợp lệ (${groupMemberCount}/5 thành viên)`
+                  : `Nhóm hiện có ${groupMemberCount}/5 thành viên (Yêu cầu tối thiểu 3 thành viên)`}
+              </h2>
+            </div>
+            <span
+              className={`px-3 py-1 text-xs font-bold rounded-xl ${isValidTeamSize ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"}`}
+            >
+              {isValidTeamSize ? "✓ Đạt chuẩn" : "⚠️ Cần bổ sung thành viên"}
+            </span>
+          </div>
+        </div>
+
         <div className="p-8 max-w-7xl mx-auto w-full">
           {hasGroup || isLeader ? (
             <>
-              {/* Nếu là Leader nhưng chưa có groupData (chưa có nhóm chính thức), ta khởi tạo groupData giả lập hoặc hiển thị giao diện quản lý Leader */}
-              {/* Banner cảnh báo sĩ số nhóm */}
-              <div
-                className={`mb-6 rounded-3xl border p-5 shadow-sm ${isValidTeamSize ? "bg-emerald-50/60 border-emerald-200 text-emerald-900" : "bg-amber-50/60 border-amber-200 text-amber-900"}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-wider">
-                      Trạng thái sĩ số nhóm
-                    </p>
-                    <h2 className="mt-1 text-sm font-black">
-                      {isValidTeamSize
-                        ? `Nhóm đã đạt sĩ số hợp lệ (${groupMemberCount}/5 thành viên)`
-                        : `Nhóm hiện có ${groupMemberCount}/5 thành viên (Yêu cầu tối thiểu 3 thành viên)`}
-                    </h2>
-                  </div>
-                  <span
-                    className={`px-3 py-1 text-xs font-bold rounded-xl ${isValidTeamSize ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"}`}
-                  >
-                    {isValidTeamSize
-                      ? "✓ Đạt chuẩn"
-                      : "⚠️ Cần bổ sung thành viên"}
-                  </span>
-                </div>
-              </div>
-
               {activeTab === "overview" && (
                 <Overview
                   groupData={groupData}
@@ -360,8 +396,6 @@ export default function StudentDashboard() {
                   isLeader={isLeader}
                 />
               )}
-              {activeTab === 'schedule' && groupData?.id && <ScheduleGroup groupId={groupData.id} topicId={groupData.topicId || groupData.topic?.id} isLeader={isLeader} />}
-              {activeTab === 'documents' && groupData?.id && <GroupDocuments groupId={groupData.id} isLeader={isLeader} />}
               {activeTab === "members" && (
                 <MemberGroup
                   groupId={groupData?.id}

@@ -8,6 +8,7 @@ export default function CreateGroup({ onGroupCreated }) {
   const semesterOptions = ["Fall2026", "Spring2027", "Summer2027", "Fall2027"];
   const [semester, setSemester] = useState("Fall2026");
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -23,7 +24,10 @@ export default function CreateGroup({ onGroupCreated }) {
 
   const handleCreateGroupSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
+
     try {
       const groupPayload = {
         groupCode: groupCode.trim(),
@@ -31,25 +35,39 @@ export default function CreateGroup({ onGroupCreated }) {
       };
 
       const response = await createGroup(groupPayload);
-      if (response && response.id) {
-        localStorage.setItem("groupId", response.id);
-      } else if (response && response.data?.id) {
-        localStorage.setItem("groupId", response.data.id);
+      const createdGroupId = response?.id || response?.data?.id;
+
+      if (createdGroupId) {
+        localStorage.setItem("groupId", createdGroupId);
       }
-      alert("Tạo nhóm thành công! Bạn đã trở thành Trưởng nhóm (Leader).");
-      if (onGroupCreated) onGroupCreated();
+
+      setNotice({
+        type: "success",
+        title: "Tạo nhóm thành công",
+        message: "Bạn đã trở thành Trưởng nhóm (Leader).",
+      });
+
+      if (onGroupCreated) {
+        await onGroupCreated();
+      }
     } catch (error) {
       console.error("Lỗi tạo nhóm:", error);
-      alert(
-        error.response?.data?.message ||
+
+      setNotice({
+        type: "error",
+        title: "Không thể tạo nhóm",
+        message:
+          error.response?.data?.message ||
           "Tạo nhóm thất bại! Vui lòng kiểm tra lại.",
-      );
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const isAlreadyLeader = ["LEADER", "GROUP_LEADER"].includes(currentUser?.role);
+  const isAlreadyLeader = ["LEADER", "GROUP_LEADER"].includes(
+    currentUser?.role,
+  );
 
   return (
     <main className="max-w-6xl mx-auto py-4 px-6 space-y-8 animate-fadeIn">
@@ -119,14 +137,55 @@ export default function CreateGroup({ onGroupCreated }) {
                 <span>Quy chế lập nhóm</span>
               </div>
               <ul className="space-y-2 text-[11px] text-[#6B635B] list-disc pl-4 leading-relaxed">
+                <li>Quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.</li>
                 <li>
-                  Quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.
-                </li>
-                <li>
-                  Mỗi sinh viên chỉ thuộc một nhóm chính thức tại một thời
-                  điểm trong cùng đợt luận án.
+                  Mỗi sinh viên chỉ thuộc một nhóm chính thức tại một thời điểm
+                  trong cùng đợt luận án.
                 </li>
               </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="create-group-notice-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h3
+                id="create-group-notice-title"
+                className="text-base font-black text-[#2C2825]"
+              >
+                {notice.title}
+              </h3>
+
+              <button
+                type="button"
+                aria-label="Đóng thông báo"
+                onClick={() => setNotice(null)}
+                className="text-2xl leading-none text-[#6B635B] hover:text-black"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm leading-6 text-[#6B635B]">
+              {notice.message}
+            </p>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                className="rounded-xl bg-[#E65100] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#D84315]"
+              >
+                OK
+              </button>
             </div>
           </div>
         </div>

@@ -65,7 +65,7 @@ const GoogleSignInButton = ({ clientId, onCredential, onError, disabled }) => {
 
   return (
     <div className={`relative flex justify-center ${disabled ? "pointer-events-none opacity-50" : ""}`}>
-      <div ref={containerRef} className="w-full flex justify-center min-h-[44px]" />
+      <div ref={containerRef} className="w-full flex justify-center min-h-11" />
       {!ready && (
         <span className="absolute inset-0 flex items-center justify-center text-xs text-[#9E958C]">
           Đang tải Google...
