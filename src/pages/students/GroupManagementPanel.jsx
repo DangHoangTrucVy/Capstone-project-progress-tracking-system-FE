@@ -302,9 +302,6 @@ export default function GroupManagementPanel({
           {error}
         </p>
       )}
-      <button type="button" onClick={fetchLeaveRequests}>
-        Làm mới yêu cầu
-      </button>
       {hasPendingRequest && (
         <p role="status" className="text-amber-700">
           Bạn có yêu cầu rời nhóm đang chờ xử lý.

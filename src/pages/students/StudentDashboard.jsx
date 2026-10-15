@@ -221,7 +221,7 @@ export default function StudentDashboard() {
                 <span>Thành viên nhóm (3–5 người)</span>
               </button>
 
-              {isLeader && (
+              {/* {isLeader && (
                 <button
                   onClick={() => setActiveTab("applications")}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
@@ -232,6 +232,20 @@ export default function StudentDashboard() {
                 >
                   <span>📝</span>
                   <span>Xét duyệt đơn Apply</span>
+                </button>
+              )} */}
+
+              {hasGroup && (
+                <button
+                  onClick={() => setActiveTab("applications")}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                    activeTab === "applications"
+                      ? "bg-[#E65100] text-white shadow-md"
+                      : "hover:bg-[#F8F6F0]"
+                  }`}
+                >
+                  <span>📝</span>
+                  <span>Đơn Apply & Vote</span>
                 </button>
               )}
 
@@ -403,9 +417,18 @@ export default function StudentDashboard() {
                   onGroupUpdated={checkUserGroup}
                 />
               )}
-              {activeTab === "applications" && isLeader && (
+              {/* {activeTab === "applications" && isLeader && (
                 <GroupApplications groupId={groupData?.id} />
+              )} */}
+
+              {activeTab === "applications" && hasGroup && (
+                <GroupApplications
+                  groupId={groupData?.id}
+                  isLeader={isLeader}
+                  currentUserId={currentUser?.id}
+                />
               )}
+              
               {activeTab === "management" && (
                 <GroupManagementPanel
                   groupData={groupData}
