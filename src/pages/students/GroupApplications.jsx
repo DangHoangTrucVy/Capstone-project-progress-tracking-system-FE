@@ -7,9 +7,15 @@ import {
   getGroupInvites,
   inviteToGroup,
   revokeInvite,
+  getApplicationVotes,
+  voteOnApplication,
 } from "../../services/groupService";
 
-export default function GroupApplications({ groupId }) {
+export default function GroupApplications({
+  groupId,
+  isLeader = false,
+  currentUserId,
+}) {
   const [applications, setApplications] = useState([]);
   const [invites, setInvites] = useState([]);
   const [inviteStudentId, setInviteStudentId] = useState("");
@@ -22,6 +28,11 @@ export default function GroupApplications({ groupId }) {
 
   const [toast, setToast] = useState(null);
   const toastTimerRef = React.useRef(null);
+
+  const [applicationVotes, setApplicationVotes] = useState({});
+  const [voteChoices, setVoteChoices] = useState({});
+  const [voteComments, setVoteComments] = useState({});
+  const [votingAppId, setVotingAppId] = useState(null);
 
   const showToast = (message, type = "success") => {
     if (toastTimerRef.current) {
@@ -54,15 +65,37 @@ export default function GroupApplications({ groupId }) {
       return;
     }
     try {
-      const [appsRes, invitesRes] = await Promise.all([
-        getGroupApplications(groupId).catch(() => []),
-        getGroupInvites(groupId).catch(() => []),
-      ]);
+      const appsRes = await getGroupApplications(groupId);
       const appList = appsRes?.content || appsRes || [];
-      setApplications(
-        appList.filter((app) => !app.status || app.status === "PENDING"),
+      const pendingApps = appList.filter(
+        (app) => !app.status || app.status === "PENDING",
       );
-      setInvites(invitesRes?.content || invitesRes || []);
+      setApplications(pendingApps);
+
+      if (isLeader) {
+        const invitesRes = await getGroupInvites(groupId).catch(() => []);
+        setInvites(invitesRes?.content || invitesRes || []);
+      } else {
+        setInvites([]);
+      }
+
+      const voteResults = await Promise.all(
+        pendingApps.map(async (app) => {
+          try {
+            const result = await getApplicationVotes(app.id);
+
+            return [
+              app.id,
+              Array.isArray(result) ? result : result?.content || [],
+            ];
+          } catch (error) {
+            console.error(`Không tải được vote của đơn ${app.id}:`, error);
+            return [app.id, []];
+          }
+        }),
+      );
+
+      setApplicationVotes(Object.fromEntries(voteResults));
     } catch (err) {
       console.error("Lỗi tải danh sách apply và invite:", err);
     } finally {
@@ -72,7 +105,7 @@ export default function GroupApplications({ groupId }) {
 
   useEffect(() => {
     fetchData();
-  }, [groupId]);
+  }, [groupId, isLeader]);
 
   const handleApprove = (appId) => {
     setDialog({
@@ -162,7 +195,7 @@ export default function GroupApplications({ groupId }) {
 
       showToast("Đã từ chối đơn Apply.", "success");
     } catch (err) {
-       showToast(apiError(err, "Từ chối đơn thất bại."), "error");
+      showToast(apiError(err, "Từ chối đơn thất bại."), "error");
     } finally {
       setProcessing(false);
     }
@@ -189,11 +222,11 @@ export default function GroupApplications({ groupId }) {
           await fetchData();
 
           showToast("Đã gửi lời mời thành công đến sinh viên!", "success");
-       } catch (err) {
-  showToast(apiError(err, "Gửi lời mời thất bại."), "error");
-} finally {
-  setInviting(false);
-}
+        } catch (err) {
+          showToast(apiError(err, "Gửi lời mời thất bại."), "error");
+        } finally {
+          setInviting(false);
+        }
       },
     });
   };
@@ -221,6 +254,33 @@ export default function GroupApplications({ groupId }) {
     );
   }
 
+  const handleVote = async (applicationId) => {
+    const vote = voteChoices[applicationId];
+
+    if (!vote || votingAppId) return;
+
+    setVotingAppId(applicationId);
+
+    try {
+      await voteOnApplication(applicationId, {
+        vote,
+        comment: voteComments[applicationId]?.trim() || "",
+      });
+
+      const result = await getApplicationVotes(applicationId);
+
+      setApplicationVotes((prev) => ({
+        ...prev,
+        [applicationId]: Array.isArray(result) ? result : result?.content || [],
+      }));
+
+      showToast("Đã gửi ý kiến vote thành công.", "success");
+    } catch (error) {
+      showToast(apiError(error, "Gửi vote thất bại."), "error");
+    } finally {
+      setVotingAppId(null);
+    }
+  };
   return (
     <div className="space-y-6 animate-fadeIn text-[#2C2825]">
       {/* 1. Phần Trưởng nhóm gửi lời mời sinh viên vào nhóm */}
@@ -228,6 +288,9 @@ export default function GroupApplications({ groupId }) {
         <h3 className="text-xs font-black uppercase text-[#6B635B]">
           Mời thành viên vào nhóm bằng MSSV
         </h3>
+        <p className="text-xs italic text-gray-500 -mt-3">
+  Dành cho Trưởng nhóm.
+</p>
         <form onSubmit={handleInviteSubmit} className="flex gap-3">
           <input
             name="studentCode"
@@ -342,6 +405,19 @@ export default function GroupApplications({ groupId }) {
               const skills =
                 studentInfo.skills || app.skills || "Chưa cập nhật";
 
+              const votes = applicationVotes[app.id] || [];
+
+              const supportCount = votes.filter(
+                (item) => item.vote === "SUPPORT",
+              ).length;
+
+              const opposeCount = votes.filter(
+                (item) => item.vote === "OPPOSE",
+              ).length;
+
+              const myVote = votes.find(
+                (item) => String(item.voterId) === String(currentUserId),
+              );
               return (
                 <div
                   key={app.id}
@@ -371,22 +447,111 @@ export default function GroupApplications({ groupId }) {
                     )}
                   </div>
 
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() =>
-                        handleApprove(app.id, app.student || app.user || app)
+                  <div className="mt-4 rounded-2xl border border-orange-100 bg-white p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="font-bold text-[#2C2825]">
+                        Ý kiến thành viên
+                      </h4>
+
+                      <div className="flex gap-2 text-xs font-bold">
+                        <span className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-700">
+                          👍 Ủng hộ: {supportCount}
+                        </span>
+                        <span className="rounded-lg bg-red-50 px-3 py-2 text-red-700">
+                          👎 Phản đối: {opposeCount}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVoteChoices((prev) => ({
+                            ...prev,
+                            [app.id]: "SUPPORT",
+                          }))
+                        }
+                        className={`rounded-xl border px-4 py-2 text-xs font-bold ${
+                          voteChoices[app.id] === "SUPPORT" ||
+                          (!voteChoices[app.id] && myVote?.vote === "SUPPORT")
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : "border-emerald-200 text-emerald-700"
+                        }`}
+                      >
+                        👍 Ủng hộ
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVoteChoices((prev) => ({
+                            ...prev,
+                            [app.id]: "OPPOSE",
+                          }))
+                        }
+                        className={`rounded-xl border px-4 py-2 text-xs font-bold ${
+                          voteChoices[app.id] === "OPPOSE" ||
+                          (!voteChoices[app.id] && myVote?.vote === "OPPOSE")
+                            ? "border-red-600 bg-red-600 text-white"
+                            : "border-red-200 text-red-700"
+                        }`}
+                      >
+                        👎 Phản đối
+                      </button>
+                    </div>
+
+                    <textarea
+                      value={voteComments[app.id] ?? myVote?.comment ?? ""}
+                      onChange={(e) =>
+                        setVoteComments((prev) => ({
+                          ...prev,
+                          [app.id]: e.target.value,
+                        }))
                       }
-                      className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer hover:bg-emerald-700"
-                    >
-                      Duyệt
-                    </button>
+                      maxLength={1000}
+                      rows={2}
+                      placeholder="Ý kiến của bạn (không bắt buộc)"
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] p-3 text-xs outline-none focus:border-[#E65100]"
+                    />
+
                     <button
-                      onClick={() => setRejectingApp(app)}
-                      className="px-4 py-2 bg-red-50 text-red-600 font-bold rounded-xl cursor-pointer hover:bg-red-100"
+                      type="button"
+                      disabled={!voteChoices[app.id] || votingAppId === app.id}
+                      onClick={() => handleVote(app.id)}
+                      className="rounded-xl bg-[#E65100] px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Từ chối
+                      {votingAppId === app.id
+                        ? "Đang gửi..."
+                        : myVote
+                          ? "Cập nhật vote"
+                          : "Gửi vote"}
                     </button>
+
+                    <p className="text-[11px] text-[#81776E]">
+                      Vote chỉ mang tính tham khảo. Nhóm trưởng vẫn là người
+                      quyết định cuối cùng.
+                    </p>
                   </div>
+
+                  {isLeader && (
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() =>
+                          handleApprove(app.id, app.student || app.user || app)
+                        }
+                        className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer hover:bg-emerald-700"
+                      >
+                        Duyệt
+                      </button>
+                      <button
+                        onClick={() => setRejectingApp(app)}
+                        className="px-4 py-2 bg-red-50 text-red-600 font-bold rounded-xl cursor-pointer hover:bg-red-100"
+                      >
+                        Từ chối
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -517,56 +682,52 @@ export default function GroupApplications({ groupId }) {
         </div>
       )}
       {/* TOAST THÔNG BÁO */}
-{toast && (
-  <div
-    role="status"
-    aria-live="polite"
-    className="fixed right-5 top-5 z-10000 w-[calc(100%-2.5rem)] max-w-sm animate-fadeIn"
-  >
-    <div
-      className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${
-        toast.type === "error"
-          ? "border-red-200"
-          : "border-emerald-200"
-      }`}
-    >
-      <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-black ${
-          toast.type === "error"
-            ? "bg-red-50 text-red-600"
-            : "bg-emerald-50 text-emerald-600"
-        }`}
-      >
-        {toast.type === "error" ? "×" : "✓"}
-      </div>
-
-      <div className="min-w-0 flex-1 pt-1">
-        <p
-          className={`text-sm font-black ${
-            toast.type === "error"
-              ? "text-red-700"
-              : "text-emerald-700"
-          }`}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-5 top-5 z-10000 w-[calc(100%-2.5rem)] max-w-sm animate-fadeIn"
         >
-          {toast.type === "error" ? "Có lỗi xảy ra" : "Thành công"}
-        </p>
+          <div
+            className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${
+              toast.type === "error" ? "border-red-200" : "border-emerald-200"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-black ${
+                toast.type === "error"
+                  ? "bg-red-50 text-red-600"
+                  : "bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              {toast.type === "error" ? "×" : "✓"}
+            </div>
 
-        <p className="mt-1 wrap-break-words text-sm leading-5 text-[#6B635B]">
-          {toast.message}
-        </p>
-      </div>
+            <div className="min-w-0 flex-1 pt-1">
+              <p
+                className={`text-sm font-black ${
+                  toast.type === "error" ? "text-red-700" : "text-emerald-700"
+                }`}
+              >
+                {toast.type === "error" ? "Có lỗi xảy ra" : "Thành công"}
+              </p>
 
-      <button
-        type="button"
-        onClick={() => setToast(null)}
-        aria-label="Đóng thông báo"
-        className="rounded-lg px-2 text-lg text-gray-400 hover:bg-gray-100"
-      >
-        ×
-      </button>
-    </div>
-  </div>
-)}
+              <p className="mt-1 wrap-break-words text-sm leading-5 text-[#6B635B]">
+                {toast.message}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              aria-label="Đóng thông báo"
+              className="rounded-lg px-2 text-lg text-gray-400 hover:bg-gray-100"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

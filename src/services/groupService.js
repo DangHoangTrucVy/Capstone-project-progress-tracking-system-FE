@@ -173,3 +173,25 @@ export const exportGroupsExcel = async (semester) => {
     });
     return response;
 };
+
+
+// --- Application Voting ---
+
+// GET /api/v1/applications/{id}/votes
+// Lấy danh sách vote của một đơn Apply
+export const getApplicationVotes = async (applicationId) => {
+  const response = await api.get(
+    `/applications/${applicationId}/votes`
+  );
+  return response.data;
+};
+
+// POST /api/v1/applications/{id}/votes
+// Gửi vote cho một đơn Apply
+export const voteOnApplication = async (applicationId, data) => {
+  const response = await api.post(
+    `/applications/${applicationId}/votes`,
+    data
+  );
+  return response.data;
+};
