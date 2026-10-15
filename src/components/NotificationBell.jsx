@@ -192,7 +192,7 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
           />
 
           <div
-            className="absolute right-0 z-50 mt-3 w-[min(360px,calc(100vw-24px))]
+            className="absolute right-0 z-50 mt-3 w-[min(320px,calc(100vw-24px))]
                        overflow-hidden rounded-2xl border border-[#E8E2D9]
                        bg-white shadow-xl"
           >
@@ -220,7 +220,7 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
 
             {error && <p className="px-4 py-3 text-sm text-red-600">{error}</p>}
 
-            <div className="max-h-150 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto  overscroll-contain">
               {loading ? (
                 <p className="p-5 text-center text-sm text-gray-500">
                   Đang tải thông báo...

@@ -22,6 +22,20 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
 
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
+  const askConfirm = ({ title, message, onConfirm }) => {
+    setConfirmDialog({ title, message, onConfirm });
+  };
+
   const fetchData = async () => {
     try {
       const [profileRes, groupsRes, appsRes, invitesRes] = await Promise.all([
@@ -70,7 +84,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     setSavingProfile(true);
     try {
       await updateMyProfile(profile);
-      alert("Cập nhật profile cá nhân thành công!");
+      showToast("Cập nhật profile cá nhân thành công!", "success");
     } catch (err) {
       alert(err.response?.data?.message || "Cập nhật profile thất bại.");
     } finally {
@@ -79,59 +93,82 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   };
 
   const handleApply = async (groupId) => {
-    if (myApps.filter(app => app.status === 'PENDING').length >= 3) {
-      alert("Bạn chỉ được phép gửi tối đa 3 đơn Apply cùng một lúc!");
+    if (myApps.filter((app) => app.status === "PENDING").length >= 3) {
+      showToast(
+        "Bạn chỉ được phép gửi tối đa 3 đơn Apply cùng một lúc!",
+        "error",
+      );
       return;
     }
-    if (
-      !window.confirm("Bạn có chắc muốn gửi đơn ứng tuyển vào nhóm này không?")
-    )
-      return;
 
-    try {
-      await applyToGroup(groupId, { message: "Xin gia nhập nhóm." });
-      alert("Gửi đơn Apply thành công!");
-      fetchData();
-    } catch (err) {
-      alert(err.response?.data?.message || "Không thể gửi đơn apply.");
-    }
+    askConfirm({
+      title: "Xác nhận gửi đơn Apply",
+      message: "Bạn có chắc muốn gửi đơn ứng tuyển vào nhóm này không?",
+      onConfirm: async () => {
+        try {
+          await applyToGroup(groupId, {
+            message: "Xin gia nhập nhóm.",
+          });
+
+          showToast("Gửi đơn Apply thành công!", "success");
+          await fetchData();
+        } catch (err) {
+          showToast(
+            err.response?.data?.message || "Không thể gửi đơn Apply.",
+            "error",
+          );
+        }
+      },
+    });
   };
 
   const handleWithdraw = async (appId) => {
-    if (!window.confirm("Bạn có muốn rút lại đơn apply này không?")) return;
-    try {
-      await withdrawApplication(appId);
-      alert("Đã rút đơn thành công!");
-      fetchData();
-    } catch (err) {
-      alert("Không thể rút đơn.");
-    }
+    askConfirm({
+      title: "Xác nhận rút đơn",
+      message: "Bạn có chắc muốn rút lại đơn Apply này không?",
+      onConfirm: async () => {
+        try {
+          await withdrawApplication(appId);
+
+          showToast("Đã rút đơn thành công!", "success");
+          await fetchData();
+        } catch (err) {
+          showToast(
+            err.response?.data?.message || "Không thể rút đơn.",
+            "error",
+          );
+        }
+      },
+    });
   };
 
-const handleAcceptInvite = async (inviteId, groupId) => {
-  try {
-    await acceptInvite(inviteId);
+  const handleAcceptInvite = async (inviteId, groupId) => {
+    try {
+      await acceptInvite(inviteId);
 
-    alert("Đã chấp nhận lời mời vào nhóm!");
+      showToast("Đã chấp nhận lời mời vào nhóm!", "success");
 
-    // Chuyển thẳng sang Group Dashboard
-    if (onJoinedGroup) {
-      await onJoinedGroup(groupId);
+      if (onJoinedGroup) {
+        await onJoinedGroup(groupId);
+      }
+    } catch (err) {
+      console.error("Accept invite error:", err?.response?.data || err);
+
+      showToast(
+        err.response?.data?.message || "Không thể chấp nhận lời mời.",
+        "error",
+      );
     }
-  } catch (err) {
-    console.error("Accept invite error:", err?.response?.data || err);
-
-    alert("Không thể chấp nhận lời mời.");
-  }
-};
+  };
 
   const handleDeclineInvite = async (inviteId) => {
     try {
       await declineInvite(inviteId);
-      alert("Đã từ chối lời mời.");
-      fetchData();
+
+      showToast("Đã từ chối lời mời.", "success");
+      await fetchData();
     } catch (err) {
-      alert("Thực hiện thất bại.");
+      showToast(err.response?.data?.message || "Thực hiện thất bại.", "error");
     }
   };
 
@@ -206,20 +243,24 @@ const handleAcceptInvite = async (inviteId, groupId) => {
                     Trưởng nhóm đã gửi lời mời bạn tham gia.
                   </p>
                 </div>
-                {inv.status === 'PENDING' ? <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAcceptInvite(inv.id, inv.groupId)}
-                    className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer"
-                  >
-                    Chấp nhận
-                  </button>
-                  <button
-                    onClick={() => handleDeclineInvite(inv.id)}
-                    className="px-4 py-2 bg-gray-100 text-red-600 font-bold rounded-xl cursor-pointer"
-                  >
-                    Từ chối
-                  </button>
-                </div> : <span>{inv.status}</span>}
+                {inv.status === "PENDING" ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleAcceptInvite(inv.id, inv.groupId)}
+                      className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer"
+                    >
+                      Chấp nhận
+                    </button>
+                    <button
+                      onClick={() => handleDeclineInvite(inv.id)}
+                      className="px-4 py-2 bg-gray-100 text-red-600 font-bold rounded-xl cursor-pointer"
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                ) : (
+                  <span>{inv.status}</span>
+                )}
               </div>
             ))}
           </div>
@@ -230,7 +271,9 @@ const handleAcceptInvite = async (inviteId, groupId) => {
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-xs font-black uppercase text-[#6B635B]">
-            Đơn Apply của tôi ({myApps.filter(app => app.status === 'PENDING').length}/3 đơn đang chờ)
+            Đơn Apply của tôi (
+            {myApps.filter((app) => app.status === "PENDING").length}/3 đơn đang
+            chờ)
           </h3>
         </div>
         {myApps.length > 0 ? (
@@ -329,6 +372,105 @@ const handleAcceptInvite = async (inviteId, groupId) => {
           })}
         </div>
       </div>
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-5 top-5 z-100 w-[calc(100%-2.5rem)] max-w-sm animate-fadeIn"
+        >
+          <div
+            className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${
+              toast.type === "error" ? "border-red-200" : "border-emerald-200"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-black ${
+                toast.type === "error"
+                  ? "bg-red-50 text-red-600"
+                  : "bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              {toast.type === "error" ? "×" : "✓"}
+            </div>
+
+            <div className="min-w-0 flex-1 pt-1">
+              <p
+                className={`text-sm font-black ${
+                  toast.type === "error" ? "text-red-700" : "text-emerald-700"
+                }`}
+              >
+                {toast.type === "error" ? "Có lỗi xảy ra" : "Thành công"}
+              </p>
+              <p className="mt-1 wrap-break-words text-sm leading-5 text-[#6B635B]">
+                {toast.message}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              aria-label="Đóng thông báo"
+              className="rounded-lg px-2 text-lg text-gray-400 hover:bg-gray-100"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL */}
+      {confirmDialog && (
+        <div
+          className="fixed inset-0 z-110 flex items-center justify-center bg-[#2C2825]/45 p-4 backdrop-blur-[2px]"
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
+            className="w-full max-w-md animate-fadeIn rounded-3xl border border-[#E8E2D9] bg-white p-6 shadow-2xl sm:p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-xl">
+              ⚠️
+            </div>
+
+            <h3
+              id="confirm-dialog-title"
+              className="text-lg font-black text-[#2C2825]"
+            >
+              {confirmDialog.title}
+            </h3>
+
+            <p className="mt-3 text-sm leading-6 text-[#6B635B]">
+              {confirmDialog.message}
+            </p>
+
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="rounded-xl border border-[#E8E2D9] px-5 py-3 text-sm font-bold text-[#6B635B] transition hover:bg-[#FBF9F5]"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const action = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  await action();
+                }}
+                className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#D84315]"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

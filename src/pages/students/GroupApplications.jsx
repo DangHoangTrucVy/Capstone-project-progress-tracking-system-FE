@@ -20,6 +20,29 @@ export default function GroupApplications({ groupId }) {
   const [dialog, setDialog] = useState(null);
   const [processing, setProcessing] = useState(false);
 
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = React.useRef(null);
+
+  const showToast = (message, type = "success") => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({ message, type });
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
   const fetchData = async () => {
     if (
       !groupId ||
@@ -71,13 +94,17 @@ export default function GroupApplications({ groupId }) {
 
         await fetchData();
 
-        setDialog({
-          title: "Thành công",
-          message:
-            "Đã gửi lời mời. Sinh viên cần chấp nhận lời mời để vào nhóm.",
-          confirmText: "OK",
-          action: null,
-        });
+        // setDialog({
+        //   title: "Thành công",
+        //   message:
+        //     "Đã gửi lời mời. Sinh viên cần chấp nhận lời mời để vào nhóm.",
+        //   confirmText: "OK",
+        //   action: null,
+        // });
+        showToast(
+          "Đã gửi lời mời. Sinh viên cần chấp nhận lời mời để vào nhóm.",
+          "success",
+        );
       },
     });
   };
@@ -133,19 +160,9 @@ export default function GroupApplications({ groupId }) {
       setRejectReason("");
       await fetchData();
 
-      setDialog({
-        title: "Thành công",
-        message: "Đã từ chối đơn Apply.",
-        confirmText: "OK",
-        action: null,
-      });
+      showToast("Đã từ chối đơn Apply.", "success");
     } catch (err) {
-      setDialog({
-        title: "Có lỗi xảy ra",
-        message: apiError(err, "Từ chối đơn thất bại."),
-        confirmText: "OK",
-        action: null,
-      });
+       showToast(apiError(err, "Từ chối đơn thất bại."), "error");
     } finally {
       setProcessing(false);
     }
@@ -171,15 +188,12 @@ export default function GroupApplications({ groupId }) {
           setInviteStudentId("");
           await fetchData();
 
-          setDialog({
-            title: "Thành công",
-            message: "Đã gửi lời mời thành công đến sinh viên!",
-            confirmText: "OK",
-            action: null,
-          });
-        } finally {
-          setInviting(false);
-        }
+          showToast("Đã gửi lời mời thành công đến sinh viên!", "success");
+       } catch (err) {
+  showToast(apiError(err, "Gửi lời mời thất bại."), "error");
+} finally {
+  setInviting(false);
+}
       },
     });
   };
@@ -194,12 +208,7 @@ export default function GroupApplications({ groupId }) {
         await revokeInvite(inviteId);
         await fetchData();
 
-        setDialog({
-          title: "Thành công",
-          message: "Đã thu hồi lời mời.",
-          confirmText: "OK",
-          action: null,
-        });
+        showToast("Đã thu hồi lời mời.", "success");
       },
     });
   };
@@ -431,11 +440,11 @@ export default function GroupApplications({ groupId }) {
       )}
 
       {dialog && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-[#2C2825]/45 p-4 backdrop-blur-[2px]">
           <div
             role="dialog"
             aria-modal="true"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-md rounded-3xl border border-[#E8E2D9] bg-white p-6 shadow-2xl sm:p-7"
           >
             <div className="flex items-start justify-between gap-4">
               <h3 className="text-base font-black text-[#2C2825]">
@@ -507,6 +516,57 @@ export default function GroupApplications({ groupId }) {
           </div>
         </div>
       )}
+      {/* TOAST THÔNG BÁO */}
+{toast && (
+  <div
+    role="status"
+    aria-live="polite"
+    className="fixed right-5 top-5 z-10000 w-[calc(100%-2.5rem)] max-w-sm animate-fadeIn"
+  >
+    <div
+      className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${
+        toast.type === "error"
+          ? "border-red-200"
+          : "border-emerald-200"
+      }`}
+    >
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-black ${
+          toast.type === "error"
+            ? "bg-red-50 text-red-600"
+            : "bg-emerald-50 text-emerald-600"
+        }`}
+      >
+        {toast.type === "error" ? "×" : "✓"}
+      </div>
+
+      <div className="min-w-0 flex-1 pt-1">
+        <p
+          className={`text-sm font-black ${
+            toast.type === "error"
+              ? "text-red-700"
+              : "text-emerald-700"
+          }`}
+        >
+          {toast.type === "error" ? "Có lỗi xảy ra" : "Thành công"}
+        </p>
+
+        <p className="mt-1 wrap-break-words text-sm leading-5 text-[#6B635B]">
+          {toast.message}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setToast(null)}
+        aria-label="Đóng thông báo"
+        className="rounded-lg px-2 text-lg text-gray-400 hover:bg-gray-100"
+      >
+        ×
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 }

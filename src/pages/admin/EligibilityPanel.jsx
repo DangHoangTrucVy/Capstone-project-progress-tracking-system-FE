@@ -89,6 +89,9 @@ export default function EligibilityPanel({ onChanged }) {
   const [flag, setFlag] = useState("true");
   const [reason, setReason] = useState("");
 
+const [studentCode, setStudentCode] = useState("");
+
+
   useEffect(() => {
     let cancelled = false;
     getImportedStudents({
@@ -157,7 +160,7 @@ export default function EligibilityPanel({ onChanged }) {
   const update = async (event) => {
     event.preventDefault();
 
-    if (busy || !userId.trim()) return;
+    if (busy || !studentCode.trim()) return;
 
     if (flag === "false" && !reason.trim()) {
       setError("Vui lòng nhập lý do sinh viên chưa đủ điều kiện.");
@@ -169,11 +172,11 @@ export default function EligibilityPanel({ onChanged }) {
     setResult(null);
 
     try {
-      await updateStudentEligibility(userId.trim(), {
+      await updateStudentEligibility(studentCode.trim(), {
         eligible: flag === "true",
         reason: reason.trim(),
       });
-
+      setStudentCode("");
       setReason("");
       refresh();
     } catch (err) {
@@ -504,7 +507,7 @@ export default function EligibilityPanel({ onChanged }) {
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-[#81766D]">
-            Nhập ID sinh viên, chọn trạng thái và ghi rõ lý do để lưu vào danh
+            Nhập mã số sinh viên, chọn trạng thái và ghi rõ lý do để lưu vào danh
             sách.
           </p>
         </div>
@@ -515,8 +518,8 @@ export default function EligibilityPanel({ onChanged }) {
             <input
               aria-label="Mã số sinh viên"
               className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 font-normal outline-none transition placeholder:text-[#B6AAA0] focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
+              value={studentCode}
+              onChange={(e) => setStudentCode(e.target.value)}
               placeholder="Mã số sinh viên..."
               required
               disabled={busy}
@@ -565,7 +568,7 @@ export default function EligibilityPanel({ onChanged }) {
 
           <button
             type="submit"
-            disabled={busy || !userId.trim()}
+            disabled={busy || !studentCode.trim()}
             className="rounded-xl bg-[#C9784F] px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "Đang cập nhật..." : "Lưu điều kiện"}

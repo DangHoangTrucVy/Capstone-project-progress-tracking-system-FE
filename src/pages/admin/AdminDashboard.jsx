@@ -32,9 +32,20 @@ import {
   Legend,
 } from "recharts";
 
+import {
+  getSemesterCalendar,
+  updateSemesterStartDate,
+} from "../../services/semesterService";
+
 const defaultSystemSettings = {
   semester: "Fall2026",
+
+  // Thời hạn phản hồi Apply/Invite — giữ riêng
   applyDeadlineHours: 48,
+
+  // Thời lượng của đợt đăng ký nhóm
+  groupRegistrationHours: 48,
+
   maxGroupSize: 5,
   minGroupSize: 3,
   submissionOpen: true,
@@ -68,6 +79,40 @@ export default function AdminDashboard() {
 
   const [pendingCount, setPendingCount] = useState(0);
 
+  const [eligibilityConfirmUser, setEligibilityConfirmUser] = useState(null);
+  const [updatingEligibility, setUpdatingEligibility] = useState(false);
+
+  const [semesterStartDate, setSemesterStartDate] = useState("");
+  const [semesterCalendarLoading, setSemesterCalendarLoading] = useState(false);
+  const [savingSemesterDate, setSavingSemesterDate] = useState(false);
+
+  const handleSaveSemesterDate = async (event) => {
+    event.preventDefault();
+
+    if (!systemSettings.semester.trim() || !semesterStartDate) {
+      showToast("Vui lòng nhập học kỳ và ngày bắt đầu.", "error");
+      return;
+    }
+
+    setSavingSemesterDate(true);
+
+    try {
+      await updateSemesterStartDate(
+        systemSettings.semester.trim(),
+        semesterStartDate,
+      );
+
+      showToast("Cập nhật ngày bắt đầu học kỳ thành công!");
+    } catch (error) {
+      showToast(
+        error.response?.data?.message ||
+          "Không thể cập nhật ngày bắt đầu học kỳ.",
+        "error",
+      );
+    } finally {
+      setSavingSemesterDate(false);
+    }
+  };
   const handleReviewRoster = async (approved) => {
     if (!rosterReviewGroup || reviewingRoster) return;
 
@@ -213,6 +258,59 @@ export default function AdminDashboard() {
     }, 3000); // Tự động tắt sau 3 giây
   };
 
+  const handleStartRegistrationRound = () => {
+    const startTime = new Date(registrationStartInput).getTime();
+    const endTime = new Date(registrationEndInput).getTime();
+
+    if (
+      !Number.isFinite(startTime) ||
+      !Number.isFinite(endTime) ||
+      endTime <= startTime
+    ) {
+      showToast("Thời gian kết thúc phải sau thời gian bắt đầu.", "error");
+      return;
+    }
+
+    if (startTime > Date.now()) {
+      showToast("Thời gian bắt đầu không được ở trong tương lai.", "error");
+      return;
+    }
+
+    if (
+      registrationRound?.status === "OPEN" &&
+      registrationRound.endTime > Date.now()
+    ) {
+      showToast("Đợt đăng ký hiện tại vẫn đang mở.", "error");
+      return;
+    }
+
+    const round = {
+      status: "OPEN",
+      startTime,
+      endTime,
+    };
+
+    localStorage.setItem("groupRegistrationRound", JSON.stringify(round));
+    setRegistrationRound(round);
+
+    showToast("Đã bắt đầu đợt đăng ký nhóm!");
+  };
+
+  const handleEndRegistrationRound = () => {
+    if (!registrationRound || registrationRound.status !== "OPEN") return;
+
+    const closedRound = {
+      ...registrationRound,
+      status: "CLOSED",
+      endTime: Date.now(),
+    };
+
+    localStorage.setItem("groupRegistrationRound", JSON.stringify(closedRound));
+    setRegistrationRound(closedRound);
+
+    showToast("Đã đóng đợt đăng ký.");
+  };
+
   const [groups, setGroups] = useState([]);
   const [users, setUsers] = useState([]);
   const [ineligibleUsers, setIneligibleUsers] = useState([]);
@@ -235,6 +333,56 @@ export default function AdminDashboard() {
       return defaultSystemSettings;
     }
   });
+
+  const [registrationRound, setRegistrationRound] = useState(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("groupRegistrationRound") || "null",
+      );
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const remainingMs = registrationRound
+    ? Math.max(0, registrationRound.endTime - currentTime)
+    : 0;
+
+  const isRegistrationOpen =
+    registrationRound?.status === "OPEN" && remainingMs > 0;
+
+  const toDateTimeLocal = (timestamp) => {
+    const date = new Date(timestamp);
+    const offset = date.getTimezoneOffset() * 60000;
+
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  };
+
+  const [registrationStartInput, setRegistrationStartInput] = useState(() =>
+    toDateTimeLocal(Date.now()),
+  );
+
+  const [registrationEndInput, setRegistrationEndInput] = useState(() =>
+    toDateTimeLocal(Date.now() + 48 * 60 * 60 * 1000),
+  );
+  const remainingHours = Math.floor(remainingMs / 3600000);
+  const remainingMinutes = Math.floor((remainingMs % 3600000) / 60000);
+  const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+
+  const countdownText = [
+    String(remainingHours).padStart(2, "0"),
+    String(remainingMinutes).padStart(2, "0"),
+    String(remainingSeconds).padStart(2, "0"),
+  ].join(":");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
@@ -348,7 +496,7 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  const handleToggleEligibility = async (u) => {
+  const handleToggleEligibility = (u) => {
     const targetId = u.id || u.studentCode;
 
     if (!targetId) {
@@ -356,31 +504,42 @@ export default function AdminDashboard() {
       return;
     }
 
-    const currentStatus = u.eligible !== false;
-    const newStatus = !currentStatus;
+    // Chỉ mở modal, chưa gọi API.
+    setEligibilityConfirmUser(u);
+  };
 
-    const confirmed = window.confirm(
-      newStatus
-        ? `Gỡ cờ không đủ điều kiện cho ${u.fullName || u.email}?`
-        : `Đánh cờ không đủ điều kiện cho ${u.fullName || u.email}?\n\n` +
-            "Nếu sinh viên này đang là Leader, Backend sẽ tự chọn thành viên ACTIVE khác làm Leader và cập nhật vai trò.",
-    );
+  const confirmToggleEligibility = async () => {
+    const u = eligibilityConfirmUser;
 
-    if (!confirmed) return;
+    if (!u || updatingEligibility) return;
+
+    const targetId = u.id || u.studentCode;
+
+    if (!targetId) {
+      showToast("Không tìm thấy ID sinh viên.", "error");
+      return;
+    }
+
+    // Đang đủ điều kiện -> đánh cờ.
+    // Đang bị đánh cờ -> gỡ cờ.
+    const newStatus = u.eligible === false;
+
+    setUpdatingEligibility(true);
 
     try {
-      // Chỉ cập nhật cờ. Backend chịu trách nhiệm xử lý thành viên và Leader.
       await updateStudentEligibility(targetId, {
         eligible: newStatus,
       });
 
-      // Tải lại nhóm, thành viên, vai trò và danh sách cờ từ Backend.
+      setEligibilityConfirmUser(null);
+
       await fetchAdminData();
 
       showToast(
         newStatus
           ? `Đã gỡ cờ điều kiện cho ${u.fullName || u.email}.`
-          : `Đã đánh cờ không đủ điều kiện cho ${u.fullName || u.email}. Nếu đây là Leader, hệ thống sẽ áp dụng cơ chế tự động chuyển Leader của Backend.`,
+          : `Đã đánh cờ không đủ điều kiện cho ${u.fullName || u.email}.`,
+        "success",
       );
     } catch (error) {
       showToast(
@@ -388,6 +547,8 @@ export default function AdminDashboard() {
           "Cập nhật trạng thái đủ điều kiện thất bại.",
         "error",
       );
+    } finally {
+      setUpdatingEligibility(false);
     }
   };
 
@@ -479,6 +640,36 @@ export default function AdminDashboard() {
   const updateSystemSetting = (key, value) => {
     setSystemSettings((current) => ({ ...current, [key]: value }));
   };
+  const loadSemesterCalendar = async (semester) => {
+    if (!semester?.trim()) {
+      setSemesterStartDate("");
+      return;
+    }
+
+    setSemesterCalendarLoading(true);
+
+    try {
+      const data = await getSemesterCalendar(semester.trim());
+
+      // Điều chỉnh tên trường theo response thực tế của Backend.
+      setSemesterStartDate(data.startDate ?? "");
+    } catch (error) {
+      setSemesterStartDate("");
+
+      showToast(
+        error.response?.data?.message || "Không thể tải lịch học kỳ.",
+        "error",
+      );
+    } finally {
+      setSemesterCalendarLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeMenu === "settings") {
+      loadSemesterCalendar(systemSettings.semester);
+    }
+  }, [activeMenu, systemSettings.semester]);
 
   const handleExportExcel = async (e) => {
     e.preventDefault();
@@ -578,8 +769,8 @@ export default function AdminDashboard() {
       )}
 
       {/* SIDEBAR */}
-      <aside className="w-72 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0 h-screen">
-        <div className="space-y-8">
+      <aside className="w-79 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 select-none shrink-0 h-screen min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-8 pr-1">
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-full bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-200">
               <svg
@@ -756,7 +947,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="pt-6 border-t border-[#E8E2D9] space-y-4">
+        <div className="shrink-0 pt-4 mt-3 border-t border-[#E8E2D9] space-y-3">
           <div className="flex items-center space-x-3">
             {user?.avatarUrl || user?.avatar ? (
               <img
@@ -915,14 +1106,42 @@ export default function AdminDashboard() {
                             },
                           ]}
                           cx="50%"
-                          cy="45%"
+                          cy="42%"
                           innerRadius={55}
-                          outerRadius={85}
-                          paddingAngle={5}
+                          outerRadius={75}
+                          paddingAngle={4}
                           dataKey="value"
-                          label={({ name, percent }) =>
-                            `${name} ${(percent * 100).toFixed(0)}%`
-                          }
+                          nameKey="name"
+                          labelLine={({ points, stroke }) => (
+                            <polyline
+                              points={points
+                                .map((point) => `${point.x},${point.y}`)
+                                .join(" ")}
+                              stroke={stroke || "#9CA3AF"}
+                              strokeWidth={1.5}
+                              fill="none"
+                            />
+                          )}
+                          label={({
+                            name,
+                            percent,
+                            x,
+                            y,
+                            textAnchor,
+                            fill,
+                          }) => (
+                            <text
+                              x={x}
+                              y={y}
+                              fill={fill}
+                              fontSize={12}
+                              fontWeight={700}
+                              textAnchor={textAnchor}
+                              dominantBaseline="central"
+                            >
+                              {`${name} ${(percent * 100).toFixed(1)}%`}
+                            </text>
+                          )}
                         >
                           {["#3B82F6", "#10B981", "#EF4444"].map(
                             (color, index) => (
@@ -1021,48 +1240,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-
-              {/* <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between gap-4">
-                  <h2 className="text-sm font-black text-[#2C2825]">
-                    📑 Chỉ số hoạt động Backend
-                  </h2>
-                </div>
-                {reportsLoading ? (
-                  <p className="text-xs text-[#6B635B]">Đang tải báo cáo...</p>
-                ) : reportsError ? (
-                  <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
-                    <p>{reportsError}</p>
-                    <button
-                      onClick={fetchReportsSummary}
-                      className="font-bold underline cursor-pointer"
-                    >
-                      Thử lại
-                    </button>
-                  </div>
-                ) : reportEntries.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {reportEntries.map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="rounded-2xl border border-[#E8E2D9] bg-white p-5 shadow-xs"
-                      >
-                        <p className="text-xs font-bold text-[#6B635B]">
-                          {formatReportLabel(key)}
-                        </p>
-                        <p className="mt-2 text-2xl font-black text-[#2C2825]">
-                          {formatReportValue(value)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#6B635B]">
-                    Hệ thống vận hành ổn định. Sẵn sàng quản lý sinh viên đầu
-                    kỳ.
-                  </p>
-                )}
-              </div> */}
             </section>
           )}
 
@@ -1647,263 +1824,264 @@ export default function AdminDashboard() {
           {/* --- SETTINGS --- */}
 
           {activeMenu === "settings" && (
-            <section className="min-h-full w-full bg-[#FBF8F4] p-5 text-[#352D28] sm:p-7 xl:p-10">
-              <div className="mx-auto w-full max-w-[1600px] space-y-7">
-                {/* Header */}
-                <div className="relative overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm">
-                  <div className="flex flex-col justify-between gap-5 p-6 sm:p-8 md:flex-row md:items-center">
-                    <div className="max-w-3xl">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-[#F8EAE0] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[#A96745]">
-                        <span className="h-2 w-2 rounded-full bg-[#C98C68]" />
-                        Cấu hình hệ thống
-                      </span>
-                      <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">
-                        Quản lý thời hạn & quy mô nhóm
-                      </h1>
-                      <p className="mt-2 text-sm leading-6 text-[#81766D]">
-                        Thiết lập học kỳ hiện tại, thời gian phản hồi đơn
-                        Apply/Invite và số lượng thành viên tối đa trong mỗi
-                        nhóm.
-                      </p>
-                    </div>
+            <section className="p-6 space-y-6 lg:p-8">
+              {/* HEADER */}
+              <div>
+                <span className="inline-flex items-center rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-[#E65100]">
+                  CẤU HÌNH HỆ THỐNG
+                </span>
+                <h1 className="mt-3 text-2xl font-black text-[#2C2825]">
+                  Cấu hình thời hạn
+                </h1>
+                <p className="mt-2 text-sm text-[#81766D]">
+                  Quản lý lịch học kỳ và thời gian đăng ký nhóm đồ án.
+                </p>
+              </div>
 
-                    <div className="hidden h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-[#F8EAE0] md:flex">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-12 w-12 text-[#B77954]"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        aria-hidden="true"
-                      >
-                        <circle cx="12" cy="12" r="3" />
-                        <path
-                          d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.8 3.12-.09-.02a1.7 1.7 0 0 0-1.75.64l-.05.08h-3.6l-.04-.08a1.7 1.7 0 0 0-1.76-.64l-.08.02-1.8-3.12.06-.06A1.7 1.7 0 0 0 9.2 15l-.08-.04v-3.6l.08-.04a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.8-3.12.08.02a1.7 1.7 0 0 0 1.76-.64l.04-.08h3.6l.05.08a1.7 1.7 0 0 0 1.75.64l.09-.02 1.8 3.12-.06.06A1.7 1.7 0 0 0 19.4 11l.08.04v3.6z"
-                          transform="translate(-2 -2) scale(1.16)"
-                        />
-                      </svg>
-                    </div>
+              {/* 1. CẤU HÌNH HỌC KỲ */}
+              <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 shadow-sm sm:p-7">
+                <div className="mb-6 flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xl">
+                    📅
                   </div>
-                  <div className="h-1 bg-linear-to-r from-[#D9A27F] via-[#EBD3C2] to-[#F8EAE0]" />
-                </div>
-
-                {/* Overview cards */}
-                <div className="grid gap-4 md:grid-cols-3">
-                  <article className="rounded-2xl border border-[#E9DED4] bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[#81766D]">
-                        Học kỳ hiện tại
-                      </span>
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8EAE0] text-lg text-[#A96745]">
-                        ▦
-                      </span>
-                    </div>
-                    <p className="mt-4 wrap-break-words text-xl font-black">
-                      {systemSettings.semester || "Chưa thiết lập"}
-                    </p>
-                    <p className="mt-1 text-xs text-[#968A80]">
-                      Học kỳ áp dụng cho hệ thống
-                    </p>
-                  </article>
-
-                  <article className="rounded-2xl border border-[#E9DED4] bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[#81766D]">
-                        Thời hạn Apply / Invite
-                      </span>
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8EAE0] text-lg text-[#A96745]">
-                        ◷
-                      </span>
-                    </div>
-                    <p className="mt-4 text-2xl font-black">
-                      {systemSettings.applyDeadlineHours}{" "}
-                      <span className="text-sm font-semibold text-[#81766D]">
-                        giờ
-                      </span>
-                    </p>
-                    <p className="mt-1 text-xs text-[#968A80]">
-                      Thời gian phản hồi yêu cầu
-                    </p>
-                  </article>
-
-                  <article className="rounded-2xl border border-[#E9DED4] bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[#81766D]">
-                        Quy mô nhóm tối đa
-                      </span>
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8EAE0] text-lg text-[#A96745]">
-                        ♧
-                      </span>
-                    </div>
-                    <p className="mt-4 text-2xl font-black">
-                      {systemSettings.maxGroupSize}{" "}
-                      <span className="text-sm font-semibold text-[#81766D]">
-                        thành viên
-                      </span>
-                    </p>
-                    <p className="mt-1 text-xs text-[#968A80]">
-                      Số thành viên tối đa mỗi nhóm
-                    </p>
-                  </article>
-                </div>
-
-                {/* Configuration form */}
-                <form
-                  onSubmit={handleSaveSystemSettings}
-                  className="overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm"
-                >
-                  <div className="border-b border-[#F0E8E1] p-6 sm:p-8">
-                    <h2 className="text-xl font-extrabold">
-                      Thiết lập cấu hình
+                  <div>
+                    <h2 className="text-lg font-black text-[#2C2825]">
+                      Ngày bắt đầu học kỳ
                     </h2>
                     <p className="mt-1 text-sm text-[#81766D]">
-                      Thay đổi giá trị bên dưới rồi lưu để áp dụng cấu hình mới.
+                      Thiết lập lịch học kỳ để phục vụ việc lên lịch review.
                     </p>
                   </div>
+                </div>
 
-                  <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-2">
-                    {/* Semester */}
-                    <div className="space-y-4 lg:col-span-2">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8EAE0] text-lg text-[#A96745]">
-                          ▦
-                        </div>
-                        <div>
-                          <h3 className="font-bold">Thông tin học kỳ</h3>
-                          <p className="mt-1 text-sm text-[#81766D]">
-                            Xác định học kỳ đang được sử dụng trong hệ thống.
-                          </p>
-                        </div>
-                      </div>
-
-                      <label className="block space-y-2 text-sm font-semibold text-[#51463F]">
-                        Học kỳ hiện tại
-                        <input
-                          value={systemSettings.semester}
-                          onChange={(event) =>
-                            updateSystemSetting("semester", event.target.value)
-                          }
-                          placeholder="Ví dụ: Fall2026"
-                          className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 text-sm font-normal outline-none transition placeholder:text-[#B6AAA0] focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
-                          required
-                        />
-                        <span className="block text-xs font-normal text-[#968A80]">
-                          Nhập mã học kỳ theo định dạng hệ thống đang sử dụng.
-                        </span>
-                      </label>
-                    </div>
-
-                    <div className="hidden lg:col-span-2 lg:block">
-                      <div className="border-t border-[#F0E8E1]" />
-                    </div>
-
-                    {/* Deadline */}
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8EAE0] text-lg text-[#A96745]">
-                          ◷
-                        </div>
-                        <div>
-                          <h3 className="font-bold">Thời hạn phản hồi</h3>
-                          <p className="mt-1 text-sm leading-5 text-[#81766D]">
-                            Thời gian xử lý các yêu cầu Apply và Invite.
-                          </p>
-                        </div>
-                      </div>
-
-                      <label className="block space-y-2 text-sm font-semibold text-[#51463F]">
-                        Thời hạn đơn Apply / Invite (giờ)
-                        <input
-                          type="number"
-                          min="1"
-                          value={systemSettings.applyDeadlineHours}
-                          onChange={(event) =>
-                            updateSystemSetting(
-                              "applyDeadlineHours",
-                              Number(event.target.value),
-                            )
-                          }
-                          className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 text-sm font-normal outline-none transition focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
-                          required
-                        />
-                      </label>
-
-                      <div className="rounded-xl border border-[#EFE1D5] bg-[#FCF7F2] p-4 text-xs leading-5 text-[#81766D]">
-                        <span className="font-bold text-[#A96745]">Lưu ý:</span>{" "}
-                        Thời hạn được tính bằng giờ. Kiểm tra quy tắc xử lý thời
-                        gian trong Backend trước khi thay đổi giá trị đang áp
-                        dụng.
-                      </div>
-                    </div>
-
-                    {/* Group size */}
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8EAE0] text-lg text-[#A96745]">
-                          ♧
-                        </div>
-                        <div>
-                          <h3 className="font-bold">Quy mô nhóm</h3>
-                          <p className="mt-1 text-sm leading-5 text-[#81766D]">
-                            Giới hạn số lượng thành viên trong một nhóm ( từ 3 -
-                            5 thành viên ).
-                          </p>
-                        </div>
-                      </div>
-
-                      <label className="block space-y-2 text-sm font-semibold text-[#51463F]">
-                        Số thành viên tối đa
-                        <input
-                          type="number"
-                          min="3"
-                          max="5"
-                          value={systemSettings.maxGroupSize}
-                          onChange={(event) =>
-                            updateSystemSetting(
-                              "maxGroupSize",
-                              Number(event.target.value),
-                            )
-                          }
-                          className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 text-sm font-normal outline-none transition focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
-                          required
-                        />
-                      </label>
-
-                      <div className="rounded-xl border border-[#EFE1D5] bg-[#FCF7F2] p-4 text-xs leading-5 text-[#81766D]">
-                        <span className="font-bold text-[#A96745]">Lưu ý:</span>{" "}
-                        Quy mô tối đa phải phù hợp với quy định ghép nhóm của dự
-                        án.
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 border-t border-[#F0E8E1] bg-[#FCFAF7] p-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                    <p className="text-xs leading-5 text-[#968A80]">
-                      Vui lòng kiểm tra các giá trị trước khi lưu cấu hình.
-                    </p>
-                    <button
-                      type="submit"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C9784F] px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943] hover:shadow-md"
-                    >
-                      <span>✓</span>
-                      Lưu cấu hình hệ thống
-                    </button>
-                  </div>
-                </form>
-
-                {/* Footer note */}
-                <div className="flex items-start gap-3 rounded-2xl border border-[#E9DED4] bg-[#F5EEE7] p-5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#A96745]">
-                    i
-                  </span>
+                <div className="grid gap-5 md:grid-cols-2">
                   <div>
-                    <h3 className="text-sm font-bold">Lưu ý quản trị</h3>
-                    <p className="mt-1 text-sm leading-5 text-[#81766D]">
-                      Chỉ thay đổi các thông số khi đã xác nhận quy định học kỳ
-                      và chính sách ghép nhóm. Việc lưu thành công phụ thuộc vào
-                      xử lý của hàm cấu hình hệ thống hiện tại.
+                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
+                      Mã học kỳ
+                    </label>
+                    <input
+                      type="text"
+                      value={systemSettings.semester}
+                      onChange={(e) =>
+                        updateSystemSetting("semester", e.target.value)
+                      }
+                      placeholder="Ví dụ: Fall2026"
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
+                      Ngày bắt đầu học kỳ
+                    </label>
+                    <input
+                      type="date"
+                      value={semesterStartDate}
+                      onChange={(e) => setSemesterStartDate(e.target.value)}
+                      disabled={semesterCalendarLoading || savingSemesterDate}
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100] disabled:opacity-60"
+                    />
+                    {semesterCalendarLoading && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Đang tải lịch học kỳ...
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      loadSemesterCalendar(systemSettings.semester)
+                    }
+                    disabled={
+                      semesterCalendarLoading || !systemSettings.semester.trim()
+                    }
+                    className="rounded-xl border border-[#E8E2D9] px-4 py-3 text-sm font-bold text-[#51463F] transition hover:bg-[#FBF9F5] disabled:opacity-50"
+                  >
+                    Tải lịch học kỳ
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={savingSemesterDate || !semesterStartDate}
+                    onClick={async () => {
+                      if (
+                        !systemSettings.semester.trim() ||
+                        !semesterStartDate
+                      ) {
+                        showToast(
+                          "Vui lòng nhập mã học kỳ và ngày bắt đầu.",
+                          "error",
+                        );
+                        return;
+                      }
+
+                      setSavingSemesterDate(true);
+                      try {
+                        await updateSemesterStartDate(
+                          systemSettings.semester.trim(),
+                          semesterStartDate,
+                        );
+                        showToast("Đã lưu ngày bắt đầu học kỳ thành công!");
+                      } catch (error) {
+                        showToast(
+                          error.response?.data?.message ||
+                            "Không thể lưu ngày bắt đầu học kỳ.",
+                          "error",
+                        );
+                      } finally {
+                        setSavingSemesterDate(false);
+                      }
+                    }}
+                    className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#D84315] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingSemesterDate ? "Đang lưu..." : "Lưu ngày bắt đầu"}
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. QUẢN LÝ ĐỢT ĐĂNG KÝ NHÓM */}
+              <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 shadow-sm sm:p-7">
+                <div className="mb-6 flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-xl">
+                    ⏱️
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-[#2C2825]">
+                      Quản lý đợt đăng ký nhóm
+                    </h2>
+                    <p className="mt-1 text-sm text-[#81766D]">
+                      Thiết lập thời lượng và theo dõi thời gian đăng ký.
                     </p>
                   </div>
+                </div>
+
+                {/* THỜI GIAN ĐĂNG KÝ */}
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
+                      Thời gian bắt đầu
+                    </label>
+
+                    <input
+                      type="datetime-local"
+                      value={registrationStartInput}
+                      onChange={(e) =>
+                        setRegistrationStartInput(e.target.value)
+                      }
+                      disabled={isRegistrationOpen}
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100] disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
+                      Thời gian kết thúc
+                    </label>
+
+                    <input
+                      type="datetime-local"
+                      value={registrationEndInput}
+                      onChange={(e) => setRegistrationEndInput(e.target.value)}
+                      disabled={isRegistrationOpen}
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100] disabled:opacity-60"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-[#81766D]">
+                  Chọn ngày và giờ cụ thể. Hệ thống sẽ tính thời lượng đăng ký
+                  từ hai mốc này.
+                </p>
+
+                {/* COUNTDOWN */}
+                <div className="mt-6 rounded-2xl border border-orange-100 bg-orange-50/70 p-5 sm:p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-[#51463F]">
+                      Trạng thái đợt đăng ký
+                    </p>
+
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                        isRegistrationOpen
+                          ? "bg-emerald-100 text-emerald-700"
+                          : registrationRound?.status === "CLOSED" ||
+                              (registrationRound && remainingMs === 0)
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {isRegistrationOpen
+                        ? "● Đang mở"
+                        : registrationRound?.status === "CLOSED" ||
+                            (registrationRound && remainingMs === 0)
+                          ? "Đã đóng"
+                          : "Chưa bắt đầu"}
+                    </span>
+                  </div>
+
+                  <p className="mt-5 text-sm text-[#81766D]">
+                    Thời gian còn lại
+                  </p>
+                  <p className="mt-1 font-mono text-4xl font-black tracking-tight text-[#E65100] sm:text-5xl">
+                    {isRegistrationOpen ? countdownText : "00:00:00"}
+                  </p>
+
+                  {registrationRound && (
+                    <div className="mt-5 grid gap-3 border-t border-orange-200 pt-4 text-sm sm:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-[#81766D]">Bắt đầu</p>
+                        <p className="mt-1 font-semibold text-[#51463F]">
+                          {new Date(registrationRound.startTime).toLocaleString(
+                            "vi-VN",
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-[#81766D]">Kết thúc</p>
+                        <p className="mt-1 font-semibold text-[#51463F]">
+                          {new Date(registrationRound.endTime).toLocaleString(
+                            "vi-VN",
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ACTIONS */}
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.setItem(
+                        "adminSystemSettings",
+                        JSON.stringify(systemSettings),
+                      );
+                      handleStartRegistrationRound();
+                    }}
+                    disabled={
+                      isRegistrationOpen ||
+                      !Number.isFinite(
+                        Number(systemSettings.groupRegistrationHours),
+                      ) ||
+                      Number(systemSettings.groupRegistrationHours) <= 0
+                    }
+                    className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#D84315] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Bắt đầu đợt đăng ký
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleEndRegistrationRound}
+                    disabled={!isRegistrationOpen}
+                    className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Kết thúc đợt ngay
+                  </button>
                 </div>
               </div>
             </section>
@@ -2158,6 +2336,113 @@ export default function AdminDashboard() {
                 {reviewingRoster ? "Đang xử lý..." : "Xác nhận duyệt"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {eligibilityConfirmUser && (
+        <div
+          className="fixed inset-0 z-100 flex items-center justify-center bg-[#2C2825]/40 p-4 backdrop-blur-sm"
+          onClick={() => {
+            if (!updatingEligibility) setEligibilityConfirmUser(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="eligibility-modal-title"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[#E8E2D9] bg-[#FBF9F5] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const u = eligibilityConfirmUser;
+              const isCurrentlyEligible = u.eligible !== false;
+              const willBeEligible = !isCurrentlyEligible;
+
+              return (
+                <>
+                  <div className="flex items-start gap-4 border-b border-[#E8E2D9] bg-white p-6">
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl ${
+                        willBeEligible
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-orange-50 text-[#E65100]"
+                      }`}
+                    >
+                      {willBeEligible ? "✓" : "!"}
+                    </div>
+
+                    <div className="flex-1">
+                      <h2
+                        id="eligibility-modal-title"
+                        className="text-lg font-black text-[#2C2825]"
+                      >
+                        {willBeEligible
+                          ? "Gỡ cờ điều kiện?"
+                          : "Xác nhận chưa đủ điều kiện"}
+                      </h2>
+
+                      <p className="mt-1 text-sm leading-6 text-[#81766D]">
+                        Bạn có chắc muốn{" "}
+                        {willBeEligible ? "gỡ cờ cho" : "đánh cờ cho"} sinh viên
+                        này?
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 p-6">
+                    <div className="rounded-2xl border border-[#E8E2D9] bg-white p-4">
+                      <p className="text-sm font-extrabold text-[#2C2825]">
+                        {u.fullName || "Chưa có họ tên"}
+                      </p>
+                      <p className="mt-1 break-all text-xs text-[#81766D]">
+                        {u.email || "Chưa có email"}
+                      </p>
+                      {u.studentCode && (
+                        <p className="mt-2 text-xs font-bold text-[#A96745]">
+                          MSSV: {u.studentCode}
+                        </p>
+                      )}
+                    </div>
+
+                    {!willBeEligible && (
+                      <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-5 text-[#8C4B2D]">
+                        Nếu sinh viên đang là Trưởng nhóm, hệ thống sẽ xử lý
+                        việc chuyển Trưởng nhóm theo quy tắc của hệ thống.
+                      </div>
+                    )}
+
+                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                      <button
+                        type="button"
+                        disabled={updatingEligibility}
+                        onClick={() => setEligibilityConfirmUser(null)}
+                        className="rounded-xl border border-[#E8E2D9] bg-white px-5 py-3 text-sm font-bold text-[#6B635B] transition hover:bg-[#F4EEE7] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Hủy
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={updatingEligibility}
+                        onClick={confirmToggleEligibility}
+                        className={`rounded-xl px-5 py-3 text-sm font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                          willBeEligible
+                            ? "bg-emerald-600 hover:bg-emerald-700"
+                            : "bg-[#E65100] hover:bg-[#D84315]"
+                        }`}
+                      >
+                        {updatingEligibility
+                          ? "Đang cập nhật..."
+                          : willBeEligible
+                            ? "Xác nhận gỡ cờ"
+                            : "Xác nhận đánh cờ"}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
