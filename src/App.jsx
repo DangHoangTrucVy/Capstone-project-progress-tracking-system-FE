@@ -11,6 +11,12 @@ import Contact from "./components/Contact"; // Trang Liên hệ
 import StudentDashboard from "./pages/students/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
+import ModeratorLayout from "./pages/moderator/ModeratorLayout";
+import ModeratorDashboard from "./pages/moderator/ModeratorDashboard";
+import ContentReviewQueue from "./pages/moderator/ContentReviewQueue";
+import SubModManagement from "./pages/moderator/SubModManagement";
+import SubModTasks from "./pages/moderator/SubModTasks";
+import Profile from "./auth/Profile";
 
 const App = () => {
   return (
@@ -18,6 +24,32 @@ const App = () => {
       <Routes>
         <Route element={<ProtectedRoute allowedRoles={["ADMIN", "SYSTEM_ADMIN"]} />}>
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        </Route>
+
+        {/* Phân quyền cho MODERATOR CHÍNH */}
+        {/* <Route element={<ProtectedRoute allowedRoles={["MODERATOR", "MAIN_MODERATOR", "ADMIN"]} />}>
+          <Route path="/moderator/dashboard" element={<ModeratorDashboard />} />
+          <Route path="/moderator/review-queue" element={<ContentReviewQueue />} />
+          <Route path="/moderator/sub-mods" element={<SubModManagement />} />
+        </Route> */}
+
+        {/* Phân quyền cho SUB MODERATOR */}
+        {/* <Route element={<ProtectedRoute allowedRoles={["SUB_MODERATOR", "MODERATOR", "MAIN_MODERATOR", "ADMIN"]} />}>
+          <Route path="/submod/tasks" element={<SubModTasks />} />
+        </Route> */}
+
+        {/* Tạm thời cho phép ADMIN hoặc STUDENT truy cập để test UI nhanh */}
+        {/* Bỏ bọc ProtectedRoute để test trực tiếp */}
+        <Route element={<ModeratorLayout />}>
+          <Route path="/moderator/dashboard" element={<ModeratorDashboard />} />
+          <Route path="/moderator/review-queue" element={<ContentReviewQueue />} />
+          <Route path="/moderator/sub-mods" element={<SubModManagement />} />
+          <Route path="/submod/tasks" element={<SubModTasks />} />
+          <Route path="/moderator/profile" element={
+            <div className="p-8 w-full">
+              <Profile />
+            </div>
+          } />
         </Route>
 
         <Route path="/" element={<Home />} />
