@@ -28,6 +28,28 @@ const Home = () => {
       btnText: "Đăng nhập với vai trò Admin",
       link: "/login",
     },
+    {
+      title: "Moderator chính",
+      heading: "Quản trị & Kiểm duyệt viên cấp cao",
+      features: [
+        "Quản lý toàn bộ hệ thống kiểm duyệt và hoạt động nhóm",
+        "Phân quyền, theo dõi và giám sát đội ngũ Sub moderator",
+        "Xử lý các khiếu nại, tranh chấp và vi phạm lớn của sinh viên",
+      ],
+      btnText: "Đăng nhập với vai trò Moderator chính",
+      link: "/login",
+    },
+    {
+      title: "Sub moderator",
+      heading: "Kiểm duyệt viên hỗ trợ",
+      features: [
+        "Hỗ trợ kiểm duyệt thông tin đăng ký và trạng thái nhóm",
+        "Tiếp nhận và xử lý các báo cáo, thắc mắc từ sinh viên",
+        "Theo dõi tiến độ và báo cáo công việc cho Moderator chính",
+      ],
+      btnText: "Đăng nhập với vai trò Sub moderator",
+      link: "/login",
+    },
   ];
 
   return (
@@ -60,7 +82,7 @@ const Home = () => {
               </div>
             </div>
             <span className="font-extrabold text-xl text-[#2C2825] tracking-tight group-hover:text-[#E65100] transition-colors">
-              Lịch Đồ Án
+              MatchPoint FPT
             </span>
           </div>
 
@@ -100,15 +122,12 @@ const Home = () => {
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-black text-[#2C2825] leading-[1.15] tracking-tight">
-              Quản lý đồ án tốt nghiệp,
-              <br />
-              bắt đầu từ việc
-              <br />
-              lập nhóm vững chắc
+              MatchPoint FPT
+      
             </h1>
 
             <p className="text-[#6B635B] text-base leading-relaxed max-w-lg">
-              Hệ thống quản lý và theo dõi đồ án tốt nghiệp chuyên biệt cho Khoa Công nghệ thông tin: kiểm tra điều kiện đầu kỳ, tạo nhóm, quản lý đơn Apply, Invite và phân quyền minh bạch.
+              Điểm kết nối, nơi các sinh viên tìm thấy mảnh ghép phù hợp cho đội của mình.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -202,10 +221,10 @@ const Home = () => {
             </div>
             <div className="group cursor-default">
               <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
-                3
+                4
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Vai trò quản lý (Student/Leader/Admin)
+                Vai trò quản lý hệ thống
               </div>
             </div>
           </div>
@@ -294,8 +313,9 @@ const Home = () => {
               </h2>
             </div>
 
-            <div className="max-w-4xl mx-auto px-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="max-w-6xl mx-auto px-4">
+              {/* Đã mở rộng sang 3 cột (md:grid-cols-2 lg:grid-cols-3) để hiển thị hoàn hảo 4 role */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {rolesData.map((role, index) => {
                   const isHovered = hoveredRole === index;
                   return (
@@ -344,9 +364,9 @@ const Home = () => {
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Thông tin bên trái */}
           <div className="flex items-center gap-3 text-center md:text-left">
-            <span className="font-bold text-[#2C2825]">Lịch Đồ Án</span>
+            <span className="font-bold text-[#2C2825]"> MatchPoint FPT</span>
             <span className="text-[#E8E2D9] hidden md:inline">|</span>
-            <p>© 2026 Khoa Công nghệ thông tin · Đại học FPT</p>
+            <p>© 2026 MatchPoint · Đại học FPT</p>
           </div>
 
           {/* Các liên kết hoặc điều hướng phụ bên phải */}

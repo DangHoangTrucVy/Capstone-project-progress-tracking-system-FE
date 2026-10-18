@@ -123,7 +123,7 @@ export default function JoinGroup({ onJoined }) {
                     )}
                 </div>
             </div>
-            <footer className="text-center text-[10px] text-[#6B635B] pb-4">Lịch Đồ Án · Khoa Công nghệ thông tin · Đại học FPT</footer>
+            <footer className="text-center text-[10px] text-[#6B635B] pb-4"> MatchPoint FPT</footer>
         </div>
     );
 }

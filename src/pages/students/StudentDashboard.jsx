@@ -153,7 +153,7 @@ export default function StudentDashboard() {
                 Quản Lý Sinh Viên
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                Hệ thống quản lý đồ án
+                Hệ thống quản lý MatchPoint FPT.
               </p>
             </div>
           </div>

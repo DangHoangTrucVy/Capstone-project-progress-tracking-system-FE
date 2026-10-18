@@ -794,7 +794,7 @@ export default function AdminDashboard() {
                 Quản Lý Sinh Viên
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                Hệ thống Quản lý Đồ án
+                Hệ thống quản lý MatchPoint FPT.
               </p>
             </div>
           </div>

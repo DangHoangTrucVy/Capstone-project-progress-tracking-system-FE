@@ -22,14 +22,14 @@ export default function Privacy() {
                         QUY CHẾ & BẢO MẬT
                     </span>
                     <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2825]">Chính sách Quản lý Đồ án Tốt nghiệp</h1>
-                    <p className="text-xs text-[#9E958C]">Áp dụng cho các vai trò: Student, Leader và Admin</p>
+                    <p className="text-xs text-[#9E958C]">Áp dụng cho các vai trò: Student, Leader, Admin, Moderator chính và Sub moderator</p>
                 </div>
 
                 {/* Nội dung chính sách */}
                 <div className="space-y-6 text-xs leading-relaxed bg-white p-8 border border-[#E8E2D9] rounded-2xl shadow-sm transition-all duration-300 hover:shadow-md">
                     <section className="space-y-2 border-b border-[#F2ECE4] pb-4">
-                        <h2 className="font-bold text-sm text-[#2C2825]">1. Phân quyền và Vai trò (Actors)</h2>
-                        <p className="text-[#6B635B]">Hệ thống vận hành với 3 nhóm người dùng chính: <strong>Student</strong> (sinh viên tự do, tham gia nhóm), <strong>Leader</strong> (trưởng nhóm quản lý thành viên và xét duyệt đơn) và <strong>Admin / Phòng Đào Tạo</strong> (quản lý danh sách, gắn/gỡ cờ điều kiện và can thiệp thay đổi nhân sự khi cần thiết).</p>
+                        <h2 className="font-bold text-sm text-[#2C2825]">1. Phân quyền và Vai trò hệ thống (Actors)</h2>
+                        <p className="text-[#6B635B]">Hệ thống vận hành với các nhóm người dùng chính: <strong>Student & Leader</strong> (sinh viên tham gia, tạo và quản lý nhóm), <strong>Admin</strong> (quản trị viên hệ thống và cấu hình đầu kỳ), <strong>Moderator chính</strong> (quản lý toàn bộ hệ thống kiểm duyệt và phân công công việc), cùng với <strong>Sub moderator</strong> (kiểm duyệt viên hỗ trợ xử lý đơn và theo dõi tiến độ).</p>
                     </section>
 
                     <section className="space-y-2 border-b border-[#F2ECE4] pb-4">

@@ -125,7 +125,7 @@ export default function Profile() {
                 Hồ sơ cá nhân
               </h1>
               <p className="mt-2 text-sm leading-6 text-[#786B61]">
-                Thông tin định danh và vai trò trong hệ thống quản lý đồ án.
+                Thông tin định danh và vai trò trong hệ thống MatchPoint FPT.
               </p>
             </div>
           </div>

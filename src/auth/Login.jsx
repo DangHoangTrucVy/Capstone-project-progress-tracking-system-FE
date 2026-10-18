@@ -216,7 +216,7 @@ const Login = () => {
               </div>
             </div>
             <span className="font-extrabold text-lg text-[#2C2825] tracking-tight">
-              Lịch Đồ Án FPT
+              MatchPoint FPT
             </span>
           </div>
 
@@ -323,7 +323,7 @@ const Login = () => {
           </div>
 
           <div className="flex justify-between items-center text-[11px] text-[#9E958C] pt-4 border-t border-[#F0EBE1]">
-            <p>© 2026 Lịch Đồ Án FPT</p>
+            <p>© 2026 MatchPoint FPT</p>
             <a href="#privacy" className="hover:text-[#2C2825]">Chính sách bảo mật</a>
           </div>
         </div>
@@ -334,11 +334,11 @@ const Login = () => {
 
           <div className="space-y-2 z-10">
             <span className="px-3 py-1 bg-white/20 text-white text-[10px] font-bold rounded-lg uppercase tracking-wider inline-block">
-              Hệ thống quản lý Đồ án
+               MatchPoint FPT
             </span>
-            <h2 className="text-xl sm:text-2xl font-black leading-snug tracking-tight">
-              Quản Lý Sinh Viên
-            </h2>
+            <h3 className="text-xl sm:text-1xl italic font-normal leading-snug tracking-tight">
+              Điểm kết nối, nơi các sinh viên tìm thấy mảnh ghép phù hợp cho đội của mình
+            </h3>
           </div>
 
           <div className="my-4 z-10 space-y-3">
@@ -384,7 +384,7 @@ const Login = () => {
           </div>
 
           <div className="z-10 text-[11px] text-orange-100/90 font-medium flex justify-between items-center pt-2 border-t border-white/20">
-            <span>Khoa Công nghệ thông tin</span>
+            <span>© 2026 MatchPoint FPT</span>
             <span>Đại học FPT TP.HCM</span>
           </div>
         </div>
