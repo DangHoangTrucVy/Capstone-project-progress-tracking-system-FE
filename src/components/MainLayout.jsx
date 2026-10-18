@@ -59,7 +59,7 @@ const MainLayout = ({ children, user, onLogout }) => {
             {/* FOOTER */}
             <footer className="bg-white/80 backdrop-blur-md border-t border-[#E8E2D9] py-6 mt-auto z-10">
                 <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-[#6B635B] gap-4">
-                    <p>© 2026 Đại học FPT - Hệ thống Quản lý Đồ án Tốt nghiệp.</p>
+                    <p>© 2026 Đại học FPT - MatchPoint FPT University. </p>
                     <div className="flex space-x-6">
                         <a href="#" className="hover:text-[#E65100] transition">Quy chế đồ án</a>
                         <a href="#" className="hover:text-[#E65100] transition">Tài liệu hướng dẫn</a>

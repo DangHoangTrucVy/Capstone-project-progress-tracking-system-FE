@@ -96,7 +96,7 @@ const Register = () => {
             ✓
           </div>
           <span className="font-extrabold text-lg text-[#2C2825] tracking-tight">
-            Lịch Đồ Án FPT
+            MatchPoint FPT
           </span>
         </div>
 
