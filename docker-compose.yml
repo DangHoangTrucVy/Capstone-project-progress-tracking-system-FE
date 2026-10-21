@@ -1,0 +1,27 @@
+# FE served by nginx on this PC; /api is proxied to the backend stack (project "capstone-lan").
+# Start the backend first (BE repo: .\deploy-lan.ps1), then here: .\deploy-fe.ps1
+name: capstone-fe
+
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${FE_PORT:-3000}:80"
+    networks:
+      - backend
+
+  # Free public HTTPS URL for the FE (API included, same origin): https://<random>.trycloudflare.com
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://web:80
+    depends_on:
+      - web
+    networks:
+      - backend
+
+networks:
+  backend:
+    name: capstone-lan_default
+    external: true

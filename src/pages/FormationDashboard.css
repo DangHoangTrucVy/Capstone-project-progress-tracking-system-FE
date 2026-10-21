@@ -1,0 +1,13 @@
+body{margin:0;background:#faf7f3;color:#29231e;font-family:Arial,sans-serif}
+.formation{max-width:1200px;margin:auto;padding:24px;box-sizing:border-box}
+.formation h1{font-size:26px}.formation h2{font-size:20px}.formation h3{font-size:16px}
+.formation header,.formation nav,.formation .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.formation header{justify-content:space-between}.formation nav{margin:20px 0}
+.formation button,.formation input,.formation select{font:inherit;border:1px solid #ded3c7;border-radius:8px;padding:9px 12px}
+.formation button{cursor:pointer;background:#fff;color:#6d2d0b}.formation button:hover,.formation button[aria-selected=true]{background:#f0d9c8}
+.formation button:disabled{opacity:.5;cursor:wait}.formation form{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:12px 0}
+.formation label{display:flex;flex-direction:column;gap:6px;font-size:14px}.formation section{background:#fff;border:1px solid #e8dfd5;border-radius:14px;padding:20px;margin:16px 0}
+.formation .table-wrap{overflow:auto}.formation table{width:100%;border-collapse:collapse}.formation td,.formation th{text-align:left;border-bottom:1px solid #e8dfd5;padding:12px;white-space:nowrap;font-size:14px}
+.formation pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;max-height:400px;overflow:auto}.formation .error{color:#a11818;background:#fff0ef;padding:12px;border-radius:8px}
+.formation .notice{padding:12px;background:#e9f5e7;border-radius:8px}.formation .login-card{max-width:680px}.formation .muted{color:#685e55}
+@media(max-width:600px){.formation{padding:14px}.formation section{padding:12px}.formation h1{font-size:22px}.formation input{max-width:100%;box-sizing:border-box}}

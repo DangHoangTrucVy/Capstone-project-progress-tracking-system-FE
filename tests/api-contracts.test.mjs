@@ -1,117 +1,61 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-
-const calls = [];
-const api = Object.fromEntries(['get', 'post', 'put', 'delete'].map(method => [method, async (...args) => {
-  calls.push({ method, args });
-  return { status: 200, headers: {}, data: { id: 'result' } };
-}]));
-globalThis.contractApi = api;
-async function moduleFrom(path, replacement) {
-  let source = await readFile(new URL(path, import.meta.url), 'utf8');
-  source = source.replace(/import .*? from ['"].*?['"];?/, replacement);
-  return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
-}
-const group = await moduleFrom('../src/services/groupService.js', 'const api = globalThis.contractApi;');
-const eligibility = await moduleFrom('../src/services/eligibilityService.js', 'const api = globalThis.contractApi;');
-const documents = await moduleFrom('../src/services/documentService.js', 'const api = globalThis.contractApi;');
-const scheduling = await moduleFrom('../src/services/schedulingService.js', 'const api = globalThis.contractApi;');
-
-test('Booking, cancellation and pre-meeting questions use the BE DTO fields', async () => {
-  await scheduling.bookSlot('S1', 'G1');
-  assert.deepEqual(calls.pop(), { method: 'post', args: ['/slots/S1/book', { groupId: 'G1' }] });
-  await scheduling.cancelBooking('B1', 'Schedule conflict');
-  assert.deepEqual(calls.pop(), { method: 'delete', args: ['/bookings/B1', { data: { reason: 'Schedule conflict' } }] });
-  await scheduling.submitTopicQuestion('T1', 'How should we implement this?');
-  assert.deepEqual(calls.pop().args, ['/topics/T1/questions', { questionText: 'How should we implement this?' }]);
-});
-
-test('Invite and leader decisions use the documented request contracts', async () => {
-  await group.inviteToGroup('G1', { studentCode: 'SE170001' });
-  assert.deepEqual(calls.pop(), { method: 'post', args: ['/groups/G1/invites', { studentCode: 'SE170001' }] });
-  await group.requestLeaveGroup('G1', { reason: 'Study abroad' });
-  assert.deepEqual(calls.pop().args, ['/groups/G1/leave-requests', { reason: 'Study abroad' }]);
-  await group.approveLeaveRequest('R1', { newLeaderUserId: 'U2' });
-  assert.deepEqual(calls.pop().args, ['/leave-requests/R1/approve', { newLeaderUserId: 'U2' }]);
-  await group.approveLeaveRequest('R1');
-  assert.deepEqual(calls.pop().args, ['/leave-requests/R1/approve', {}]);
-  await group.getLeaveRequests({ status: 'PENDING', leaderOnly: true });
-  assert.deepEqual(calls.pop().args, ['/leave-requests', { params: { status: 'PENDING', leaderOnly: true } }]);
-  await group.replaceGroupLeader('G1', { userId: 'U2' });
-  assert.deepEqual(calls.pop(), { method: 'put', args: ['/groups/G1/leader', { userId: 'U2' }] });
-});
-
-test('Approving an application returns the pending invite, including a reused invite', async context => {
-  const invite = { id: 'I1', type: 'INVITE', status: 'PENDING', sourceApplicationId: 'A1' };
-  const requests = [];
-  context.mock.method(api, 'post', async (...args) => {
-    requests.push(args);
-    return { data: invite };
-  });
-  assert.equal(await group.approveApplication('A1'), invite);
-  assert.equal(await group.approveApplication('A1'), invite);
-  assert.deepEqual(requests, [['/applications/A1/approve'], ['/applications/A1/approve']]);
-});
-
-test('Import and document uploads retain FormData and let the browser set the boundary', async () => {
-  const data = new FormData(); data.append('file', new Blob(['email,name']), 'students.csv');
-  await eligibility.importEligibilityFile(data);
-  let request = calls.pop();
-  assert.equal(request.args[0], '/eligibility/import/file');
-  assert.equal(request.args[1], data);
-  assert.equal(request.args[2].headers['Content-Type'], undefined);
-  await eligibility.getImportedStudents({ eligible: false, q: 'SE17', page: 2, size: 20 });
-  assert.deepEqual(calls.pop().args, ['/eligibility/students', { params: { eligible: false, q: 'SE17', page: 2, size: 20 } }]);
-  await documents.uploadDocument('G1', data);
-  request = calls.pop();
-  assert.equal(request.args[0], '/groups/G1/documents');
-  assert.equal(request.args[1], data);
-  assert.equal(request.args[2].headers['Content-Type'], undefined);
-  await documents.submitDocumentLink('G1', { title: 'Demo', fileUrl: 'https://example.com/demo', fileType: 'LINK' });
-  assert.equal(calls.pop().args[1].fileUrl, 'https://example.com/demo');
-  await documents.downloadDocument('D1');
-  assert.deepEqual(calls.pop().args, ['/documents/D1/file', { responseType: 'blob' }]);
-});
-
-globalThis.exportResponse = null;
-const { downloadGroupsReport } = await moduleFrom('../src/utils/downloadGroupsReport.js', 'const exportGroupsExcel = async () => { if (globalThis.exportResponse instanceof Error) throw globalThis.exportResponse; return globalThis.exportResponse; };');
-const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-test('Excel export only saves a successful XLSX and uses the server filename', async context => {
-  let clicked = 0, removed = 0, revoked = 0, link;
-  context.mock.method(URL, 'createObjectURL', () => 'blob:test');
-  context.mock.method(URL, 'revokeObjectURL', () => { revoked++; });
-  context.mock.method(globalThis, 'setTimeout', callback => { callback(); return 0; });
-  globalThis.document = { createElement: () => link = { click() { clicked++; }, remove() { removed++; } }, body: { appendChild() {} } };
-  globalThis.exportResponse = { status: 200, headers: { 'content-type': xlsx, 'content-disposition': 'attachment; filename="BE_report.xlsx"' }, data: new Blob(['PK workbook'], { type: xlsx }) };
-  await downloadGroupsReport('Fall2026');
-  assert.equal(link.download, 'BE_report.xlsx');
-  assert.equal(clicked, 1); assert.equal(removed, 1); assert.equal(revoked, 1);
-  globalThis.exportResponse.headers['content-disposition'] = "attachment; filename*=UTF-8''Vietnam%20report.xlsx";
-  await downloadGroupsReport('');
-  assert.equal(link.download, 'Vietnam report.xlsx');
-  globalThis.exportResponse.headers['content-disposition'] = '';
-  await downloadGroupsReport('Fall2026');
-  assert.match(link.download, /^Danh_sach_ghep_nhom_Fall2026_\d{8}_\d{6}\.xlsx$/);
-  for (const [status, type] of [[200, 'application/json'], [201, xlsx], [200, 'text/html']]) {
-    globalThis.exportResponse = { status, headers: { 'content-type': type }, data: new Blob(['{"message":"Export failed"}']) };
-    await assert.rejects(downloadGroupsReport('Fall2026'), /Export failed/);
-  }
-  assert.equal(clicked, 3);
-  for (const status of [401, 403, 404, 405, 501]) {
-    const error = new Error('Request failed'); error.response = { status };
-    globalThis.exportResponse = error;
-    await assert.rejects(downloadGroupsReport('Fall2026'));
-  }
-  const error = new Error('Request failed'); error.response = { status: 400, data: new Blob(['{"message":"Invalid semester"}'], { type: 'application/json' }) };
-  globalThis.exportResponse = error;
-  await assert.rejects(downloadGroupsReport('invalid'), /Invalid semester/);
-  delete globalThis.document;
-});
-
-test('Export service retains status and headers; omitting semester requests all semesters', async () => {
-  const response = await group.exportGroupsExcel(undefined);
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFile, readdir } from "node:fs/promises";
+const source = await readFile(new URL("../src/services/formationService.js", import.meta.url), "utf8");
+const requests = [];
+globalThis.cleanupApi = { request: async request => { requests.push(request); return { data: {} }; } };
+const moduleSource = source.replace('import api from "./api";', "const api = globalThis.cleanupApi;");
+const { operations, call, allRows } = await import("data:text/javascript;base64," + Buffer.from(moduleSource).toString("base64"));
+test("Every frontend operation exists on the running backend, with the same method", async () => {
+  const response = await fetch(process.env.OPENAPI_URL || "http://localhost:8081/v3/api-docs");
   assert.equal(response.status, 200);
-  assert.deepEqual(calls.pop().args, ['/reports/export', { params: { semester: undefined }, responseType: 'blob' }]);
+  const { paths } = await response.json();
+  for (const [name, [method, path]] of Object.entries(operations)) {
+    assert.ok(paths["/api/v1" + path]?.[method], name + ": " + method + " " + path);
+  }
+  for (const path of ["/api/v1/auth/register", "/api/v1/auth/campuses",
+    "/api/v1/registrations", "/api/v1/reports/summary", "/api/v1/eligibility/import/file"]) {
+    assert.equal(paths[path], undefined, path);
+  }
+});
+test("Uploads leave multipart boundary to the browser, Excel requests a blob", async () => {
+  await call("importPreview", {path:{semester:"FA26"},file:new Blob(["MSSV"],{type:"text/csv"})});
+  assert.ok(requests.at(-1).data instanceof FormData);
+  assert.equal(requests.at(-1).headers["Content-Type"], undefined);
+  await call("export", {path:{semester:"FA26"}});
+  assert.equal(requests.at(-1).responseType, "blob");
+});
+test("Missing route parameters fail before sending a request", async () => {
+  const count = requests.length;
+  await assert.rejects(call("group"), /Missing parameter: groupId/);
+  assert.equal(requests.length, count);
+});
+test("Paginated lists load every page rather than silently truncating accounts or groups", async () => {
+  const original = globalThis.cleanupApi.request;
+  let page = 0;
+  globalThis.cleanupApi.request = async request => {
+    assert.equal(request.params.page, page);
+    return {data:{content:[{id:page}],totalPages:2,last:page++ === 1}};
+  };
+  try {
+    assert.deepEqual(await allRows("students",{semester:"FA26"}),[{id:0},{id:1}]);
+  } finally { globalThis.cleanupApi.request = original; }
+});
+test("Old workflow API paths are absent from frontend source", async () => {
+  async function scan(dir) {
+    for (const entry of await readdir(dir,{withFileTypes:true})) {
+      const child = new URL(entry.name + (entry.isDirectory()?"/":""),dir);
+      if (entry.isDirectory()) await scan(child);
+      else if (/\.(js|jsx)$/.test(entry.name)) {
+        const text = await readFile(child,"utf8");
+        for (const pattern of [/\/auth\/register/, /\/auth\/campuses/, /\/registrations/,
+          /\/eligibility\/(?:import|me|ineligible|students)/, /\/reports\/(?:summary|export)/,
+          /\/slots(?:[/"'`])/, /\/bookings/, /\/topics\/.*\/questions/,
+          /\/documents/, /\/roster\/(?:submit|review)/, /\/me\/(?:applications|invites|formation-window)/]) {
+          assert.doesNotMatch(text,pattern,child.pathname);
+        }
+      }
+    }
+  }
+  await scan(new URL("../src/",import.meta.url));
 });
