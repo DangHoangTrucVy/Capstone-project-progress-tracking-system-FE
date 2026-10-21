@@ -134,7 +134,7 @@ const Login = () => {
     [],
   );
 
-  const navigateBasedOnRole = (userRole) => {
+const navigateBasedOnRole = (userRole) => {
     const normalizedRole = String(userRole || "")
       .trim()
       .toUpperCase()
@@ -142,6 +142,8 @@ const Login = () => {
 
     if (["ADMIN", "SYSTEM_ADMIN"].includes(normalizedRole)) {
       navigate("/admin/dashboard");
+    } else if (["MODERATOR", "LECTURER"].includes(normalizedRole)) {
+      navigate("/moderator/dashboard"); // Điều hướng đến trang của Moderator
     } else if (["LEADER", "GROUP_LEADER"].includes(normalizedRole)) {
       navigate("/leader/dashboard");
     } else {

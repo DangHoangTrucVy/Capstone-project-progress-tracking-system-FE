@@ -10,29 +10,38 @@ import Privacy from "./components/Privacy"; // Trang Chính sách
 import Contact from "./components/Contact"; // Trang Liên hệ
 import StudentDashboard from "./pages/students/StudentDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import ModeratorDashboard from "./pages/moderator/ModeratorDashboard";
 
 const App = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<ProtectedRoute allowedRoles={["ADMIN", "SYSTEM_ADMIN"]} />}>
+        <Route
+          element={<ProtectedRoute allowedRoles={["ADMIN", "SYSTEM_ADMIN"]} />}
+        >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Route>
-
-       
 
         <Route path="/" element={<Home />} />
         <Route path="/support" element={<Support />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/login" element={<Login />} />
-       
 
-        <Route element={<ProtectedRoute allowedRoles={["STUDENT", "LEADER", "GROUP_LEADER"]} />}>
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={["STUDENT", "LEADER", "GROUP_LEADER"]}
+            />
+          }
+        >
           <Route path="/leader/dashboard" element={<StudentDashboard />} />
           <Route path="/student/dashboard" element={<StudentDashboard />} />
         </Route>
-        
+
+        <Route element={<ProtectedRoute allowedRoles={["MODERATOR", "LECTURER"]} />}>
+          <Route path="/moderator/dashboard" element={<ModeratorDashboard />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
