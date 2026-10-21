@@ -38,7 +38,7 @@ export const getSemesterSubjects = async (semester) => {
 
 // Set scope deadline: PUT /api/v1/scopes/{scopeId}/deadline
 export const setScopeDeadline = async (scopeId, data) => {
-    const response = await api.put(`/api/v1/scopes/${scopeId}/deadline`, data);
+    const response = await api.put(`/scopes/${scopeId}/deadline`, data);
     return response.data;
 };
 

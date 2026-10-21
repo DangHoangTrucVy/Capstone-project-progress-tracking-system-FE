@@ -41,7 +41,7 @@ export default function ModeratorDashboard() {
       const currentUser = await getCurrentUser().catch(() => null);
       setUser(currentUser);
 
-      const semRes = await getSemesters().catch(() => []);
+      const semRes = await getSemesters({ size: 1000 }).catch(() => []);
       const semList = Array.isArray(semRes) ? semRes : semRes.content || [];
       setSemesters(semList);
       if (semList.length > 0 && !selectedSemester) {

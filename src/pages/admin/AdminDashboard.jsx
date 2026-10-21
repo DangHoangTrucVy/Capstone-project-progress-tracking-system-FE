@@ -164,7 +164,7 @@ export default function AdminDashboard() {
       setGroups(groupList);
 
       // 3. Lấy danh sách học kỳ
-      const semRes = await getSemesters().catch(() => []);
+      const semRes = await getSemesters({ size: 1000 }).catch(() => []);
       const semList = Array.isArray(semRes) ? semRes : semRes.content || [];
       setSemesters(semList);
       if (semList.length > 0 && !accountSemester) {

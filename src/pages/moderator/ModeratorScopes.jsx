@@ -55,23 +55,48 @@ export default function ModeratorScopes() {
     setModalOpen(true);
   };
 
-  const handleSaveDeadline = async (e) => {
+//  const handleSaveDeadline = async (e) => {
+//     e.preventDefault();
+//     if (!activeScope || !newDeadline) return;
+
+//     try {
+//       // Chuyển đổi ngày giờ sang chuẩn ISO string để backend Java nhận diện chính xác tuyệt đối
+//       const formattedDeadline = new Date(newDeadline).toISOString();
+
+//       await api.post(`/scopes/${activeScope.id || activeScope.scopeId}/extend`, {
+//         deadline: formattedDeadline,
+//       });
+//       showToast("Cập nhật / Gia hạn deadline thành công!");
+//       setModalOpen(false);
+//       loadScopes(selectedSemester);
+//     } catch (error) {
+//       showToast(error.response?.data?.message || "Không thể đổi deadline.", "error");
+//     }
+//   };
+
+const handleSaveDeadline = async (e) => {
     e.preventDefault();
     if (!activeScope || !newDeadline) return;
 
     try {
-      // Gọi API gia hạn scope deadline theo Swagger
-      await api.post(`/scopes/${activeScope.id || activeScope.scopeId}/extend`, {
-        deadline: newDeadline,
-      });
-      showToast("Cập nhật / Gia hạn deadline thành công!");
+      const formattedDeadline = new Date(newDeadline).toISOString();
+      const scopeId = activeScope.id || activeScope.scopeId;
+
+      // Nếu đang ở trạng thái PREPARING thì dùng API set deadline ban đầu, ngược lại mới dùng extend
+      if (activeScope.phase === "PREPARING") {
+        await api.put(`/scopes/${scopeId}/deadline`, { deadline: formattedDeadline });
+      } else {
+        await api.post(`/scopes/${scopeId}/extend`, { deadline: formattedDeadline });
+      }
+
+      showToast("Cấu hình deadline thành công!");
       setModalOpen(false);
       loadScopes(selectedSemester);
     } catch (error) {
-      showToast(error.response?.data?.message || "Không thể đổi deadline.", "error");
+      showToast(error.response?.data?.message || "Không thể cập nhật deadline.", "error");
     }
   };
-
+  
   return (
     <div className="p-8 space-y-6">
       {toast.show && (
