@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { login, loginWithGoogle, getGoogleConfig, getCampuses } from "../services/authService";
 import GoogleSignInButton from "./GoogleSignInButton";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import fptBg from "../assets/fpt-bg.jpg";
 
 const CAMPUS_LABELS = {
@@ -12,17 +12,10 @@ const CAMPUS_LABELS = {
   QUY_NHON: "Quy Nhơn",
 };
 
-// Sinh viên đăng ký bằng email cá nhân: trạng thái chờ duyệt / bị từ chối (dùng cho cả mật khẩu và Google)
-const REGISTRATION_ERRORS = {
-  ACCOUNT_PENDING_APPROVAL: "Đăng ký của bạn đang chờ Admin xác nhận là sinh viên của trường. Vui lòng quay lại sau.",
-  ACCOUNT_REJECTED: null, // dùng message của backend vì có kèm lý do
-};
-
 const GOOGLE_ERRORS = {
-  REGISTRATION_REQUIRED: "Email cá nhân cần đăng ký (kèm MSSV) và được Admin duyệt trước khi đăng nhập.",
-  ACCOUNT_NOT_PROVISIONED: "Tài khoản chưa được cấp quyền. Vui lòng liên hệ Admin để được tạo tài khoản.",
-  WORKSPACE_REQUIRED: "Vui lòng dùng tài khoản Google của trường (@fpt.edu.vn), không dùng Gmail cá nhân.",
-  CAMPUS_MISMATCH: "Tài khoản này thuộc campus khác. Vui lòng chọn đúng campus.",
+  REGISTRATION_REQUIRED: "Email của bạn chưa có trong danh sách đồ án được import từ phòng đào tạo.",
+  ACCOUNT_NOT_PROVISIONED: "Tài khoản chưa được cấp quyền. Vui lòng liên hệ Quản trị viên.",
+  CAMPUS_MISMATCH: "Tài khoản này thuộc cơ sở (campus) khác. Vui lòng chọn đúng cơ sở.",
   GOOGLE_NOT_CONFIGURED: "Máy chủ chưa cấu hình đăng nhập Google.",
   GOOGLE_UNAVAILABLE: "Không kết nối được Google lúc này, vui lòng thử lại.",
   GOOGLE_SIGN_IN_FAILED: "Xác thực Google thất bại, vui lòng thử lại.",
@@ -78,7 +71,6 @@ const Login = () => {
     setNotification({ show: true, message, type });
   };
 
-  // Đăng nhập bằng email trường (@fpt.edu.vn) và mật khẩu do Admin cấp
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -97,28 +89,21 @@ const Login = () => {
       } else {
         localStorage.removeItem("rememberedEmail");
       }
-
     } catch (error) {
       const status = error.response?.status;
       const errorCode = error.response?.data?.errorCode;
       const message =
         status === 429
-          ? "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ một lúc trước khi thử lại."
-          : errorCode === "ACCOUNT_PENDING_APPROVAL"
-          ? REGISTRATION_ERRORS.ACCOUNT_PENDING_APPROVAL
-          : errorCode === "ACCOUNT_REJECTED"
-          ? `Đăng ký bị từ chối. ${error.response?.data?.message || ""} Bạn có thể đăng ký lại với thông tin chính xác.`
+          ? "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ trong giây lát."
           : errorCode === "INVALID_CREDENTIALS"
-          ? "Email hoặc mật khẩu không đúng. Hãy kiểm tra thông tin đăng nhập hoặc liên hệ Admin để xác nhận tài khoản."
-          : error.response?.data?.message ||
-            "Đăng nhập thất bại. Vui lòng thử lại.";
+          ? "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại."
+          : error.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
       showToast(message, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Lưu phiên đăng nhập (dùng chung cho mật khẩu và Google) rồi chuyển trang theo role
   const finishLogin = (result) => {
     const userRole = result.user?.role || result.role;
 
@@ -130,13 +115,12 @@ const Login = () => {
 
     setTimeout(() => {
       navigateBasedOnRole(userRole);
-    }, 1500);
+    }, 1200);
   };
 
-  // Google trả về ID token; backend kiểm tra token, domain trường và tài khoản đã được Admin cấp
   const handleGoogleCredential = async (idToken) => {
     if (!campus) {
-      showToast("Vui lòng chọn campus trước khi đăng nhập bằng Google.", "error");
+      showToast("Vui lòng chọn cơ sở (campus) của bạn trước khi đăng nhập bằng Google.", "error");
       return;
     }
     setLoading(true);
@@ -147,11 +131,9 @@ const Login = () => {
     } catch (error) {
       const errorCode = error.response?.data?.errorCode;
       showToast(
-        (errorCode === "ACCOUNT_REJECTED"
-          ? `Đăng ký bị từ chối. ${error.response?.data?.message || ""}`
-          : REGISTRATION_ERRORS[errorCode] || GOOGLE_ERRORS[errorCode]) ||
+        GOOGLE_ERRORS[errorCode] ||
           error.response?.data?.message ||
-          "Đăng nhập Google thất bại. Vui lòng thử lại.",
+          "Đăng nhập Google thất bại. Email của bạn phải nằm trong danh sách đồ án được cấp phép.",
         "error"
       );
     } finally {
@@ -171,83 +153,118 @@ const Login = () => {
       navigate("/admin/dashboard");
     } else if (["LEADER", "GROUP_LEADER"].includes(normalizedRole)) {
       navigate("/leader/dashboard");
-    } else if (
-      ["STUDENT"].includes(normalizedRole)
-    ) {
-      navigate("/student/dashboard");
     } else {
-      navigate("/");
+      navigate("/student/dashboard");
     }
   };
 
   return (
     <div 
-      className="relative flex min-h-screen w-full bg-cover bg-center items-center justify-center font-sans overflow-hidden p-4 sm:p-6 md:p-8"
+      className="relative flex h-screen w-full bg-cover bg-center items-center justify-center font-sans overflow-hidden p-4 md:p-6"
       style={{ backgroundImage: `url(${fptBg})` }}
     >
-      <div className="absolute inset-0 bg-[#2C2825]/40 backdrop-blur-[2px]"></div>
+      {/* Lớp phủ tối nhẹ tạo chiều sâu cho nền */}
+      <div className="absolute inset-0 bg-neutral-900/50 backdrop-blur-[3px]"></div>
 
+      {/* Thông báo dạng Toast nổi */}
       {notification.show && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-xl bg-white px-5 py-4 shadow-2xl border border-gray-100 transition-all duration-300">
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-2xl border border-neutral-100 animate-bounce">
           <div
-            className={`flex h-8 w-8 items-center justify-center rounded-full text-white font-bold shrink-0 ${
-              notification.type === "success" ? "bg-green-500" : "bg-red-500"
+            className={`flex h-8 w-8 items-center justify-center rounded-full text-white font-bold text-xs shrink-0 ${
+              notification.type === "success" ? "bg-emerald-600" : "bg-rose-600"
             }`}
           >
             {notification.type === "success" ? "✓" : "✕"}
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-800">
-              {notification.type === "success" ? "Thành công" : "Lỗi"}
+            <p className="text-xs font-bold text-neutral-900">
+              {notification.type === "success" ? "Thành công" : "Thông báo lỗi"}
             </p>
-            <p className="text-xs text-gray-500">{notification.message}</p>
+            <p className="text-xs text-neutral-600">{notification.message}</p>
           </div>
         </div>
       )}
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto bg-white/95 backdrop-blur-md rounded-[2.5rem] shadow-2xl border border-white/40 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+      {/* Khung tổng thể căn chuẩn vừa vặn trong 1 màn hình */}
+      <div className="relative z-10 w-full max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 border border-neutral-100">
         
-        {/* CỘT TRÁI: Form đăng nhập */}
-        <div className="lg:col-span-6 p-8 sm:p-12 flex flex-col justify-between bg-white/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#E65100] rounded-2xl flex items-center justify-center text-white font-bold shadow-md">
-              <div className="w-4 h-4 border-2 border-white rounded-lg flex items-center justify-center text-[9px]">
-                ✓
-              </div>
+        {/* CỘT TRÁI: Khu vực Form đăng nhập */}
+        <div className="lg:col-span-6 p-7 sm:p-9 flex flex-col justify-between bg-white">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-[#E65100] rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md shadow-orange-200">
+              ✓
             </div>
-            <span className="font-extrabold text-lg text-[#2C2825] tracking-tight">
+            <span className="font-extrabold text-sm text-neutral-900 tracking-tight">
               MatchPoint FPT
             </span>
           </div>
 
-          <div className="max-w-md w-full mx-auto my-auto space-y-4 py-4">
+          <div className="w-full my-auto space-y-4 py-3">
             <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-black text-[#2C2825] tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
                 Đăng nhập hệ thống
               </h1>
-              <p className="text-xs text-[#6B635B]">
-                Dùng email trường <strong className="text-[#E65100]">@fpt.edu.vn</strong>, hoặc email cá nhân đã đăng ký và được duyệt.
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                Sinh viên xác thực bằng Google; Quản trị viên và Điều phối viên dùng mật khẩu hệ thống.
               </p>
             </div>
 
-            {/* Form đăng nhập chính bằng Gmail trường & Mật khẩu */}
+            {/* Phần dành cho Sinh viên đăng nhập Google */}
+            {googleConfig?.enabled ? (
+              <div className="space-y-2.5 rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-[#E65100]">Dành cho Sinh viên</span>
+                  <span className="text-[10px] text-neutral-400 font-medium">Bắt buộc chọn cơ sở</span>
+                </div>
+                <select
+                  value={campus}
+                  onChange={(e) => setCampus(e.target.value)}
+                  className="w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-xs text-neutral-800 outline-none transition focus:border-[#E65100] focus:ring-2 focus:ring-orange-100 cursor-pointer shadow-xs"
+                >
+                  <option value="" disabled>
+                    -- Chọn cơ sở (Campus) của bạn --
+                  </option>
+                  {campuses.map((c) => (
+                    <option key={c} value={c}>
+                      {CAMPUS_LABELS[c] || c}
+                    </option>
+                  ))}
+                </select>
+                <div className="pt-0.5">
+                  <GoogleSignInButton
+                    clientId={googleConfig.clientId}
+                    onCredential={handleGoogleCredential}
+                    onError={handleGoogleError}
+                    disabled={loading || !campus}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex items-center my-2">
+              <div className="grow border-t border-neutral-200"></div>
+              <span className="px-3 text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Hoặc tài khoản quản trị</span>
+              <div className="grow border-t border-neutral-200"></div>
+            </div>
+
+            {/* Phần đăng nhập bằng Email / Mật khẩu */}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-bold text-[#2C2825]">
-                  Email
+                <label className="mb-1 block text-xs font-bold text-neutral-700">
+                  Email hệ thống
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="username@fpt.edu.vn hoặc email cá nhân"
+                  placeholder="admin@fpt.edu.vn"
                   required
-                  className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-2.5 text-xs outline-none transition focus:border-[#E65100] focus:bg-white"
+                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-xs text-neutral-800 outline-none transition focus:border-[#E65100] focus:bg-white focus:ring-2 focus:ring-orange-100"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-bold text-[#2C2825]">
+                <label className="mb-1 block text-xs font-bold text-neutral-700">
                   Mật khẩu
                 </label>
                 <div className="relative">
@@ -257,12 +274,12 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-2.5 pr-10 text-xs outline-none transition focus:border-[#E65100] focus:bg-white"
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 pr-10 text-xs text-neutral-800 outline-none transition focus:border-[#E65100] focus:bg-white focus:ring-2 focus:ring-orange-100"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer text-xs font-bold"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 focus:outline-none cursor-pointer text-xs font-bold"
                   >
                     {showPassword ? "Ẩn" : "Hiện"}
                   </button>
@@ -272,120 +289,51 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-[#E65100] py-3 text-xs font-bold text-white shadow-md transition-all hover:bg-[#D84315] disabled:opacity-50 cursor-pointer mt-1"
+                className="w-full rounded-xl bg-[#E65100] py-3 text-xs font-bold text-white shadow-md shadow-orange-200 transition-all hover:bg-[#D84315] active:scale-[0.99] disabled:opacity-50 cursor-pointer mt-1"
               >
-                {loading ? "Đang xử lý..." : "Đăng nhập"}
+                {loading ? "Đang xác thực..." : "Đăng nhập Quản trị / Điều phối"}
               </button>
             </form>
-
-            <div className="flex items-center my-2">
-              <div className="grow border-t border-[#E8E2D9]"></div>
-              <span className="px-3 text-[10px] text-[#9E958C] uppercase font-bold">Hoặc</span>
-              <div className="grow border-t border-[#E8E2D9]"></div>
-            </div>
-
-            {/* Đăng nhập Google Workspace: chọn campus rồi bấm nút Google */}
-            {googleConfig?.enabled ? (
-              <div className="space-y-2">
-                <select
-                  value={campus}
-                  onChange={(e) => setCampus(e.target.value)}
-                  className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-2.5 text-xs outline-none transition focus:border-[#E65100] focus:bg-white cursor-pointer"
-                >
-                  <option value="" disabled>
-                    Chọn campus để đăng nhập bằng Google
-                  </option>
-                  {campuses.map((c) => (
-                    <option key={c} value={c}>
-                      {CAMPUS_LABELS[c] || c}
-                    </option>
-                  ))}
-                </select>
-                <GoogleSignInButton
-                  clientId={googleConfig.clientId}
-                  onCredential={handleGoogleCredential}
-                  onError={handleGoogleError}
-                  disabled={loading || !campus}
-                />
-              </div>
-            ) : (
-              <p className="text-center text-[11px] text-[#9E958C]">
-                {googleConfig ? "Đăng nhập Google chưa được cấu hình trên máy chủ." : "Đang tải..."}
-              </p>
-            )}
-
-            <p className="text-center text-xs text-[#6B635B]">
-              Chưa có email trường?{" "}
-              <Link to="/register" className="font-bold text-[#E65100] hover:underline">
-                Đăng ký bằng email cá nhân
-              </Link>
-            </p>
           </div>
 
-          <div className="flex justify-between items-center text-[11px] text-[#9E958C] pt-4 border-t border-[#F0EBE1]">
-            <p>© 2026 MatchPoint FPT</p>
-            <a href="#privacy" className="hover:text-[#2C2825]">Chính sách bảo mật</a>
+          <div className="flex justify-between items-center text-[11px] text-neutral-400 pt-3 border-t border-neutral-100">
+            <p>© 2026 Đại học FPT</p>
+            <span className="font-medium">Phiên bản chính thức v2.9</span>
           </div>
         </div>
 
-        {/* CỘT PHẢI: Lịch trình đồ án trực quan */}
-        <div className="lg:col-span-6 bg-[#E65100]/95 backdrop-blur-md p-8 sm:p-10 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+        {/* CỘT PHẢI: Khung banner giới thiệu thương hiệu phong cách chuyên nghiệp */}
+        <div className="lg:col-span-6 bg-linear-to-br from-[#E65100] to-[#D84315] p-7 sm:p-9 text-white flex flex-col justify-between relative overflow-hidden shadow-inner">
+          {/* Họa tiết trang trí nền mờ */}
+          <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
 
           <div className="space-y-2 z-10">
-            <span className="px-3 py-1 bg-white/20 text-white text-[10px] font-bold rounded-lg uppercase tracking-wider inline-block">
-               MatchPoint FPT
+            <span className="px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-[10px] font-extrabold rounded-lg uppercase tracking-wider inline-block">
+               Cổng thông tin Capstone
             </span>
-            <h3 className="text-xl sm:text-1xl italic font-normal leading-snug tracking-tight">
-              Điểm kết nối, nơi các sinh viên tìm thấy mảnh ghép phù hợp cho đội của mình
+            <h3 className="text-xl sm:text-2xl font-black leading-snug tracking-tight">
+              Hệ thống ghép nhóm Đồ án tốt nghiệp chuyên ngành
             </h3>
           </div>
 
-          <div className="my-4 z-10 space-y-3">
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 shadow-md">
-                1
-              </div>
-              <div>
-                <h4 className="font-extrabold text-xs">Quản lý điều kiện sinh viên</h4>
-                <p className="text-[11px] text-orange-100">Import danh sách đầu kỳ · Kiểm tra điều kiện · Quản lý cờ không đủ điều kiện</p>
-              </div>
+          <div className="my-5 z-10 space-y-3">
+            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-sm">
+              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">✓</div>
+              <p className="text-xs font-medium leading-relaxed">Ghép nhóm chuyên ngành khép kín đảm bảo tính chính xác cao.</p>
             </div>
-
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 shadow-md">
-                2
-              </div>
-              <div>
-                <h4 className="font-extrabold text-xs">Tạo nhóm & quản lý thành viên</h4>
-                <p className="text-[11px] text-orange-100">Tạo nhóm · Phân công Leader · Quy mô hợp lệ từ 3–5 thành viên</p>
-              </div>
+            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-sm">
+              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">✓</div>
+              <p className="text-xs font-medium leading-relaxed">Quy mô nhóm chuẩn mực từ 3 đến 5 thành viên chính thức.</p>
             </div>
-
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 shadow-md">
-                3
-              </div>
-              <div>
-                <h4 className="font-extrabold text-xs">Tuyển thành viên vào nhóm</h4>
-                <p className="text-[11px] text-orange-100">Apply vào nhóm · Gửi lời mời · Duyệt hoặc từ chối · Chấp nhận hoặc thu hồi</p>
-              </div>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 shadow-md">
-                4
-              </div>
-              <div>
-                <h4 className="font-extrabold text-xs">Quản lý thay đổi nhóm</h4>
-                <p className="text-[11px] text-orange-100">Xin rời nhóm · Xóa thành viên · Thay đổi Leader · Admin can thiệp khi cần</p>
-              </div>
+            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-sm">
+              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">✓</div>
+              <p className="text-xs font-medium leading-relaxed">Điều phối và kiểm duyệt minh bạch toàn bộ học kỳ bởi Moderator.</p>
             </div>
           </div>
 
-          <div className="z-10 text-[11px] text-orange-100/90 font-medium flex justify-between items-center pt-2 border-t border-white/20">
-            <span>© 2026 MatchPoint FPT</span>
-            <span>Đại học FPT TP.HCM</span>
+          <div className="z-10 text-[11px] text-orange-100 font-semibold flex items-center justify-between">
+            <span>MatchPoint FPT University</span>
+            <span>Hệ thống quản lý khép kín</span>
           </div>
         </div>
 

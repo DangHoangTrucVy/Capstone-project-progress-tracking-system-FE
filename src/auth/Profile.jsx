@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { getCurrentUser } from "../services/authService";
 
@@ -10,8 +9,7 @@ const roleLabels = {
   STUDENT: "Sinh viên",
   GROUP_LEADER: "Nhóm trưởng",
   LEADER: "Nhóm trưởng",
-  RESCUE_COORDINATOR: "Điều phối viên",
-  MANAGER: "Quản lý",
+  MODERATOR: "Giảng viên điều phối",
 };
 
 function InfoField({ label, value, icon }) {
@@ -125,7 +123,7 @@ export default function Profile() {
                 Hồ sơ cá nhân
               </h1>
               <p className="mt-2 text-sm leading-6 text-[#786B61]">
-                Thông tin định danh và vai trò trong hệ thống MatchPoint FPT.
+                Thông tin định danh và vai trò trong hệ thống MatchPoint FPT Capstone.
               </p>
             </div>
           </div>
@@ -204,9 +202,9 @@ export default function Profile() {
                     🏛
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-[#8A7768]">Khoa / Bộ môn</p>
+                    <p className="text-xs text-[#8A7768]">Ngành (Major)</p>
                     <p className="mt-1 text-sm font-bold">
-                      Khoa Công nghệ thông tin
+                      {user?.major || user?.majorName || "Chưa cập nhật ngành"}
                     </p>
                   </div>
                 </div>
@@ -249,10 +247,10 @@ export default function Profile() {
                 </span>
                 <div>
                   <p className="text-sm font-bold text-[#C94A08]">
-                    Bio & thông tin tài khoản
+                    Thông tin hồ sơ Capstone
                   </p>
                   <p className="mt-1 text-xs leading-5 text-[#786B61]">
-                    Các thông tin dưới đây được lấy từ tài khoản hiện tại. Liên hệ Admin nếu cần điều chỉnh dữ liệu.
+                    Dữ liệu được đồng bộ từ danh sách do Phòng Đào Tạo cung cấp.
                   </p>
                 </div>
               </div>
@@ -275,6 +273,12 @@ export default function Profile() {
                 label="Email hệ thống"
                 value={user?.email}
                 icon="✉"
+              />
+
+              <InfoField
+                label="Ngành (Major)"
+                value={user?.major || user?.majorName}
+                icon="🏛"
               />
 
               <div className="min-w-0 rounded-xl border border-[#F0E7DE] bg-[#FBF9F5] p-4 transition hover:border-[#F3B58C] hover:bg-[#FFF9F3] sm:p-5">
@@ -311,17 +315,11 @@ export default function Profile() {
                 value={displayRole}
                 icon="♛"
               />
-
-              <InfoField
-                label="Khoa / Bộ môn"
-                value="Khoa Công nghệ thông tin"
-                icon="🏛"
-              />
             </div>
 
             <div className="mt-6 flex items-center gap-2 border-t border-[#EEE5DC] pt-5 text-xs text-[#8A7768]">
               <span className="h-2 w-2 rounded-full bg-[#E65100]" />
-              Thông tin hồ sơ chỉ dùng để xem.
+              Thông tin cấu hình theo phạm vi ngành Capstone.
             </div>
           </section>
         </div>

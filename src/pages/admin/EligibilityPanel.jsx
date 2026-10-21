@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  importEligibilityJson,
-  importEligibilityFile,
   getImportedStudents,
   updateStudentEligibility,
 } from "../../services/eligibilityService";

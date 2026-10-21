@@ -8,11 +8,12 @@ const Home = () => {
   const rolesData = [
     {
       title: "Student & Leader",
-      heading: "Quản lý nhóm và tham gia đợt đồ án",
+      heading: "Đăng nhập Google & Quản lý nhóm đồ án",
       features: [
-        "Kiểm tra trạng thái đủ điều kiện và nhận cờ từ Phòng đào tạo",
-        "Tạo nhóm mới (quy mô 3–5 người) hoặc gửi đơn Apply (tối đa 3 đơn chờ)",
-        "Nhận lời mời (Invite), quản lý thành viên và xin rời/kick trước khi khóa danh sách",
+        "Đăng nhập trực tiếp bằng tài khoản Google (danh sách import từ phòng đào tạo)",
+        "Kiểm tra trạng thái đủ điều kiện (tín chỉ tích lũy >= 80%)",
+        "Tạo nhóm mới (quy mô 3–5 người) hoặc gửi tối đa 3 đơn Apply đang chờ",
+        "Quản lý thành viên, nhận Invite và xin rời nhóm an toàn",
       ],
       btnText: "Đăng nhập với vai trò Student / Leader",
       link: "/login",
@@ -21,65 +22,34 @@ const Home = () => {
       title: "Admin",
       heading: "Quản trị hệ thống và cấu hình đầu kỳ",
       features: [
-        "Import danh sách sinh viên và quản lý cờ điều kiện tham gia",
-        "Cấu hình thời hạn đơn Apply và Invite (mặc định 48 giờ)",
-        "Can thiệp chỉnh sửa danh sách nhóm và thay đổi Leader sau khi đã khóa",
+        "Import danh sách sinh viên & điều kiện bằng file Excel/CSV",
+        "Cấu hình mốc thời gian, học kỳ và phân công Moderator",
+        "Can thiệp chỉnh sửa danh sách nhóm, thay đổi Leader sau khi khóa",
       ],
       btnText: "Đăng nhập với vai trò Admin",
       link: "/login",
     },
     {
-      title: "Moderator chính",
-      heading: "Quản trị & Kiểm duyệt viên cấp cao",
+      title: "Moderator & Sub moderator",
+      heading: "Kiểm duyệt và Hướng dẫn đồ án",
       features: [
         "Quản lý toàn bộ hệ thống kiểm duyệt và hoạt động nhóm",
-        "Phân quyền, theo dõi và giám sát đội ngũ Sub moderator",
-        "Xử lý các khiếu nại, tranh chấp và vi phạm lớn của sinh viên",
+        "Theo dõi tiến độ, đặt lịch hẹn tư vấn 1:1 và Pre-meeting",
+        "Xử lý các khiếu nại, tranh chấp và xét duyệt danh sách finalized",
       ],
-      btnText: "Đăng nhập với vai trò Moderator chính",
-      link: "/login",
-    },
-    {
-      title: "Sub moderator",
-      heading: "Kiểm duyệt viên hỗ trợ",
-      features: [
-        "Hỗ trợ kiểm duyệt thông tin đăng ký và trạng thái nhóm",
-        "Tiếp nhận và xử lý các báo cáo, thắc mắc từ sinh viên",
-        "Theo dõi tiến độ và báo cáo công việc cho Moderator chính",
-      ],
-      btnText: "Đăng nhập với vai trò Sub moderator",
+      btnText: "Đăng nhập với vai trò Moderator",
       link: "/login",
     },
   ];
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] text-[#2C2825] font-sans antialiased selection:bg-[#E65100] selection:text-white overflow-x-hidden">
-      <style>{`
-                @keyframes float-slow {
-                    0%, 100% { transform: translateY(0px) rotate(-1deg); }
-                    50% { transform: translateY(-8px) rotate(-1deg); }
-                }
-                @keyframes float-badge-left {
-                    0%, 100% { transform: translateY(0px) rotate(-6deg); }
-                    50% { transform: translateY(-6px) rotate(-6deg); }
-                }
-                @keyframes float-badge-right {
-                    0%, 100% { transform: translateY(0px) rotate(3deg); }
-                    50% { transform: translateY(-7px) rotate(3deg); }
-                }
-                .animate-float-main { animation: float-slow 6s ease-in-out infinite; }
-                .animate-float-badge-1 { animation: float-badge-left 5s ease-in-out infinite 0.5s; }
-                .animate-float-badge-2 { animation: float-badge-right 5.5s ease-in-out infinite 1s; }
-            `}</style>
-
       {/* 1. Header / Navigation */}
       <header className="bg-[#FBF9F5]/90 backdrop-blur-md border-b border-[#E8E2D9] sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3 group cursor-pointer">
             <div className="w-10 h-10 bg-[#E65100] rounded-2xl flex items-center justify-center text-white font-bold shadow-md group-hover:scale-105 transition-transform">
-              <div className="w-5 h-5 border-2 border-white rounded-lg flex items-center justify-center text-[10px]">
-                ✓
-              </div>
+              ✓
             </div>
             <span className="font-extrabold text-xl text-[#2C2825] tracking-tight group-hover:text-[#E65100] transition-colors">
               MatchPoint FPT
@@ -87,16 +57,10 @@ const Home = () => {
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#6B635B]">
-            <a
-              href="#tinh-nang"
-              className="hover:text-[#E65100] transition-colors"
-            >
+            <a href="#tinh-nang" className="hover:text-[#E65100] transition-colors">
               Tính năng
             </a>
-            <a
-              href="#danh-cho-ai"
-              className="hover:text-[#E65100] transition-colors"
-            >
+            <a href="#danh-cho-ai" className="hover:text-[#E65100] transition-colors">
               Dành cho ai
             </a>
           </nav>
@@ -118,16 +82,15 @@ const Home = () => {
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F5EBE1] text-[#E65100] text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#E65100] animate-pulse"></span>
-              Quản lý sinh viên từ lập nhóm đến bảo vệ
+              Hệ thống quản lý ghép nhóm Capstone Project v2.9
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-black text-[#2C2825] leading-[1.15] tracking-tight">
               MatchPoint FPT
-      
             </h1>
 
             <p className="text-[#6B635B] text-base leading-relaxed max-w-lg">
-              Điểm kết nối, nơi các sinh viên tìm thấy mảnh ghép phù hợp cho đội của mình.
+              Điểm kết nối chính thức, hỗ trợ sinh viên CNTT Đại học FPT tìm kiếm mảnh ghép hoàn hảo và quản lý đồ án tốt nghiệp minh bạch.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -144,16 +107,16 @@ const Home = () => {
             <div className="absolute w-72 h-72 bg-linear-to-br from-amber-200/40 via-orange-300/30 to-transparent rounded-full blur-3xl pointer-events-none"></div>
 
             <div className="relative w-full max-w-125">
-              <div className="absolute -top-6 -left-4 z-20 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-[0_12px_28px_rgba(0,0,0,0.08)] border border-slate-100 flex items-center gap-2.5 animate-float-badge-1">
+              <div className="absolute -top-6 -left-4 z-20 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-[0_12px_28px_rgba(0,0,0,0.08)] border border-slate-100 flex items-center gap-2.5">
                 <div className="w-6 h-6 rounded-full bg-[#E8F5E9] flex items-center justify-center text-[#2E7D32] text-xs font-bold">
                   ✓
                 </div>
                 <span className="text-xs font-bold text-[#2C2825]">
-                  Đã duyệt thành viên nhóm
+                  Trạng thái Finalized (Cấp nhóm)
                 </span>
               </div>
 
-              <div className="bg-white/90 backdrop-blur-sm rounded-[2.5rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-[#F0ECE6] animate-float-main space-y-7 relative z-10">
+              <div className="bg-white/90 backdrop-blur-sm rounded-[2.5rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-[#F0ECE6] space-y-7 relative z-10">
                 <div className="flex justify-end gap-1.5 pr-1">
                   <span className="w-2 h-2 rounded-full bg-[#E8E2D9]"></span>
                   <span className="w-2 h-2 rounded-full bg-[#E8E2D9]"></span>
@@ -196,7 +159,7 @@ const Home = () => {
         <ScrollReveal delay={100}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-20 border-t border-[#E8E2D9] mt-16 text-center">
             <div className="group cursor-default">
-              <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
+              <div className="text-3xl sm:text-4xl font-black text-[#E65100]">
                 3–5
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
@@ -204,7 +167,7 @@ const Home = () => {
               </div>
             </div>
             <div className="group cursor-default">
-              <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
+              <div className="text-3xl sm:text-4xl font-black text-[#E65100]">
                 3
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
@@ -212,7 +175,7 @@ const Home = () => {
               </div>
             </div>
             <div className="group cursor-default">
-              <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
+              <div className="text-3xl sm:text-4xl font-black text-[#E65100]">
                 48h
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
@@ -220,11 +183,11 @@ const Home = () => {
               </div>
             </div>
             <div className="group cursor-default">
-              <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
-                4
+              <div className="text-3xl sm:text-4xl font-black text-[#E65100]">
+                Google
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Vai trò quản lý hệ thống
+                OAuth cho sinh viên
               </div>
             </div>
           </div>
@@ -233,10 +196,7 @@ const Home = () => {
 
       {/* 3. Features Section */}
       <ScrollReveal delay={100}>
-        <section
-          id="tinh-nang"
-          className="py-20 bg-white border-y border-[#E8E2D9]"
-        >
+        <section id="tinh-nang" className="py-20 bg-white border-y border-[#E8E2D9]">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center max-w-2xl mx-auto mb-16 space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-[#E65100]">
@@ -256,7 +216,7 @@ const Home = () => {
                   Kiểm tra điều kiện & Cờ
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Phòng đào tạo import danh sách, gắn cờ sinh viên không đủ điều kiện tham gia đầu kỳ.
+                  Tự động đánh giá tiêu chí tích lũy tín chỉ và gắn cờ ineligible từ phòng đào tạo.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
@@ -275,10 +235,10 @@ const Home = () => {
                   📨
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Đơn Apply & Invite
+                  Đơn Apply & Vote
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Quản lý tối đa 3 đơn Apply đang chờ, gửi lời mời trực tiếp và xem hồ sơ riêng tư của ứng viên.
+                  Quản lý tối đa 3 đơn Apply đang chờ, biểu quyết ý kiến thành viên và gửi lời mời qua MSSV.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
@@ -286,10 +246,10 @@ const Home = () => {
                   ⚙️
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Quản trị viên (Admin)
+                  Quản trị viên & Moderator
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Cấu hình thời hạn hệ thống, can thiệp thay đổi nhân sự và xử lý các trường hợp đặc biệt sau khóa danh sách.
+                  Cấu hình học kỳ, xuất báo cáo Excel bàn giao với mức cô lập giao dịch và quản lý trạng thái Finalized nhóm.
                 </p>
               </div>
             </div>
@@ -299,10 +259,7 @@ const Home = () => {
 
       {/* 4. Target Roles Section */}
       <ScrollReveal delay={100}>
-        <section
-          id="danh-cho-ai"
-          className="py-20 bg-white border-t border-[#E8E2D9]"
-        >
+        <section id="danh-cho-ai" className="py-20 bg-white border-t border-[#E8E2D9]">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center max-w-2xl mx-auto mb-16 space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-[#E65100]">
@@ -314,8 +271,7 @@ const Home = () => {
             </div>
 
             <div className="max-w-6xl mx-auto px-4">
-              {/* Đã mở rộng sang 3 cột (md:grid-cols-2 lg:grid-cols-3) để hiển thị hoàn hảo 4 role */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {rolesData.map((role, index) => {
                   const isHovered = hoveredRole === index;
                   return (
@@ -338,8 +294,7 @@ const Home = () => {
                         <ul className="space-y-2.5 text-xs text-[#6B635B]">
                           {role.features.map((feature, fIndex) => (
                             <li key={fIndex} className="flex items-start gap-2">
-                              <span className="text-[#E65100]">✓</span>{" "}
-                              {feature}
+                              <span className="text-[#E65100]">✓</span> {feature}
                             </li>
                           ))}
                         </ul>
@@ -362,31 +317,20 @@ const Home = () => {
       {/* 5. Footer */}
       <footer className="py-10 border-t border-[#E8E2D9] bg-[#FDFBF7] text-[#6B635B] text-xs">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Thông tin bên trái */}
           <div className="flex items-center gap-3 text-center md:text-left">
-            <span className="font-bold text-[#2C2825]"> MatchPoint FPT</span>
+            <span className="font-bold text-[#2C2825]">MatchPoint FPT</span>
             <span className="text-[#E8E2D9] hidden md:inline">|</span>
             <p>© 2026 MatchPoint · Đại học FPT</p>
           </div>
 
-          {/* Các liên kết hoặc điều hướng phụ bên phải */}
           <div className="flex items-center gap-6 font-medium">
-            <Link
-              to="/support"
-              className="hover:text-[#E65100] transition-colors"
-            >
+            <Link to="/support" className="hover:text-[#E65100] transition-colors">
               Hỗ trợ
             </Link>
-            <Link
-              to="/privacy"
-              className="hover:text-[#E65100] transition-colors"
-            >
+            <Link to="/privacy" className="hover:text-[#E65100] transition-colors">
               Chính sách
             </Link>
-            <Link
-              to="/contact"
-              className="hover:text-[#E65100] transition-colors"
-            >
+            <Link to="/contact" className="hover:text-[#E65100] transition-colors">
               Liên hệ
             </Link>
           </div>

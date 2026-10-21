@@ -1,36 +1,62 @@
 import api from "./api";
 
-// PUT /api/v1/eligibility/{userId}
-export const updateStudentEligibility = async (userId, data) => {
-    const response = await api.put(`/eligibility/${userId}`, data);
+// Lấy danh sách sinh viên đã import / không đủ điều kiện
+export const getImportedStudents = async (semester) => {
+    const response = await api.get(`/semesters/${semester}/students`);
     return response.data;
 };
 
-// POST /api/v1/eligibility/import
-export const importEligibilityJson = async (data) => {
-    const response = await api.post("/eligibility/import", data);
+export const getIneligibleStudents = async () => {
+    const response = await api.get(`/semesters/ineligible-students`);
     return response.data;
 };
 
-// POST /api/v1/eligibility/import/file
-export const importEligibilityFile = async (formData) => {
-    const response = await api.post("/eligibility/import/file", formData, {
+// Cập nhật trạng thái đủ/không đủ điều kiện cho sinh viên
+export const updateStudentEligibility = async (studentId, data) => {
+    const response = await api.put(`/students/${studentId}/eligibility`, data);
+    return response.data;
+};
+
+// Preview student list file: POST /api/v1/semesters/{semester}/imports/students/preview
+export const previewStudentImport = async (semester, formData) => {
+    const response = await api.post(`/semesters/${semester}/imports/students/preview`, formData, {
         headers: { "Content-Type": undefined },
     });
     return response.data;
 };
 
-export const getImportedStudents = async (params) =>
-    (await api.get('/eligibility/students', { params })).data;
-
-// GET /api/v1/eligibility/me
-export const getMyEligibilityStatus = async () => {
-    const response = await api.get("/eligibility/me");
+// Import students: POST /api/v1/semesters/{semester}/imports/students
+export const importStudents = async (semester, formData) => {
+    const response = await api.post(`/semesters/${semester}/imports/students`, formData, {
+        headers: { "Content-Type": undefined },
+    });
     return response.data;
 };
 
-// GET /api/v1/eligibility/ineligible
-export const getIneligibleStudents = async () => {
-    const response = await api.get("/eligibility/ineligible");
+// Preview eligibility file: POST /api/v1/semesters/{semester}/imports/eligibility/preview
+export const previewEligibilityImport = async (semester, formData) => {
+    const response = await api.post(`/semesters/${semester}/imports/eligibility/preview`, formData, {
+        headers: { "Content-Type": undefined },
+    });
+    return response.data;
+};
+
+// Import eligibility: POST /api/v1/semesters/{semester}/imports/eligibility
+export const importEligibility = async (semester, formData) => {
+    const response = await api.post(`/semesters/${semester}/imports/eligibility`, formData, {
+        headers: { "Content-Type": undefined },
+    });
+    return response.data;
+};
+
+// Change a student's eligibility with a reason: PUT /api/v1/enrollments/{enrollmentId}/eligibility
+export const updateEnrollmentEligibility = async (enrollmentId, data) => {
+    const response = await api.put(`/enrollments/${enrollmentId}/eligibility`, data);
+    return response.data;
+};
+
+// Edit student contact details: PUT /api/v1/semester-students/{semesterStudentId}
+export const updateStudentContact = async (semesterStudentId, data) => {
+    const response = await api.put(`/semester-students/${semesterStudentId}`, data);
     return response.data;
 };
