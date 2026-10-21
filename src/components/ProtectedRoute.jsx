@@ -10,6 +10,7 @@ const normalizeRole = (value) =>
 const roleGroups = {
   STUDENT: ['STUDENT', 'LEADER', 'GROUP_LEADER'], // <-- Bổ sung STUDENT vào đây
   ADMIN: ['ADMIN', 'SYSTEM_ADMIN'],
+  MODERATOR: ['MODERATOR', 'LECTURER'],
 };
 
 const acceptedRoles = new Set(
