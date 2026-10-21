@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { getMyProfile, updateMyProfile } from "../../services/userService";
 import {
-  getAllGroups,
+  getSubjectsBySemester,
+  getOpenGroupsBySubject,
   applyToGroup,
   getMyApplications,
-  withdrawApplication,
+  withdrawRequest, // Dùng withdrawRequest thay cho withdrawApplication
   getMyInvites,
-  acceptInvite,
-  declineInvite,
+  acceptRequest,   // Dùng acceptRequest thay cho acceptInvite
+  rejectRequest,
 } from "../../services/groupService";
 
 export default function StudentProfileAndApply({ onJoinedGroup }) {
@@ -16,6 +17,8 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     weaknesses: "",
     skills: "",
   });
+  const [subjects, setSubjects] = useState([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [groups, setGroups] = useState([]);
   const [myApps, setMyApps] = useState([]);
   const [myInvites, setMyInvites] = useState([]);
@@ -36,48 +39,62 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     setConfirmDialog({ title, message, onConfirm });
   };
 
-  const fetchData = async () => {
-    try {
-      const [profileRes, groupsRes, appsRes, invitesRes] = await Promise.all([
-        getMyProfile().catch(() => ({})),
-        getAllGroups().catch(() => []),
-        getMyApplications().catch(() => []),
-        getMyInvites().catch(() => []),
-      ]);
-
-      setProfile(
-        profileRes?.data ||
-          profileRes || { strengths: "", weaknesses: "", skills: "" },
-      );
-
-      const groupList = groupsRes?.content || groupsRes || [];
-
-      // Lọc trực tiếp từ danh sách nhóm công khai và hỗ trợ lấy số lượng thành viên linh hoạt
-      setGroups(
-        groupList.filter((g) => {
-          const count =
-            g.memberCount ??
-            g.numberOfMembers ??
-            g.currentMembers ??
-            g.totalMembers ??
-            (Array.isArray(g.members) ? g.members.length : 0) ??
-            (Array.isArray(g.studentIds) ? g.studentIds.length : 0);
-          return count < 5;
-        }),
-      );
-
-      setMyApps(appsRes?.content || appsRes || []);
-      setMyInvites(invitesRes?.content || invitesRes || []);
-    } catch (err) {
-      console.error("Lỗi tải dữ liệu profile và đơn:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
+    const fetchInit = async () => {
+      try {
+        const [profileRes, appsRes, invitesRes] = await Promise.all([
+          getMyProfile().catch(() => ({})),
+          getMyApplications().catch(() => []),
+          getMyInvites().catch(() => []),
+        ]);
+
+        setProfile(
+          profileRes?.data ||
+            profileRes || { strengths: "", weaknesses: "", skills: "" },
+        );
+        setMyApps(appsRes?.content || appsRes || []);
+        setMyInvites(invitesRes?.content || invitesRes || []);
+
+        // Mặc định lấy danh sách môn học của học kỳ hiện tại (VD: Fall2026)
+        const subRes = await getSubjectsBySemester("Fall2026").catch(() => []);
+        const subList = Array.isArray(subRes) ? subRes : subRes?.content || [];
+        setSubjects(subList);
+        if (subList.length > 0) {
+          setSelectedSubjectId(subList[0].id || subList[0].subjectId);
+        }
+      } catch (err) {
+        console.error("Lỗi khởi tạo dữ liệu profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInit();
   }, []);
+
+  // Khi chọn môn học, tải danh sách nhóm mở của môn đó theo đúng chuẩn Swagger GET /api/v1/subjects/{subjectId}/open-groups
+  useEffect(() => {
+    if (selectedSubjectId) {
+      const fetchGroups = async () => {
+        try {
+          const res = await getOpenGroupsBySubject(selectedSubjectId).catch(() => []);
+          const groupList = Array.isArray(res) ? res : res?.content || [];
+          setGroups(
+            groupList.filter((g) => {
+              const count =
+                g.memberCount ??
+                g.numberOfMembers ??
+                (Array.isArray(g.members) ? g.members.length : 0);
+              return count < 5;
+            }),
+          );
+        } catch (err) {
+          console.error("Lỗi tải danh sách nhóm mở:", err);
+          setGroups([]);
+        }
+      };
+      fetchGroups();
+    }
+  }, [selectedSubjectId]);
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -106,12 +123,10 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
       message: "Bạn có chắc muốn gửi đơn ứng tuyển vào nhóm này không?",
       onConfirm: async () => {
         try {
-          await applyToGroup(groupId, {
-            message: "Xin gia nhập nhóm.",
-          });
-
+          await applyToGroup(groupId, { message: "Xin gia nhập nhóm." });
           showToast("Gửi đơn Apply thành công!", "success");
-          await fetchData();
+          const appsRes = await getMyApplications().catch(() => []);
+          setMyApps(appsRes?.content || appsRes || []);
         } catch (err) {
           showToast(
             err.response?.data?.message || "Không thể gửi đơn Apply.",
@@ -129,14 +144,11 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
       onConfirm: async () => {
         try {
           await withdrawApplication(appId);
-
           showToast("Đã rút đơn thành công!", "success");
-          await fetchData();
+          const appsRes = await getMyApplications().catch(() => []);
+          setMyApps(appsRes?.content || appsRes || []);
         } catch (err) {
-          showToast(
-            err.response?.data?.message || "Không thể rút đơn.",
-            "error",
-          );
+          showToast(err.response?.data?.message || "Không thể rút đơn.", "error");
         }
       },
     });
@@ -145,28 +157,21 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   const handleAcceptInvite = async (inviteId, groupId) => {
     try {
       await acceptInvite(inviteId);
-
       showToast("Đã chấp nhận lời mời vào nhóm!", "success");
-
       if (onJoinedGroup) {
         await onJoinedGroup(groupId);
       }
     } catch (err) {
-      console.error("Accept invite error:", err?.response?.data || err);
-
-      showToast(
-        err.response?.data?.message || "Không thể chấp nhận lời mời.",
-        "error",
-      );
+      showToast(err.response?.data?.message || "Không thể chấp nhận lời mời.", "error");
     }
   };
 
   const handleDeclineInvite = async (inviteId) => {
     try {
       await declineInvite(inviteId);
-
       showToast("Đã từ chối lời mời.", "success");
-      await fetchData();
+      const invitesRes = await getMyInvites().catch(() => []);
+      setMyInvites(invitesRes?.content || invitesRes || []);
     } catch (err) {
       showToast(err.response?.data?.message || "Thực hiện thất bại.", "error");
     }
@@ -185,19 +190,14 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
       {/* 1. Phần Quản lý Profile cá nhân */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div>
-          <h2 className="text-base font-black">
-            Hồ sơ năng lực (Profile cá nhân)
-          </h2>
+          <h2 className="text-base font-black">Hồ sơ năng lực (Profile cá nhân)</h2>
           <p className="text-xs text-[#6B635B]">
-            Ghi rõ thế mạnh kỹ năng, ưu điểm và nhược điểm để các Trưởng nhóm
-            xem xét khi bạn apply.
+            Ghi rõ thế mạnh kỹ năng, ưu điểm và nhược điểm để các Trưởng nhóm xem xét khi bạn apply.
           </p>
         </div>
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-bold">
-              Thế mạnh kỹ năng, ưu điểm & nhược điểm
-            </label>
+            <label className="text-xs font-bold">Thế mạnh kỹ năng, ưu điểm & nhược điểm</label>
             <textarea
               rows={4}
               value={profile.skills || ""}
@@ -209,7 +209,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                   weaknesses: e.target.value,
                 })
               }
-              placeholder="VD: Thế mạnh: ReactJS, NodeJS. Ưu điểm: Chăm chỉ, đúng giờ. Nhược điểm: Còn rụt rè khi thuyết trình..."
+              placeholder="VD: Thế mạnh: ReactJS, NodeJS. Ưu điểm: Chăm chỉ, đúng giờ..."
               className="w-full p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100]"
             />
           </div>
@@ -231,30 +231,17 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
           </h3>
           <div className="space-y-3">
             {myInvites.map((inv) => (
-              <div
-                key={inv.id}
-                className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200 flex justify-between items-center text-xs"
-              >
+              <div key={inv.id} className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200 flex justify-between items-center text-xs">
                 <div>
-                  <p className="font-bold">
-                    Nhóm: {inv.groupCode || inv.groupId}
-                  </p>
-                  <p className="text-[#6B635B]">
-                    Trưởng nhóm đã gửi lời mời bạn tham gia.
-                  </p>
+                  <p className="font-bold">Nhóm: {inv.groupCode || inv.groupId}</p>
+                  <p className="text-[#6B635B]">Trưởng nhóm đã gửi lời mời bạn tham gia.</p>
                 </div>
                 {inv.status === "PENDING" ? (
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleAcceptInvite(inv.id, inv.groupId)}
-                      className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer"
-                    >
+                    <button onClick={() => handleAcceptInvite(inv.id, inv.groupId)} className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl cursor-pointer">
                       Chấp nhận
                     </button>
-                    <button
-                      onClick={() => handleDeclineInvite(inv.id)}
-                      className="px-4 py-2 bg-gray-100 text-red-600 font-bold rounded-xl cursor-pointer"
-                    >
+                    <button onClick={() => handleDeclineInvite(inv.id)} className="px-4 py-2 bg-gray-100 text-red-600 font-bold rounded-xl cursor-pointer">
                       Từ chối
                     </button>
                   </div>
@@ -267,58 +254,23 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
         </div>
       )}
 
-      {/* 3. Danh sách đơn Apply đang chờ (Tối đa 3) */}
+      {/* 3. Danh sách đơn Apply đang chờ */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-xs font-black uppercase text-[#6B635B]">
-            Đơn Apply của tôi (
-            {myApps.filter((app) => app.status === "PENDING").length}/3 đơn đang
-            chờ)
-          </h3>
-        </div>
+        <h3 className="text-xs font-black uppercase text-[#6B635B]">
+          Đơn Apply của tôi ({myApps.filter((app) => app.status === "PENDING").length}/3 đơn đang chờ)
+        </h3>
         {myApps.length > 0 ? (
           <div className="space-y-3">
             {myApps.map((app) => (
-              <div
-                key={app.id}
-                className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs"
-              >
+              <div key={app.id} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs">
                 <div>
-                  <p className="font-bold">
-                    Mã nhóm ứng tuyển: {app.groupCode || app.groupId}
-                  </p>
+                  <p className="font-bold">Mã nhóm ứng tuyển: {app.groupCode || app.groupId}</p>
                   <p className="text-[11px] text-[#6B635B]">
-                    Trạng thái:{" "}
-                    <strong
-                      className={
-                        String(app.status).toUpperCase() === "REJECTED"
-                          ? "text-red-600"
-                          : "text-orange-600"
-                      }
-                    >
-                      {app.status || "PENDING"}
-                    </strong>
+                    Trạng thái: <strong className="text-orange-600">{app.status || "PENDING"}</strong>
                   </p>
-
-                  {/* Hiển thị lý do nếu đơn bị từ chối */}
-                  {String(app.status).toUpperCase() === "REJECTED" &&
-                    (app.reason || app.message) && (
-                      <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl">
-                        <p className="text-[11px] font-black text-red-700 mb-1">
-                          ❌ Lý do từ chối
-                        </p>
-
-                        <p className="text-[11px] text-red-600 leading-relaxed">
-                          {app.reason || app.message}
-                        </p>
-                      </div>
-                    )}
                 </div>
                 {String(app.status).toUpperCase() === "PENDING" && (
-                  <button
-                    onClick={() => handleWithdraw(app.id)}
-                    className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg cursor-pointer hover:bg-red-100"
-                  >
+                  <button onClick={() => handleWithdraw(app.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg cursor-pointer">
                     Rút đơn
                   </button>
                 )}
@@ -326,147 +278,75 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[#6B635B] italic">
-            Bạn chưa gửi đơn apply vào nhóm nào.
-          </p>
+          <p className="text-xs text-[#6B635B] italic">Bạn chưa gửi đơn apply vào nhóm nào.</p>
         )}
       </div>
 
-      {/* 4. Danh sách các nhóm để chọn và Apply */}
+      {/* 4. Chọn môn học để xem danh sách nhóm mở và Apply */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-        <h3 className="text-xs font-black uppercase text-[#6B635B]">
-          Danh sách nhóm đang tuyển thành viên ({groups.length})
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {groups.map((g) => {
-            const memberCount =
-              g.memberCount ??
-              g.numberOfMembers ??
-              g.currentMembers ??
-              g.totalMembers ??
-              (Array.isArray(g.members) ? g.members.length : 0) ??
-              (Array.isArray(g.studentIds) ? g.studentIds.length : 0);
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h3 className="text-xs font-black uppercase text-[#6B635B]">
+            Danh sách nhóm đang tuyển theo môn học
+          </h3>
+          <select
+            value={selectedSubjectId}
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+            className="p-2 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
+          >
+            {subjects.map((sub) => {
+              const subId = sub.id || sub.subjectId;
+              const subName = sub.name || sub.code || subId;
+              return (
+                <option key={subId} value={subId}>
+                  {subName}
+                </option>
+              );
+            })}
+          </select>
+        </div>
 
-            return (
-              <div
-                key={g.id}
-                className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs"
-              >
-                <div>
-                  <p className="font-black text-sm">{g.groupCode}</p>
-                  <p className="text-[11px] text-[#6B635B]">
-                    Thành viên:{" "}
-                    <strong className="text-[#2C2825]">
-                      {memberCount}/5 người
-                    </strong>
-                  </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {groups.length > 0 ? (
+            groups.map((g) => {
+              const memberCount = g.memberCount ?? g.numberOfMembers ?? (Array.isArray(g.members) ? g.members.length : 0);
+              return (
+                <div key={g.id} className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs">
+                  <div>
+                    <p className="font-black text-sm">{g.groupCode}</p>
+                    <p className="text-[11px] text-[#6B635B]">Thành viên: <strong>{memberCount}/5 người</strong></p>
+                  </div>
+                  <button onClick={() => handleApply(g.id)} className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl shadow-md cursor-pointer hover:bg-[#D84315]">
+                    Gửi đơn Apply
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleApply(g.id)}
-                  className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl shadow-md cursor-pointer hover:bg-[#D84315]"
-                >
-                  Gửi đơn Apply
-                </button>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <p className="text-xs text-[#6B635B] italic col-span-2">Không có nhóm nào đang mở tuyển trong môn học này.</p>
+          )}
         </div>
       </div>
-      {/* TOAST NOTIFICATION */}
+
+      {/* TOAST & CONFIRM MODAL */}
       {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed right-5 top-5 z-100 w-[calc(100%-2.5rem)] max-w-sm animate-fadeIn"
-        >
-          <div
-            className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${
-              toast.type === "error" ? "border-red-200" : "border-emerald-200"
-            }`}
-          >
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg font-black ${
-                toast.type === "error"
-                  ? "bg-red-50 text-red-600"
-                  : "bg-emerald-50 text-emerald-600"
-              }`}
-            >
-              {toast.type === "error" ? "×" : "✓"}
-            </div>
-
+        <div role="status" aria-live="polite" className="fixed right-5 top-5 z-100 w-[calc(100%-2.5rem)] max-w-sm animate-fadeIn">
+          <div className={`flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-xl ${toast.type === "error" ? "border-red-200" : "border-emerald-200"}`}>
             <div className="min-w-0 flex-1 pt-1">
-              <p
-                className={`text-sm font-black ${
-                  toast.type === "error" ? "text-red-700" : "text-emerald-700"
-                }`}
-              >
-                {toast.type === "error" ? "Có lỗi xảy ra" : "Thành công"}
-              </p>
-              <p className="mt-1 wrap-break-words text-sm leading-5 text-[#6B635B]">
-                {toast.message}
-              </p>
+              <p className="text-sm font-black">{toast.type === "error" ? "Có lỗi xảy ra" : "Thành công"}</p>
+              <p className="mt-1 text-sm text-[#6B635B]">{toast.message}</p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              aria-label="Đóng thông báo"
-              className="rounded-lg px-2 text-lg text-gray-400 hover:bg-gray-100"
-            >
-              ×
-            </button>
           </div>
         </div>
       )}
 
-      {/* CONFIRMATION MODAL */}
       {confirmDialog && (
-        <div
-          className="fixed inset-0 z-110 flex items-center justify-center bg-[#2C2825]/45 p-4 backdrop-blur-[2px]"
-          onClick={() => setConfirmDialog(null)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-            className="w-full max-w-md animate-fadeIn rounded-3xl border border-[#E8E2D9] bg-white p-6 shadow-2xl sm:p-7"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-xl">
-              ⚠️
-            </div>
-
-            <h3
-              id="confirm-dialog-title"
-              className="text-lg font-black text-[#2C2825]"
-            >
-              {confirmDialog.title}
-            </h3>
-
-            <p className="mt-3 text-sm leading-6 text-[#6B635B]">
-              {confirmDialog.message}
-            </p>
-
-            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setConfirmDialog(null)}
-                className="rounded-xl border border-[#E8E2D9] px-5 py-3 text-sm font-bold text-[#6B635B] transition hover:bg-[#FBF9F5]"
-              >
-                Hủy
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  const action = confirmDialog.onConfirm;
-                  setConfirmDialog(null);
-                  await action();
-                }}
-                className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#D84315]"
-              >
-                Xác nhận
-              </button>
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-[#2C2825]/45 p-4 backdrop-blur-[2px]" onClick={() => setConfirmDialog(null)}>
+          <div className="w-full max-w-md rounded-3xl border border-[#E8E2D9] bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-[#2C2825]">{confirmDialog.title}</h3>
+            <p className="mt-3 text-sm text-[#6B635B]">{confirmDialog.message}</p>
+            <div className="mt-7 flex justify-end gap-3">
+              <button type="button" onClick={() => setConfirmDialog(null)} className="rounded-xl border px-5 py-3 text-sm font-bold">Hủy</button>
+              <button type="button" onClick={async () => { const action = confirmDialog.onConfirm; setConfirmDialog(null); await action(); }} className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white">Xác nhận</button>
             </div>
           </div>
         </div>

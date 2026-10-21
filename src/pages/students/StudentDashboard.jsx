@@ -28,57 +28,32 @@ export default function StudentDashboard() {
       setCurrentUser(user);
       localStorage.setItem("role", user.role);
       localStorage.setItem("user", JSON.stringify(user));
-      const ids = new Set();
-      const cached = localStorage.getItem("groupId");
-      if (cached) ids.add(cached);
-      const groups = await getAllGroups({ page: 0, size: 100 });
-      const list = Array.isArray(groups) ? groups : groups.content || [];
-      list.forEach((g) => ids.add(g.id));
-      for (let page = 1; page < (groups.totalPages || 0); page++) {
-        const next = await getAllGroups({ page, size: 100 });
-        (next.content || []).forEach((g) => ids.add(g.id));
-      }
-      if (!["LEADER", "GROUP_LEADER"].includes(user.role)) {
-        const [apps, invites] = await Promise.all([
-          getMyApplications(),
-          getMyInvites(),
-        ]);
-        for (const item of [
-          ...(Array.isArray(apps) ? apps : apps.content || []),
-          ...(Array.isArray(invites) ? invites : invites.content || []),
-        ]) {
-          if (
-            ["APPROVED", "ACCEPTED"].includes(item.status) &&
-            (item.groupId || item.group?.id)
-          )
-            ids.add(item.groupId || item.group.id);
-        }
-      }
-      for (const id of ids) {
-        let group;
+
+      // Lấy trực tiếp groupId đã lưu nếu có
+      const cachedGroupId = localStorage.getItem("groupId");
+      if (cachedGroupId) {
         try {
-          group = await getGroupById(id);
-        } catch (error) {
-          if ([403, 404].includes(error.response?.status)) continue;
-          throw error;
+          const group = await getGroupById(cachedGroupId);
+          if (
+            group &&
+            group.members?.some(
+              (m) => String(m.userId) === String(user.id) && m.status === "ACTIVE"
+            )
+          ) {
+            setGroupData(group);
+            setHasGroup(true);
+            setActiveTab((tab) =>
+              ["create", "profile_apply"].includes(tab) ? "overview" : tab
+            );
+            setGroupError("");
+            return;
+          }
+        } catch {
+          localStorage.removeItem("groupId");
         }
-        if (
-          !group.members?.some(
-            (m) =>
-              String(m.userId) === String(user.id) && m.status === "ACTIVE",
-          )
-        )
-          continue;
-        setGroupData(group);
-        setHasGroup(true);
-        localStorage.setItem("groupId", group.id);
-        setActiveTab((tab) =>
-          ["create", "profile_apply"].includes(tab) ? "overview" : tab,
-        );
-        setGroupError("");
-        return;
       }
-      localStorage.removeItem("groupId");
+
+      // Nếu chưa có cache hợp lệ, đưa sinh viên về trạng thái chưa có nhóm để chọn môn/tạo nhóm
       setGroupData(null);
       setHasGroup(false);
       setActiveTab("create");
