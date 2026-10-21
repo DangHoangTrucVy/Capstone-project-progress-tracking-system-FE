@@ -35,7 +35,7 @@ export default function ModeratorLeaveRequests() {
     setLoading(true);
     try {
       // Gọi API lấy danh sách khiếu nại / yêu cầu chờ Moderator xử lý
-      const res = await api.get(`/semesters/${semester}/complaints`).catch(() => ({ data: [] }));
+      const res = await api.get(`/subjects/${subjectId}/complaints`).catch(() => ({ data: [] }));
       const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
       setRequests(list);
     } catch {
