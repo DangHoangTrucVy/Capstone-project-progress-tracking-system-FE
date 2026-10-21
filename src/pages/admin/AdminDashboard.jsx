@@ -5,18 +5,14 @@ import {
   getAllGroups,
   getGroupById,
   replaceGroupLeader,
-  reviewRoster,
-  unlockGroup,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
-import {
-  updateStudentEligibility,
-  getIneligibleStudents,
-} from "../../services/eligibilityService";
-import { downloadGroupsReport } from "../../utils/downloadGroupsReport";
+import { getSemesters, updateStudentEligibility } from "../../services/eligibilityService";
 import Profile from "../../auth/Profile";
 import EligibilityPanel from "./EligibilityPanel";
 import LeaderLeaveRequests from "./LeaderLeaveRequests";
+import SemesterSettings from "./SemesterSettings";
+import api from "../../services/api";
 import {
   PieChart,
   Pie,
@@ -26,23 +22,20 @@ import {
   Legend,
 } from "recharts";
 
-const defaultSystemSettings = {
-  semester: "Fall2026",
-  applyDeadlineHours: 48,
-  groupRegistrationHours: 48,
-  maxGroupSize: 5,
-  minGroupSize: 3,
-  submissionOpen: true,
-};
-
 const getManagedRole = (role) => {
   const normalizedRole = String(role || "")
     .trim()
-    .toUpperCase();
+    .toUpperCase()
+    .replace("ROLE_", "");
+
   const aliases = {
     GROUP_LEADER: "LEADER",
     SYSTEM_ADMIN: "ADMIN",
     LECTURER: "MODERATOR",
+    STUDENT: "STUDENT",
+    ADMIN: "ADMIN",
+    MODERATOR: "MODERATOR",
+    LEADER: "LEADER",
   };
   return aliases[normalizedRole] || normalizedRole;
 };
@@ -58,18 +51,13 @@ export default function AdminDashboard() {
   const [newLeaderId, setNewLeaderId] = useState("");
   const [changingLeader, setChangingLeader] = useState(false);
 
-  const [rosterReviewGroup, setRosterReviewGroup] = useState(null);
-  const [rosterReviewNote, setRosterReviewNote] = useState("");
-  const [reviewingRoster, setReviewingRoster] = useState(false);
+  // States cho quản lý tài khoản & học kỳ
+  const [semesters, setSemesters] = useState([]);
+  const [accountSemester, setAccountSemester] = useState("");
+  const [semesterStudents, setSemesterStudents] = useState([]);
+  const [loadingSemesterStudents, setLoadingSemesterStudents] = useState(false);
 
-  const [eligibilityConfirmUser, setEligibilityConfirmUser] = useState(null);
-  const [updatingEligibility, setUpdatingEligibility] = useState(false);
-
-  const [semesterStartDate, setSemesterStartDate] = useState("");
-  const [semesterCalendarLoading, setSemesterCalendarLoading] = useState(false);
-  const [savingSemesterDate, setSavingSemesterDate] = useState(false);
-
-  // State cho Toast Notification tự động tắt
+  // Toast thông báo
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -81,37 +69,6 @@ export default function AdminDashboard() {
     setTimeout(() => {
       setToast((prev) => ({ ...prev, show: false }));
     }, 3000);
-  };
-
-  const handleReviewRoster = async (approved) => {
-    if (!rosterReviewGroup || reviewingRoster) return;
-    setReviewingRoster(true);
-    try {
-      await reviewRoster(rosterReviewGroup.id, {
-        approved,
-        note: rosterReviewNote.trim(),
-      });
-      if (!approved) {
-        await unlockGroup(rosterReviewGroup.id);
-      }
-      const groupCode = rosterReviewGroup.groupCode;
-      setRosterReviewGroup(null);
-      setRosterReviewNote("");
-      await fetchAdminData();
-      showToast(
-        approved
-          ? `Đã duyệt danh sách nhóm ${groupCode}.`
-          : `Đã từ chối danh sách nhóm ${groupCode}. Nhóm đã được mở khóa.`,
-        "success",
-      );
-    } catch (error) {
-      showToast(
-        error.response?.data?.message || "Không thể xử lý danh sách nhóm.",
-        "error",
-      );
-    } finally {
-      setReviewingRoster(false);
-    }
   };
 
   const openLeaderModal = async (group) => {
@@ -162,7 +119,7 @@ export default function AdminDashboard() {
       setSelectedGroup(null);
       setNewLeaderId("");
       await fetchAdminData();
-      showToast(`Đã đổi Leader nhóm ${selectedGroup.groupCode} thành công.`);
+      showToast(`Đổi Leader nhóm ${selectedGroup.groupCode} thành công.`);
     } catch (error) {
       showToast(
         error.response?.data?.message || "Đổi Leader thất bại.",
@@ -175,26 +132,9 @@ export default function AdminDashboard() {
 
   const [groups, setGroups] = useState([]);
   const [users, setUsers] = useState([]);
-  const [ineligibleUsers, setIneligibleUsers] = useState([]);
-  const [reportsSummary, setReportsSummary] = useState(null);
-  const [reportsLoading, setReportsLoading] = useState(false);
-
-  const [exportSemester, setExportSemester] = useState("Fall2026");
-  const [exportingExcel, setExportingExcel] = useState(false);
-
-  const [systemSettings, setSystemSettings] = useState(() => {
-    try {
-      return {
-        ...defaultSystemSettings,
-        ...JSON.parse(localStorage.getItem("adminSystemSettings") || "{}"),
-      };
-    } catch {
-      return defaultSystemSettings;
-    }
-  });
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedRole, setSelectedRole] = useState(""); // Dùng để lọc vai trò & trạng thái ở tab Tài khoản
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
@@ -207,40 +147,30 @@ export default function AdminDashboard() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Fetch dữ liệu tổng quan cho toàn hệ thống (Lấy size lớn để gom đủ tất cả tài khoản các kỳ)
   const fetchAdminData = async () => {
     try {
-      const currentUser = await getCurrentUser();
+      const currentUser = await getCurrentUser().catch(() => null);
       setUser(currentUser);
 
-      const groupsRes = await getAllGroups().catch(() => []);
-      const groupList = groupsRes?.content || groupsRes || [];
-
-      const detailedGroups = await Promise.all(
-        groupList.map(async (g) => {
-          try {
-            const detail = await getGroupById(g.id);
-            return detail || g;
-          } catch (err) {
-            return g;
-          }
-        }),
-      );
-      setGroups(detailedGroups);
-
-      const usersRes = await getUsers().catch(() => []);
-      let userList = usersRes?.content || usersRes || [];
-
-      try {
-        const ineligibleRes = await getIneligibleStudents().catch(() => []);
-        setIneligibleUsers(ineligibleRes?.content || ineligibleRes || []);
-      } catch (err) {
-        console.warn(
-          "Không thể tải danh sách sinh viên không đủ điều kiện:",
-          err,
-        );
-      }
-
+      // 1. Lấy tất cả tài khoản toàn hệ thống (gọi size lớn để tránh bị phân trang ẩn mất số liệu)
+      const usersRes = await getUsers({ size: 1000 }).catch(() => []);
+      const userList = usersRes?.content || usersRes || [];
       setUsers(userList);
+
+      // 2. Lấy toàn bộ danh sách nhóm của tất cả các kỳ
+      const groupsRes = await getAllGroups().catch(() => []);
+      const groupList = Array.isArray(groupsRes) ? groupsRes : groupsRes.content || groupsRes.items || [];
+      setGroups(groupList);
+
+      // 3. Lấy danh sách học kỳ
+      const semRes = await getSemesters().catch(() => []);
+      const semList = Array.isArray(semRes) ? semRes : semRes.content || [];
+      setSemesters(semList);
+      if (semList.length > 0 && !accountSemester) {
+        const firstCode = semList[0].code || semList[0].name || semList[0];
+        setAccountSemester(firstCode);
+      }
     } catch (error) {
       console.error("Lỗi tải dữ liệu quản trị:", error);
     } finally {
@@ -252,41 +182,43 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  const handleToggleEligibility = (u) => {
-    const targetId = u.id || u.studentCode;
-    if (!targetId) {
-      showToast("Không tìm thấy ID sinh viên.", "error");
+  // Fetch danh sách sinh viên theo học kỳ được chọn ở tab Tài khoản
+  useEffect(() => {
+    if (activeMenu === "accounts" && accountSemester) {
+      setLoadingSemesterStudents(true);
+      api.get(`/semesters/${accountSemester}/students`)
+        .then((res) => {
+          const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
+          setSemesterStudents(list);
+        })
+        .catch(() => setSemesterStudents([]))
+        .finally(() => setLoadingSemesterStudents(false));
+    }
+  }, [activeMenu, accountSemester]);
+
+  const handleToggleEligibility = async (u) => {
+    const studentCode = u.studentCode || u.mssv;
+    if (!studentCode || !accountSemester) {
+      showToast("Không tìm thấy MSSV hoặc học kỳ.", "error");
       return;
     }
-    setEligibilityConfirmUser(u);
-  };
+    const newEligible = u.eligible === false ? true : false;
+    let reason = "";
+    if (!newEligible) {
+      reason = window.prompt("Nhập lý do chưa đủ điều kiện:") || "";
+      if (!reason.trim()) return;
+    }
 
-  const confirmToggleEligibility = async () => {
-    const u = eligibilityConfirmUser;
-    if (!u || updatingEligibility) return;
-    const targetId = u.id || u.studentCode;
-    const newStatus = u.eligible === false;
-
-    setUpdatingEligibility(true);
     try {
-      await updateStudentEligibility(targetId, {
-        eligible: newStatus,
+      await updateStudentEligibility(accountSemester, studentCode, {
+        eligible: newEligible,
+        reason: reason.trim(),
       });
-      setEligibilityConfirmUser(null);
-      await fetchAdminData();
-      showToast(
-        newStatus
-          ? `Đã gỡ cờ điều kiện cho ${u.fullName || u.email}.`
-          : `Đã đánh cờ không đủ điều kiện cho ${u.fullName || u.email}.`,
-        "success",
-      );
-    } catch (error) {
-      showToast(
-        error.response?.data?.message || "Cập nhật trạng thái thất bại.",
-        "error",
-      );
-    } finally {
-      setUpdatingEligibility(false);
+      showToast("Cập nhật trạng thái điều kiện thành công!");
+      const res = await api.get(`/semesters/${accountSemester}/students`);
+      setSemesterStudents(Array.isArray(res.data) ? res.data : res.data.content || []);
+    } catch (err) {
+      showToast(err.response?.data?.message || "Cập nhật thất bại.", "error");
     }
   };
 
@@ -294,18 +226,6 @@ export default function AdminDashboard() {
     setIsEditingUser(false);
     setEditingUserId(null);
     setUserForm({ email: "", fullName: "", password: "", role: "STUDENT" });
-    setIsUserModalOpen(true);
-  };
-
-  const handleOpenEditUser = (u) => {
-    setIsEditingUser(true);
-    setEditingUserId(u.id);
-    setUserForm({
-      email: u.email || "",
-      fullName: u.fullName || "",
-      password: "",
-      role: getManagedRole(u.role) || "STUDENT",
-    });
     setIsUserModalOpen(true);
   };
 
@@ -334,51 +254,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadSemesterCalendar = async (semester) => {
-    if (!semester?.trim()) {
-      setSemesterStartDate("");
-      return;
-    }
-    setSemesterCalendarLoading(true);
-    try {
-      const data = await getSemesterCalendar(semester.trim());
-      setSemesterStartDate(data.startDate ?? "");
-    } catch (error) {
-      setSemesterStartDate("");
-      showToast(
-        error.response?.data?.message || "Không thể tải lịch học kỳ.",
-        "error",
-      );
-    } finally {
-      setSemesterCalendarLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeMenu === "settings") {
-      loadSemesterCalendar(systemSettings.semester);
-    }
-  }, [activeMenu, systemSettings.semester]);
-
-  const handleExportExcel = async (e) => {
-    e.preventDefault();
-    if (exportingExcel) return;
-    setExportingExcel(true);
-    try {
-      await downloadGroupsReport(exportSemester);
-      showToast("Đã tải báo cáo Excel thành công!");
-    } catch (err) {
-      showToast(err.message, "error");
-    } finally {
-      setExportingExcel(false);
-    }
-  };
-
   const handleLogout = () => {
-    // Xóa toàn bộ thông tin đăng nhập trong LocalStorage
     localStorage.clear();
-
-    // Dùng replace để thay thế lịch sử trình duyệt và chuyển hướng thẳng về trang login
     window.location.replace("/login");
   };
 
@@ -395,27 +272,33 @@ export default function AdminDashboard() {
     .map((account) => ({ ...account, role: getManagedRole(account.role) }))
     .filter((account) => manageableRoles.includes(account.role));
 
-  const filteredUsers = manageableUsers.filter((u) => {
-    const matchesRole = !selectedRole || u.role === selectedRole;
+  // Lọc danh sách sinh viên theo học kỳ kết hợp bộ lọc vai trò và trạng thái
+  const filteredSemesterStudents = semesterStudents.filter((s) => {
     const matchesSearch =
       !searchQuery ||
-      (u.fullName &&
-        u.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesRole && matchesSearch;
-  });
+      (s.fullName && s.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (s.email && s.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (s.studentCode && s.studentCode.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const isEligible = s.eligible !== false;
+    let matchesRole = true;
 
-  const displayedUsers =
-    selectedRole === "NOT_ELIGIBLE"
-      ? ineligibleUsers.filter(
-          (u) =>
-            !searchQuery ||
-            (u.fullName &&
-              u.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (u.email &&
-              u.email.toLowerCase().includes(searchQuery.toLowerCase())),
-        )
-      : filteredUsers;
+    if (selectedRole === "ELIGIBLE") {
+      matchesRole = isEligible;
+    } else if (selectedRole === "NOT_ELIGIBLE") {
+      matchesRole = !isEligible;
+    } else if (selectedRole === "STUDENT") {
+      matchesRole = getManagedRole(s.role) === "STUDENT" || !s.role;
+    } else if (selectedRole === "LEADER") {
+      matchesRole = getManagedRole(s.role) === "LEADER";
+    } else if (selectedRole === "ADMIN") {
+      matchesRole = getManagedRole(s.role) === "ADMIN";
+    } else if (selectedRole === "MODERATOR") {
+      matchesRole = getManagedRole(s.role) === "MODERATOR";
+    }
+
+    return matchesSearch && matchesRole;
+  });
 
   if (loading) {
     return (
@@ -424,21 +307,6 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
-  const getRoleBadgeStyle = (role) => {
-    switch (role) {
-      case "ADMIN":
-        return "bg-red-50 text-red-600 border border-red-200";
-      case "MODERATOR":
-        return "bg-purple-50 text-purple-600 border border-purple-200";
-      case "LEADER":
-        return "bg-emerald-50 text-emerald-600 border border-emerald-200";
-      case "STUDENT":
-        return "bg-blue-50 text-blue-600 border border-blue-200";
-      default:
-        return "bg-orange-50 text-[#E65100] border border-orange-200";
-    }
-  };
 
   const getInitials = (name) => {
     if (!name) return "AD";
@@ -473,7 +341,7 @@ export default function AdminDashboard() {
                 Quản Trị Hệ Thống
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                MatchPoint FPT Capstone
+                MatchPoint FPT Capstone v2.9
               </p>
             </div>
           </div>
@@ -555,20 +423,6 @@ export default function AdminDashboard() {
             >
               <span>👥</span>
               <span>Danh sách nhóm</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveMenu("export");
-                setSearchQuery("");
-              }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "export"
-                  ? "bg-[#E65100] text-white shadow-md"
-                  : "hover:bg-[#F8F6F0]"
-              }`}
-            >
-              <span>📥</span>
-              <span>Xuất Excel Báo cáo</span>
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
@@ -663,10 +517,10 @@ export default function AdminDashboard() {
               <div className="bg-white p-6 border border-[#E8E2D9] space-y-2 rounded-2xl flex justify-between items-center shadow-xs">
                 <div>
                   <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-                    Giám sát đầu kỳ
+                    Giám sát tổng quan toàn hệ thống
                   </span>
                   <h1 className="text-xl font-black text-[#2C2825] mt-1">
-                    Thống kê tổng quan sinh viên & nhóm đồ án Capstone
+                    Thống kê tổng hợp toàn bộ các kỳ (Tài khoản & Nhóm đồ án)
                   </h1>
                 </div>
                 <button
@@ -686,7 +540,7 @@ export default function AdminDashboard() {
                     bg: "bg-blue-50 text-blue-600",
                   },
                   {
-                    label: "Tổng số nhóm",
+                    label: "Tổng số nhóm (Tất cả kỳ)",
                     value: groups.length,
                     icon: "👥",
                     bg: "bg-orange-50 text-[#E65100]",
@@ -790,7 +644,7 @@ export default function AdminDashboard() {
 
                 <div className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-xs space-y-5">
                   <h3 className="text-sm font-black text-[#2C2825]">
-                    📈 Thống kê sĩ số nhóm đồ án
+                    📈 Thống kê sĩ số nhóm đồ án (3 - 5 người)
                   </h3>
                   <div className="space-y-4 pt-2">
                     {(() => {
@@ -862,13 +716,13 @@ export default function AdminDashboard() {
 
           {activeMenu === "accounts" && (
             <div className="p-8 space-y-6">
-              <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl">
+              <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs">
                 <div>
                   <h2 className="text-xl font-black text-[#2C2825]">
-                    Quản lý tài khoản & Cờ điều kiện
+                    Quản lý tài khoản & Cờ điều kiện theo học kỳ
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Quản lý tài khoản sinh viên, leader, moderator và admin.
+                    Chọn học kỳ và lọc theo trạng thái hoặc vai trò để quản lý sinh viên.
                   </p>
                 </div>
                 <button
@@ -879,23 +733,40 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex justify-between items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-[#6B635B] mr-2">
-                    Lọc vai trò:
-                  </span>
+              {/* Bộ lọc Học kỳ & Vai trò/Trạng thái */}
+              <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex justify-between items-center gap-4 flex-wrap shadow-xs">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs font-bold text-[#E65100]">📅 Chọn học kỳ:</span>
+                  <select
+                    value={accountSemester}
+                    onChange={(e) => setAccountSemester(e.target.value)}
+                    className="p-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
+                  >
+                    {semesters.map((sem, idx) => {
+                      const code = sem.code || sem;
+                      const name = sem.name || code;
+                      return (
+                        <option key={idx} value={code}>
+                          {name}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <span className="text-xs font-bold text-[#6B635B] ml-2">Lọc trạng thái & vai trò:</span>
                   {[
                     { label: "Tất cả", value: "" },
+                    { label: "Đủ điều kiện", value: "ELIGIBLE" },
+                    { label: "Không đủ điều kiện", value: "NOT_ELIGIBLE" },
+                    { label: "Student", value: "STUDENT" },
+                    { label: "Leader", value: "LEADER" },
                     { label: "Admin", value: "ADMIN" },
                     { label: "Moderator", value: "MODERATOR" },
-                    { label: "Leader", value: "LEADER" },
-                    { label: "Student", value: "STUDENT" },
-                    { label: "Không đủ điều kiện", value: "NOT_ELIGIBLE" },
                   ].map((roleObj) => (
                     <button
                       key={roleObj.value}
                       onClick={() => setSelectedRole(roleObj.value)}
-                      className={`px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                      className={`px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                         selectedRole === roleObj.value
                           ? "bg-[#E65100] text-white shadow-sm"
                           : "bg-[#FBF9F5] text-[#6B635B] border border-[#E8E2D9]"
@@ -905,100 +776,71 @@ export default function AdminDashboard() {
                     </button>
                   ))}
                 </div>
+
                 <div className="w-full md:w-72">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="🔍 Tìm kiếm theo tên, email..."
+                    placeholder="🔍 Tìm MSSV, tên, email..."
                     className="w-full px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                   />
                 </div>
               </div>
 
-              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden">
+              {/* Bảng hiển thị danh sách sinh viên theo học kỳ */}
+              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase w-16 text-center">
-                        STT
-                      </th>
+                      <th className="p-4 font-black uppercase w-16 text-center">STT</th>
+                      <th className="p-4 font-black uppercase">MSSV</th>
                       <th className="p-4 font-black uppercase">Họ và tên</th>
                       <th className="p-4 font-black uppercase">Email</th>
-                      <th className="p-4 font-black uppercase">Vai trò</th>
-                      <th className="p-4 font-black uppercase">Trạng thái</th>
-                      <th className="p-4 font-black uppercase text-left">
-                        Thao tác
-                      </th>
+                      <th className="p-4 font-black uppercase">Trạng thái điều kiện</th>
+                      <th className="p-4 font-black uppercase text-left">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E8E2D9]">
-                    {displayedUsers.length > 0 ? (
-                      displayedUsers.map((u, index) => {
-                        const isEligible =
-                          selectedRole === "NOT_ELIGIBLE"
-                            ? false
-                            : u.eligible !== false;
+                    {loadingSemesterStudents ? (
+                      <tr>
+                        <td colSpan="6" className="p-12 text-center text-[#6B635B]">
+                          Đang tải danh sách sinh viên học kỳ {accountSemester}...
+                        </td>
+                      </tr>
+                    ) : filteredSemesterStudents.length > 0 ? (
+                      filteredSemesterStudents.map((u, index) => {
+                        const isEligible = u.eligible !== false;
                         return (
-                          <tr
-                            key={u.id || u.email}
-                            className="hover:bg-[#FBF9F5]/70 transition"
-                          >
-                            <td className="p-4 text-center font-bold text-[#6B635B]">
-                              {index + 1}
-                            </td>
-                            <td className="p-4 font-bold text-[#2C2825]">
-                              {u.fullName}
-                            </td>
+                          <tr key={u.id || u.studentCode || u.email} className="hover:bg-[#FBF9F5]/70 transition">
+                            <td className="p-4 text-center font-bold text-[#6B635B]">{index + 1}</td>
+                            <td className="p-4 font-bold text-[#E65100]">{u.studentCode || u.mssv || "—"}</td>
+                            <td className="p-4 font-bold text-[#2C2825]">{u.fullName || u.name}</td>
                             <td className="p-4 text-[#6B635B]">{u.email}</td>
                             <td className="p-4">
-                              <span
-                                className={`px-3 py-1 font-extrabold text-[10px] uppercase rounded-lg ${getRoleBadgeStyle(getManagedRole(u.role))}`}
-                              >
-                                {getManagedRole(u.role)}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <span
-                                className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${isEligible ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600 border border-red-200"}`}
-                              >
-                                {isEligible
-                                  ? "Đủ điều kiện"
-                                  : "📌 Không đủ điều kiện"}
+                              <span className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${isEligible ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600 border border-red-200"}`}>
+                                {isEligible ? "Đủ điều kiện" : "📌 Không đủ điều kiện"}
                               </span>
                             </td>
                             <td className="p-4 text-left">
-                              <div className="flex items-center justify-start gap-2 whitespace-nowrap">
-                                <button
-                                  onClick={() => handleOpenEditUser(u)}
-                                  className="px-3 py-1.5 bg-white border border-[#E8E2D9] hover:bg-gray-100 font-bold rounded-xl text-xs cursor-pointer shadow-xs"
-                                >
-                                  ✏️ Sửa
-                                </button>
-                                {getManagedRole(u.role) !== "ADMIN" && (
-                                  <button
-                                    onClick={() => handleToggleEligibility(u)}
-                                    className={`px-3 py-1.5 font-bold rounded-xl text-xs transition cursor-pointer border shadow-xs ${
-                                      isEligible
-                                        ? "bg-red-50 text-red-600 border-red-200"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    }`}
-                                  >
-                                    {isEligible ? "📌 Gắn cờ" : "🟢 Gỡ cờ"}
-                                  </button>
-                                )}
-                              </div>
+                              <button
+                                onClick={() => handleToggleEligibility(u)}
+                                className={`px-3 py-1.5 font-bold rounded-xl text-xs transition cursor-pointer border shadow-xs ${
+                                  isEligible
+                                    ? "bg-red-50 text-red-600 border-red-200"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                }`}
+                              >
+                                {isEligible ? "📌 Gắn cờ" : "🟢 Gỡ cờ"}
+                              </button>
                             </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td
-                          colSpan="6"
-                          className="p-12 text-center text-[#6B635B] italic"
-                        >
-                          Không tìm thấy tài khoản phù hợp.
+                        <td colSpan="6" className="p-12 text-center text-[#6B635B] italic">
+                          Không tìm thấy sinh viên nào trong học kỳ {accountSemester}.
                         </td>
                       </tr>
                     )}
@@ -1086,7 +928,7 @@ export default function AdminDashboard() {
                           colSpan="4"
                           className="p-8 text-center text-[#6B635B] italic"
                         >
-                          Không tìm thấy nhóm đồ án nào.
+                          Chưa có nhóm nào trong hệ thống.
                         </td>
                       </tr>
                     )}
@@ -1096,123 +938,10 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {activeMenu === "export" && (
-            <div className="min-h-full w-full bg-[#FBF8F4] p-5 text-[#020202] sm:p-7 xl:p-10">
-              <div className="mx-auto w-full max-w-[1600px] space-y-8">
-                <section className="relative overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm p-6 sm:p-8">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-[#F8EAE0] px-3 py-1.5 text-[11px] font-bold text-[#A96745]">
-                    QT15 · BÁO CÁO BÀN GIAO
-                  </span>
-                  <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">
-                    Xuất báo cáo ghép nhóm
-                  </h1>
-                  <p className="mt-2 text-sm text-[#81766D]">
-                    Tổng hợp thông tin nhóm và sinh viên thành file Excel.
-                  </p>
-                </section>
-
-                <section className="grid items-start gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-                  <div className="rounded-3xl border border-[#E9DED4] bg-white p-6 shadow-sm sm:p-7">
-                    <form onSubmit={handleExportExcel} className="space-y-5">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#6B635B]">
-                          Học kỳ cần xuất báo cáo
-                        </label>
-                        <select
-                          value={exportSemester}
-                          onChange={(e) => setExportSemester(e.target.value)}
-                          className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 text-sm outline-none"
-                        >
-                          <option value="Fall2026">Fall 2026</option>
-                          <option value="Spring2027">Spring 2027</option>
-                        </select>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={exportingExcel}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff6f27] px-5 py-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943]"
-                      >
-                        {exportingExcel
-                          ? "Đang tạo file Excel..."
-                          : "↓ Tải xuống báo cáo (.xlsx)"}
-                      </button>
-                    </form>
-                  </div>
-                </section>
-              </div>
-            </div>
-          )}
-
           {activeMenu === "settings" && (
-            <section className="p-6 space-y-6 lg:p-8">
-              <div>
-                <span className="inline-flex items-center rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-[#E65100]">
-                  CẤU HÌNH HỆ THỐNG
-                </span>
-                <h1 className="mt-3 text-2xl font-black text-[#2C2825]">
-                  Cấu hình học kỳ
-                </h1>
-              </div>
-
-              <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 shadow-sm sm:p-7">
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
-                      Mã học kỳ
-                    </label>
-                    <input
-                      type="text"
-                      value={systemSettings.semester}
-                      onChange={(e) =>
-                        setSystemSettings({
-                          ...systemSettings,
-                          semester: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
-                      Ngày bắt đầu học kỳ
-                    </label>
-                    <input
-                      type="date"
-                      value={semesterStartDate}
-                      onChange={(e) => setSemesterStartDate(e.target.value)}
-                      disabled={semesterCalendarLoading || savingSemesterDate}
-                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="mt-5 flex gap-3">
-                  <button
-                    type="button"
-                    disabled={savingSemesterDate || !semesterStartDate}
-                    onClick={async () => {
-                      setSavingSemesterDate(true);
-                      try {
-                        await updateSemesterStartDate(
-                          systemSettings.semester.trim(),
-                          semesterStartDate,
-                        );
-                        showToast("Đã lưu ngày bắt đầu học kỳ thành công!");
-                      } catch (error) {
-                        showToast(
-                          "Không thể lưu ngày bắt đầu học kỳ.",
-                          "error",
-                        );
-                      } finally {
-                        setSavingSemesterDate(false);
-                      }
-                    }}
-                    className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white"
-                  >
-                    {savingSemesterDate ? "Đang lưu..." : "Lưu ngày bắt đầu"}
-                  </button>
-                </div>
-              </div>
-            </section>
+            <div className="p-8 w-full">
+              <SemesterSettings />
+            </div>
           )}
 
           {activeMenu === "profile" && (
