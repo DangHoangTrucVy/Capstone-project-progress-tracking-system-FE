@@ -9,18 +9,12 @@ import {
   unlockGroup,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
-import { getReportsSummary } from "../../services/progressService";
 import {
   updateStudentEligibility,
   getIneligibleStudents,
 } from "../../services/eligibilityService";
-import {
-  getRegistrations,
-  getPendingRegistrationCount,
-} from "../../services/registrationService";
 import { downloadGroupsReport } from "../../utils/downloadGroupsReport";
 import Profile from "../../auth/Profile";
-import RegistrationReview from "./RegistrationReview";
 import EligibilityPanel from "./EligibilityPanel";
 import LeaderLeaveRequests from "./LeaderLeaveRequests";
 import {
@@ -32,20 +26,10 @@ import {
   Legend,
 } from "recharts";
 
-import {
-  getSemesterCalendar,
-  updateSemesterStartDate,
-} from "../../services/semesterService";
-
 const defaultSystemSettings = {
   semester: "Fall2026",
-
-  // Thời hạn phản hồi Apply/Invite — giữ riêng
   applyDeadlineHours: 48,
-
-  // Thời lượng của đợt đăng ký nhóm
   groupRegistrationHours: 48,
-
   maxGroupSize: 5,
   minGroupSize: 3,
   submissionOpen: true,
@@ -58,6 +42,7 @@ const getManagedRole = (role) => {
   const aliases = {
     GROUP_LEADER: "LEADER",
     SYSTEM_ADMIN: "ADMIN",
+    LECTURER: "MODERATOR",
   };
   return aliases[normalizedRole] || normalizedRole;
 };
@@ -77,8 +62,6 @@ export default function AdminDashboard() {
   const [rosterReviewNote, setRosterReviewNote] = useState("");
   const [reviewingRoster, setReviewingRoster] = useState(false);
 
-  const [pendingCount, setPendingCount] = useState(0);
-
   const [eligibilityConfirmUser, setEligibilityConfirmUser] = useState(null);
   const [updatingEligibility, setUpdatingEligibility] = useState(false);
 
@@ -86,89 +69,50 @@ export default function AdminDashboard() {
   const [semesterCalendarLoading, setSemesterCalendarLoading] = useState(false);
   const [savingSemesterDate, setSavingSemesterDate] = useState(false);
 
-  const handleSaveSemesterDate = async (event) => {
-    event.preventDefault();
+  // State cho Toast Notification tự động tắt
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
-    if (!systemSettings.semester.trim() || !semesterStartDate) {
-      showToast("Vui lòng nhập học kỳ và ngày bắt đầu.", "error");
-      return;
-    }
-
-    setSavingSemesterDate(true);
-
-    try {
-      await updateSemesterStartDate(
-        systemSettings.semester.trim(),
-        semesterStartDate,
-      );
-
-      showToast("Cập nhật ngày bắt đầu học kỳ thành công!");
-    } catch (error) {
-      showToast(
-        error.response?.data?.message ||
-          "Không thể cập nhật ngày bắt đầu học kỳ.",
-        "error",
-      );
-    } finally {
-      setSavingSemesterDate(false);
-    }
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 3000);
   };
+
   const handleReviewRoster = async (approved) => {
     if (!rosterReviewGroup || reviewingRoster) return;
-
     setReviewingRoster(true);
-
     try {
       await reviewRoster(rosterReviewGroup.id, {
         approved,
         note: rosterReviewNote.trim(),
       });
-
       if (!approved) {
-        // Admin từ chối: mở khóa để Leader chỉnh sửa danh sách.
         await unlockGroup(rosterReviewGroup.id);
       }
-
       const groupCode = rosterReviewGroup.groupCode;
-
       setRosterReviewGroup(null);
       setRosterReviewNote("");
-
       await fetchAdminData();
-
       showToast(
         approved
           ? `Đã duyệt danh sách nhóm ${groupCode}.`
-          : `Đã từ chối danh sách nhóm ${groupCode}. Nhóm đã được mở khóa để bổ sung thành viên.`,
+          : `Đã từ chối danh sách nhóm ${groupCode}. Nhóm đã được mở khóa.`,
         "success",
       );
     } catch (error) {
       showToast(
-        error.response?.data?.message ||
-          "Không thể xử lý danh sách nhóm. Vui lòng thử lại.",
+        error.response?.data?.message || "Không thể xử lý danh sách nhóm.",
         "error",
       );
     } finally {
       setReviewingRoster(false);
     }
   };
-
-  const loadPendingRegistrationCount = async () => {
-    try {
-      const count = await getPendingRegistrationCount();
-      setPendingCount(count);
-    } catch (error) {
-      console.error("Không tải được số đăng ký chờ duyệt:", error);
-    }
-  };
-
-  useEffect(() => {
-    loadPendingRegistrationCount();
-
-    const intervalId = setInterval(loadPendingRegistrationCount, 30000);
-
-    return () => clearInterval(intervalId);
-  }, []);
 
   const openLeaderModal = async (group) => {
     try {
@@ -186,14 +130,12 @@ export default function AdminDashboard() {
 
   const handleReplaceLeader = async (event) => {
     event.preventDefault();
-
     if (!selectedGroup || !newLeaderId) {
       showToast("Vui lòng chọn Leader mới.", "error");
       return;
     }
 
     const members = selectedGroup.members || [];
-
     const nextLeader = members.find(
       (member) =>
         String(member.userId) === String(newLeaderId) &&
@@ -202,38 +144,25 @@ export default function AdminDashboard() {
     );
 
     if (!nextLeader) {
-      showToast(
-        "Thành viên được chọn không còn hoạt động hoặc không hợp lệ.",
-        "error",
-      );
+      showToast("Thành viên được chọn không hợp lệ.", "error");
       return;
     }
 
     const confirmed = window.confirm(
-      `Đổi Leader nhóm ${selectedGroup.groupCode} sang ${nextLeader.userFullName}?\n\n` +
-        "Hệ thống sẽ cập nhật vai trò Leader. Việc rời nhóm của Leader cũ được xử lý theo luồng xin rời nhóm.",
+      `Đổi Leader nhóm ${selectedGroup.groupCode} sang ${nextLeader.userFullName}?`,
     );
-
     if (!confirmed) return;
 
     setChangingLeader(true);
-
     try {
-      // Chỉ đổi Leader; không tự xóa Leader cũ ở frontend.
       await replaceGroupLeader(selectedGroup.id, {
         userId: nextLeader.userId,
       });
-
       setLeaderModalOpen(false);
       setSelectedGroup(null);
       setNewLeaderId("");
-
-      // Lấy lại dữ liệu mới nhất từ Backend.
       await fetchAdminData();
-
-      showToast(
-        `Đã đổi Leader nhóm ${selectedGroup.groupCode} thành ${nextLeader.userFullName}.`,
-      );
+      showToast(`Đã đổi Leader nhóm ${selectedGroup.groupCode} thành công.`);
     } catch (error) {
       showToast(
         error.response?.data?.message || "Đổi Leader thất bại.",
@@ -244,82 +173,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // State cho Toast Notification tự động tắt
-  const [toast, setToast] = useState({
-    show: false,
-    message: "",
-    type: "success",
-  });
-
-  const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3000); // Tự động tắt sau 3 giây
-  };
-
-  const handleStartRegistrationRound = () => {
-    const startTime = new Date(registrationStartInput).getTime();
-    const endTime = new Date(registrationEndInput).getTime();
-
-    if (
-      !Number.isFinite(startTime) ||
-      !Number.isFinite(endTime) ||
-      endTime <= startTime
-    ) {
-      showToast("Thời gian kết thúc phải sau thời gian bắt đầu.", "error");
-      return;
-    }
-
-    if (startTime > Date.now()) {
-      showToast("Thời gian bắt đầu không được ở trong tương lai.", "error");
-      return;
-    }
-
-    if (
-      registrationRound?.status === "OPEN" &&
-      registrationRound.endTime > Date.now()
-    ) {
-      showToast("Đợt đăng ký hiện tại vẫn đang mở.", "error");
-      return;
-    }
-
-    const round = {
-      status: "OPEN",
-      startTime,
-      endTime,
-    };
-
-    localStorage.setItem("groupRegistrationRound", JSON.stringify(round));
-    setRegistrationRound(round);
-
-    showToast("Đã bắt đầu đợt đăng ký nhóm!");
-  };
-
-  const handleEndRegistrationRound = () => {
-    if (!registrationRound || registrationRound.status !== "OPEN") return;
-
-    const closedRound = {
-      ...registrationRound,
-      status: "CLOSED",
-      endTime: Date.now(),
-    };
-
-    localStorage.setItem("groupRegistrationRound", JSON.stringify(closedRound));
-    setRegistrationRound(closedRound);
-
-    showToast("Đã đóng đợt đăng ký.");
-  };
-
   const [groups, setGroups] = useState([]);
   const [users, setUsers] = useState([]);
   const [ineligibleUsers, setIneligibleUsers] = useState([]);
   const [reportsSummary, setReportsSummary] = useState(null);
-  const [reportsError, setReportsError] = useState("");
   const [reportsLoading, setReportsLoading] = useState(false);
 
-  // State cho phần Eligibility Import
-  // State cho phần Xuất Excel (QT15)
   const [exportSemester, setExportSemester] = useState("Fall2026");
   const [exportingExcel, setExportingExcel] = useState(false);
 
@@ -333,56 +192,6 @@ export default function AdminDashboard() {
       return defaultSystemSettings;
     }
   });
-
-  const [registrationRound, setRegistrationRound] = useState(() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("groupRegistrationRound") || "null",
-      );
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const [currentTime, setCurrentTime] = useState(Date.now());
-  const remainingMs = registrationRound
-    ? Math.max(0, registrationRound.endTime - currentTime)
-    : 0;
-
-  const isRegistrationOpen =
-    registrationRound?.status === "OPEN" && remainingMs > 0;
-
-  const toDateTimeLocal = (timestamp) => {
-    const date = new Date(timestamp);
-    const offset = date.getTimezoneOffset() * 60000;
-
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-  };
-
-  const [registrationStartInput, setRegistrationStartInput] = useState(() =>
-    toDateTimeLocal(Date.now()),
-  );
-
-  const [registrationEndInput, setRegistrationEndInput] = useState(() =>
-    toDateTimeLocal(Date.now() + 48 * 60 * 60 * 1000),
-  );
-  const remainingHours = Math.floor(remainingMs / 3600000);
-  const remainingMinutes = Math.floor((remainingMs % 3600000) / 60000);
-  const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
-
-  const countdownText = [
-    String(remainingHours).padStart(2, "0"),
-    String(remainingMinutes).padStart(2, "0"),
-    String(remainingSeconds).padStart(2, "0"),
-  ].join(":");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
@@ -416,13 +225,11 @@ export default function AdminDashboard() {
           }
         }),
       );
-
       setGroups(detailedGroups);
 
       const usersRes = await getUsers().catch(() => []);
       let userList = usersRes?.content || usersRes || [];
 
-      // Lấy danh sách sinh viên không đủ điều kiện từ API chuẩn của backend
       try {
         const ineligibleRes = await getIneligibleStudents().catch(() => []);
         setIneligibleUsers(ineligibleRes?.content || ineligibleRes || []);
@@ -431,57 +238,6 @@ export default function AdminDashboard() {
           "Không thể tải danh sách sinh viên không đủ điều kiện:",
           err,
         );
-      }
-
-      const leaderIdentifiers = new Set();
-      detailedGroups.forEach((g) => {
-        if (g.leaderId) leaderIdentifiers.add(g.leaderId);
-        if (g.leader?.id) leaderIdentifiers.add(g.leader.id);
-        if (g.leader?.email)
-          leaderIdentifiers.add(g.leader.email.toLowerCase());
-        if (g.leaderEmail) leaderIdentifiers.add(g.leaderEmail.toLowerCase());
-        if (Array.isArray(g.members)) {
-          g.members.forEach((m) => {
-            if (m.isLeader) {
-              if (m.userId) leaderIdentifiers.add(m.userId);
-              if (m.id) leaderIdentifiers.add(m.id);
-              if (m.email || m.userEmail)
-                leaderIdentifiers.add((m.email || m.userEmail).toLowerCase());
-            }
-          });
-        }
-      });
-
-      try {
-        const approvedRegsRes = await getRegistrations({
-          status: "ACTIVE",
-          size: 100,
-        }).catch(() => ({ content: [] }));
-        const approvedRegs = approvedRegsRes?.content || approvedRegsRes || [];
-
-        const mappedRegUsers = approvedRegs.map((reg) => {
-          const regId = reg.id || reg.studentCode;
-          const regEmail = (reg.email || "").toLowerCase();
-          const isGroupLeader =
-            leaderIdentifiers.has(regId) || leaderIdentifiers.has(regEmail);
-
-          return {
-            id: regId,
-            fullName: reg.fullName,
-            email: reg.email,
-            role: isGroupLeader ? "LEADER" : "STUDENT",
-            eligible: reg.eligible ?? true,
-          };
-        });
-
-        const existingEmails = new Set(userList.map((u) => u.email));
-        for (const regUser of mappedRegUsers) {
-          if (!existingEmails.has(regUser.email)) {
-            userList.push(regUser);
-          }
-        }
-      } catch (err) {
-        console.warn("Không thể tải danh sách đăng ký đã duyệt:", err);
       }
 
       setUsers(userList);
@@ -498,43 +254,26 @@ export default function AdminDashboard() {
 
   const handleToggleEligibility = (u) => {
     const targetId = u.id || u.studentCode;
-
     if (!targetId) {
       showToast("Không tìm thấy ID sinh viên.", "error");
       return;
     }
-
-    // Chỉ mở modal, chưa gọi API.
     setEligibilityConfirmUser(u);
   };
 
   const confirmToggleEligibility = async () => {
     const u = eligibilityConfirmUser;
-
     if (!u || updatingEligibility) return;
-
     const targetId = u.id || u.studentCode;
-
-    if (!targetId) {
-      showToast("Không tìm thấy ID sinh viên.", "error");
-      return;
-    }
-
-    // Đang đủ điều kiện -> đánh cờ.
-    // Đang bị đánh cờ -> gỡ cờ.
     const newStatus = u.eligible === false;
 
     setUpdatingEligibility(true);
-
     try {
       await updateStudentEligibility(targetId, {
         eligible: newStatus,
       });
-
       setEligibilityConfirmUser(null);
-
       await fetchAdminData();
-
       showToast(
         newStatus
           ? `Đã gỡ cờ điều kiện cho ${u.fullName || u.email}.`
@@ -543,49 +282,13 @@ export default function AdminDashboard() {
       );
     } catch (error) {
       showToast(
-        error.response?.data?.message ||
-          "Cập nhật trạng thái đủ điều kiện thất bại.",
+        error.response?.data?.message || "Cập nhật trạng thái thất bại.",
         "error",
       );
     } finally {
       setUpdatingEligibility(false);
     }
   };
-
-  const fetchReportsSummary = async () => {
-    setReportsLoading(true);
-    setReportsError("");
-    try {
-      const semesterToFetch = systemSettings?.semester || "Fall2026";
-      const response = await getReportsSummary({ semester: semesterToFetch });
-      setReportsSummary(response?.data ?? response);
-    } catch (error) {
-      setReportsError(
-        error.response?.data?.message || "Không thể tải báo cáo tổng hợp.",
-      );
-      setReportsSummary(null);
-    } finally {
-      setReportsLoading(false);
-    }
-  };
-
-  const reportEntries = Object.entries(
-    reportsSummary?.summary ?? reportsSummary ?? {},
-  ).filter(([, value]) =>
-    ["string", "number", "boolean"].includes(typeof value),
-  );
-
-  const formatReportValue = (value) => {
-    if (typeof value === "number") return value.toLocaleString("vi-VN");
-    if (typeof value === "boolean") return value ? "Có" : "Không";
-    return value;
-  };
-
-  const formatReportLabel = (key) =>
-    key
-      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-      .replace(/[_-]+/g, " ")
-      .replace(/^./, (character) => character.toLocaleUpperCase("vi-VN"));
 
   const handleOpenCreateUser = () => {
     setIsEditingUser(false);
@@ -631,31 +334,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveSystemSettings = (event) => {
-    event.preventDefault();
-    localStorage.setItem("adminSystemSettings", JSON.stringify(systemSettings));
-    showToast("Đã lưu cấu hình hệ thống đầu kỳ thành công!");
-  };
-
-  const updateSystemSetting = (key, value) => {
-    setSystemSettings((current) => ({ ...current, [key]: value }));
-  };
   const loadSemesterCalendar = async (semester) => {
     if (!semester?.trim()) {
       setSemesterStartDate("");
       return;
     }
-
     setSemesterCalendarLoading(true);
-
     try {
       const data = await getSemesterCalendar(semester.trim());
-
-      // Điều chỉnh tên trường theo response thực tế của Backend.
       setSemesterStartDate(data.startDate ?? "");
     } catch (error) {
       setSemesterStartDate("");
-
       showToast(
         error.response?.data?.message || "Không thể tải lịch học kỳ.",
         "error",
@@ -686,8 +375,11 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
+    // Xóa toàn bộ thông tin đăng nhập trong LocalStorage
     localStorage.clear();
-    window.location.href = "/login";
+
+    // Dùng replace để thay thế lịch sử trình duyệt và chuyển hướng thẳng về trang login
+    window.location.replace("/login");
   };
 
   const filteredGroups = groups.filter(
@@ -698,7 +390,7 @@ export default function AdminDashboard() {
         g.semester.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
-  const manageableRoles = ["STUDENT", "LEADER", "ADMIN"];
+  const manageableRoles = ["STUDENT", "LEADER", "ADMIN", "MODERATOR"];
   const manageableUsers = users
     .map((account) => ({ ...account, role: getManagedRole(account.role) }))
     .filter((account) => manageableRoles.includes(account.role));
@@ -710,11 +402,9 @@ export default function AdminDashboard() {
       (u.fullName &&
         u.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()));
-
     return matchesRole && matchesSearch;
   });
 
-  // Nếu chọn tab "Không đủ điều kiện", lấy trực tiếp từ danh sách chuyên biệt của API getIneligibleStudents
   const displayedUsers =
     selectedRole === "NOT_ELIGIBLE"
       ? ineligibleUsers.filter(
@@ -730,7 +420,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FBF9F5] flex items-center justify-center text-xs font-bold text-[#6B635B]">
-        Đang tải hệ thống quản trị đầu kỳ...
+        Đang tải hệ thống quản trị...
       </div>
     );
   }
@@ -739,6 +429,8 @@ export default function AdminDashboard() {
     switch (role) {
       case "ADMIN":
         return "bg-red-50 text-red-600 border border-red-200";
+      case "MODERATOR":
+        return "bg-purple-50 text-purple-600 border border-purple-200";
       case "LEADER":
         return "bg-emerald-50 text-emerald-600 border border-emerald-200";
       case "STUDENT":
@@ -758,10 +450,11 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans overflow-hidden relative">
-      {/* FLOATING TOAST NOTIFICATION */}
       {toast.show && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white transition-all duration-300 flex items-center gap-2 animate-bounce ${toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"}`}
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white transition-all duration-300 flex items-center gap-2 animate-bounce ${
+            toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"
+          }`}
         >
           <span>{toast.type === "error" ? "❌" : "✨"}</span>
           <span>{toast.message}</span>
@@ -773,28 +466,14 @@ export default function AdminDashboard() {
         <div className="flex-1 min-h-0 overflow-y-auto space-y-8 pr-1">
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-full bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-200">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="9" />
-                <path d="m8.5 12 2.3 2.3 4.7-4.7" />
-              </svg>
+              ✓
             </div>
-
             <div>
               <h2 className="font-black text-sm text-[#2C2825]">
-                Quản Lý Sinh Viên
+                Quản Trị Hệ Thống
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                Hệ thống quản lý MatchPoint FPT.
+                MatchPoint FPT Capstone
               </p>
             </div>
           </div>
@@ -807,7 +486,6 @@ export default function AdminDashboard() {
               onClick={() => {
                 setActiveMenu("monitoring");
                 setSearchQuery("");
-                fetchReportsSummary();
               }}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
                 activeMenu === "monitoring"
@@ -820,7 +498,7 @@ export default function AdminDashboard() {
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
-              Quản lý sinh viên & nhóm
+              Quản lý học kỳ & sinh viên
             </p>
             <button
               onClick={() => {
@@ -834,7 +512,7 @@ export default function AdminDashboard() {
               }`}
             >
               <span>📂</span>
-              <span>Import Sinh viên </span>
+              <span>Import Sinh viên & Điều kiện</span>
             </button>
             <button
               onClick={() => {
@@ -852,33 +530,17 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => {
-                setActiveMenu("registrations");
-                setSearchQuery("");
+                setSelectedLeaveId(null);
+                setActiveMenu("leader-leave");
               }}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "registrations"
+                activeMenu === "leader-leave"
                   ? "bg-[#E65100] text-white shadow-md"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>📝</span>
-
-              <span className="flex-1 text-left">Duyệt đăng ký sinh viên</span>
-
-              {pendingCount > 0 && (
-                <span className="min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">
-                  {pendingCount > 99 ? "99+" : pendingCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setSelectedLeaveId(null);
-                setActiveMenu("leader-leave");
-              }}
-              className="w-full text-left px-4 py-3 rounded-xl hover:bg-orange-50"
-            >
-              🙋 Yêu cầu rời nhóm của Leader
+              <span>🙋</span>
+              <span>Yêu cầu rời nhóm</span>
             </button>
             <button
               onClick={() => {
@@ -892,7 +554,7 @@ export default function AdminDashboard() {
               }`}
             >
               <span>👥</span>
-              <span>Danh sách nhóm </span>
+              <span>Danh sách nhóm</span>
             </button>
             <button
               onClick={() => {
@@ -906,11 +568,11 @@ export default function AdminDashboard() {
               }`}
             >
               <span>📥</span>
-              <span>Xuất Excel Báo cáo </span>
+              <span>Xuất Excel Báo cáo</span>
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
-              Cấu hình đợt
+              Cấu hình
             </p>
             <button
               onClick={() => {
@@ -924,7 +586,7 @@ export default function AdminDashboard() {
               }`}
             >
               <span>⚙️</span>
-              <span>Cấu hình thời hạn</span>
+              <span>Cấu hình học kỳ</span>
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
@@ -962,7 +624,7 @@ export default function AdminDashboard() {
             )}
             <div className="overflow-hidden">
               <h4 className="text-xs font-black truncate">
-                {user?.fullName || "Admin hệ thống"}
+                {user?.fullName || "Admin"}
               </h4>
               <p className="text-[10px] text-[#6B635B] truncate">
                 {user?.email}
@@ -982,7 +644,6 @@ export default function AdminDashboard() {
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
         <header className="h-16 bg-white border-b border-[#E8E2D9] px-6 flex justify-between items-center text-xs font-semibold text-[#6B635B] shrink-0">
           <span>Quản Trị Hệ Thống — {activeMenu.toUpperCase()}</span>
-
           <div className="flex items-center gap-4">
             <NotificationBell
               onOpenLeaderRequest={(id) => {
@@ -990,7 +651,6 @@ export default function AdminDashboard() {
                 setActiveMenu("leader-leave");
               }}
             />
-
             <span className="text-[#E65100] font-bold">
               Xin chào, {user?.fullName || "Admin"}
             </span>
@@ -998,7 +658,6 @@ export default function AdminDashboard() {
         </header>
 
         <div className="w-full flex-1 flex flex-col">
-          {/* --- MONITORING --- */}
           {activeMenu === "monitoring" && (
             <section className="p-8 space-y-6">
               <div className="bg-white p-6 border border-[#E8E2D9] space-y-2 rounded-2xl flex justify-between items-center shadow-xs">
@@ -1007,11 +666,11 @@ export default function AdminDashboard() {
                     Giám sát đầu kỳ
                   </span>
                   <h1 className="text-xl font-black text-[#2C2825] mt-1">
-                    Thống kê tổng quan sinh viên & nhóm đồ án
+                    Thống kê tổng quan sinh viên & nhóm đồ án Capstone
                   </h1>
                 </div>
                 <button
-                  onClick={fetchReportsSummary}
+                  onClick={fetchAdminData}
                   className="px-4 py-2 bg-orange-50 text-[#E65100] hover:bg-orange-100 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                 >
                   <span>🔄</span> Làm mới dữ liệu
@@ -1049,7 +708,7 @@ export default function AdminDashboard() {
                 ].map((metric) => (
                   <div
                     key={metric.label}
-                    className="rounded-2xl border border-[#E8E2D9] bg-white p-5 flex items-center justify-between shadow-xs hover:shadow-md transition"
+                    className="rounded-2xl border border-[#E8E2D9] bg-white p-5 flex items-center justify-between shadow-xs"
                   >
                     <div>
                       <p className="text-xs font-bold text-[#6B635B]">
@@ -1070,14 +729,9 @@ export default function AdminDashboard() {
 
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-xs space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-black text-[#2C2825]">
-                      📊 Tỷ lệ phân bổ vai trò tài khoản
-                    </h3>
-                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg font-bold">
-                      Hệ thống
-                    </span>
-                  </div>
+                  <h3 className="text-sm font-black text-[#2C2825]">
+                    📊 Tỷ lệ phân bổ vai trò tài khoản
+                  </h3>
                   <div className="h-84 w-full pt-4 flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -1098,6 +752,13 @@ export default function AdminDashboard() {
                               fill: "#10B981",
                             },
                             {
+                              name: "Moderator",
+                              value: manageableUsers.filter(
+                                (u) => u.role === "MODERATOR",
+                              ).length,
+                              fill: "#8B5CF6",
+                            },
+                            {
                               name: "Admin",
                               value: manageableUsers.filter(
                                 (u) => u.role === "ADMIN",
@@ -1112,38 +773,9 @@ export default function AdminDashboard() {
                           paddingAngle={4}
                           dataKey="value"
                           nameKey="name"
-                          labelLine={({ points, stroke }) => (
-                            <polyline
-                              points={points
-                                .map((point) => `${point.x},${point.y}`)
-                                .join(" ")}
-                              stroke={stroke || "#9CA3AF"}
-                              strokeWidth={1.5}
-                              fill="none"
-                            />
-                          )}
-                          label={({
-                            name,
-                            percent,
-                            x,
-                            y,
-                            textAnchor,
-                            fill,
-                          }) => (
-                            <text
-                              x={x}
-                              y={y}
-                              fill={fill}
-                              fontSize={12}
-                              fontWeight={700}
-                              textAnchor={textAnchor}
-                              dominantBaseline="central"
-                            >
-                              {`${name} ${(percent * 100).toFixed(1)}%`}
-                            </text>
-                          )}
+                          label
                         >
-                          {["#3B82F6", "#10B981", "#EF4444"].map(
+                          {["#3B82F6", "#10B981", "#8B5CF6", "#EF4444"].map(
                             (color, index) => (
                               <Cell key={`cell-${index}`} fill={color} />
                             ),
@@ -1157,23 +789,15 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-xs space-y-5">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-black text-[#2C2825]">
-                      📈 Thống kê sĩ số nhóm đồ án
-                    </h3>
-                    <span className="text-[10px] bg-orange-50 text-[#E65100] px-2.5 py-1 rounded-lg font-bold">
-                      Quy chuẩn 3-5 người
-                    </span>
-                  </div>
-
+                  <h3 className="text-sm font-black text-[#2C2825]">
+                    📈 Thống kê sĩ số nhóm đồ án
+                  </h3>
                   <div className="space-y-4 pt-2">
                     {(() => {
                       const validGroups = groups.filter((g) => {
                         const count =
                           g.memberCount ??
                           g.numberOfMembers ??
-                          g.currentMembers ??
-                          g.totalMembers ??
                           (Array.isArray(g.members) ? g.members.length : 0);
                         return count >= 3 && count <= 5;
                       }).length;
@@ -1187,7 +811,7 @@ export default function AdminDashboard() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs font-bold">
                               <span className="text-emerald-700">
-                                Nhóm đạt chuẩn sĩ số (3 - 5 thành viên)
+                                Nhóm đạt chuẩn sĩ số (3 - 5 người)
                               </span>
                               <span>
                                 {validGroups} nhóm ({validPercent}%)
@@ -1195,16 +819,15 @@ export default function AdminDashboard() {
                             </div>
                             <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
                               <div
-                                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                                className="bg-emerald-500 h-full rounded-full"
                                 style={{ width: `${validPercent}%` }}
                               ></div>
                             </div>
                           </div>
-
                           <div className="space-y-2 pt-2">
                             <div className="flex justify-between text-xs font-bold">
                               <span className="text-amber-700">
-                                Nhóm chưa đạt chuẩn sĩ số (&lt; 3 hoặc &gt; 5)
+                                Nhóm chưa đạt chuẩn (&lt; 3 hoặc &gt; 5)
                               </span>
                               <span>
                                 {invalidGroups} nhóm ({100 - validPercent}%)
@@ -1212,27 +835,10 @@ export default function AdminDashboard() {
                             </div>
                             <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
                               <div
-                                className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                                className="bg-amber-500 h-full rounded-full"
                                 style={{ width: `${100 - validPercent}%` }}
                               ></div>
                             </div>
-                          </div>
-
-                          <div className="pt-4 p-4 bg-[#FBF9F5] rounded-xl border border-[#E8E2D9] text-xs text-[#6B635B] space-y-1">
-                            <p className="font-bold text-[#2C2825]">
-                              💡 Gợi ý vận hành:
-                            </p>
-                            <p>
-                              Toàn bộ hệ thống hiện đang có{" "}
-                              <strong>{groups.length} nhóm</strong> đăng ký hoạt
-                              động trong học kỳ này. Admin có thể kiểm tra chi
-                              tiết tại tab{" "}
-                              <em>
-                                {" "}
-                                <strong>Danh sách nhóm</strong>
-                              </em>
-                              .
-                            </p>
                           </div>
                         </>
                       );
@@ -1254,17 +860,15 @@ export default function AdminDashboard() {
             />
           )}
 
-          {/* --- ACCOUNTS & CONDITION FLAGS --- */}
           {activeMenu === "accounts" && (
             <div className="p-8 space-y-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl gap-4">
+              <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl">
                 <div>
                   <h2 className="text-xl font-black text-[#2C2825]">
-                    Quản lý tài khoản & Cờ điều kiện sinh viên
+                    Quản lý tài khoản & Cờ điều kiện
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Bao gồm tài khoản hệ thống và các sinh viên đăng ký bằng
-                    email cá nhân đã được duyệt.
+                    Quản lý tài khoản sinh viên, leader, moderator và admin.
                   </p>
                 </div>
                 <button
@@ -1283,6 +887,7 @@ export default function AdminDashboard() {
                   {[
                     { label: "Tất cả", value: "" },
                     { label: "Admin", value: "ADMIN" },
+                    { label: "Moderator", value: "MODERATOR" },
                     { label: "Leader", value: "LEADER" },
                     { label: "Student", value: "STUDENT" },
                     { label: "Không đủ điều kiện", value: "NOT_ELIGIBLE" },
@@ -1321,9 +926,7 @@ export default function AdminDashboard() {
                       <th className="p-4 font-black uppercase">Họ và tên</th>
                       <th className="p-4 font-black uppercase">Email</th>
                       <th className="p-4 font-black uppercase">Vai trò</th>
-                      <th className="p-4 font-black uppercase">
-                        Trạng thái / Cờ điều kiện
-                      </th>
+                      <th className="p-4 font-black uppercase">Trạng thái</th>
                       <th className="p-4 font-black uppercase text-left">
                         Thao tác
                       </th>
@@ -1350,9 +953,7 @@ export default function AdminDashboard() {
                             <td className="p-4 text-[#6B635B]">{u.email}</td>
                             <td className="p-4">
                               <span
-                                className={`px-3 py-1 font-extrabold text-[10px] uppercase rounded-lg ${getRoleBadgeStyle(
-                                  getManagedRole(u.role),
-                                )}`}
+                                className={`px-3 py-1 font-extrabold text-[10px] uppercase rounded-lg ${getRoleBadgeStyle(getManagedRole(u.role))}`}
                               >
                                 {getManagedRole(u.role)}
                               </span>
@@ -1362,36 +963,28 @@ export default function AdminDashboard() {
                                 className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${isEligible ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600 border border-red-200"}`}
                               >
                                 {isEligible
-                                  ? "Đủ điều kiện "
-                                  : "📌 Không đủ điều kiện "}
+                                  ? "Đủ điều kiện"
+                                  : "📌 Không đủ điều kiện"}
                               </span>
                             </td>
                             <td className="p-4 text-left">
                               <div className="flex items-center justify-start gap-2 whitespace-nowrap">
-                                {/* Nút sửa */}
                                 <button
                                   onClick={() => handleOpenEditUser(u)}
-                                  className="px-3 py-1.5 bg-white border border-[#E8E2D9] hover:bg-gray-100 font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1 shadow-xs"
+                                  className="px-3 py-1.5 bg-white border border-[#E8E2D9] hover:bg-gray-100 font-bold rounded-xl text-xs cursor-pointer shadow-xs"
                                 >
-                                  <span>✏️</span> Sửa
+                                  ✏️ Sửa
                                 </button>
-
-                                {/* Chỉ hiển thị nút gắn/gỡ cờ nếu tài khoản KHÔNG PHẢI là ADMIN */}
                                 {getManagedRole(u.role) !== "ADMIN" && (
                                   <button
                                     onClick={() => handleToggleEligibility(u)}
-                                    className={`px-3 py-1.5 font-bold rounded-xl text-xs transition cursor-pointer border shadow-xs flex items-center gap-1 ${
+                                    className={`px-3 py-1.5 font-bold rounded-xl text-xs transition cursor-pointer border shadow-xs ${
                                       isEligible
-                                        ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                        ? "bg-red-50 text-red-600 border-red-200"
+                                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     }`}
                                   >
-                                    <span>{isEligible ? "📌" : "🟢"}</span>
-                                    <span>
-                                      {isEligible
-                                        ? "Gắn cờ không đủ điều kiện"
-                                        : "Gỡ cờ đủ điều kiện"}
-                                    </span>
+                                    {isEligible ? "📌 Gắn cờ" : "🟢 Gỡ cờ"}
                                   </button>
                                 )}
                               </div>
@@ -1415,29 +1008,15 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- STUDENT SIGN-UPS WITH A PERSONAL EMAIL --- */}
-          {activeMenu === "registrations" && (
-            <RegistrationReview
-              onChanged={() => {
-                fetchAdminData();
-                loadPendingRegistrationCount();
-              }}
-            />
-          )}
-
-          {/* --- GROUPS MANAGEMENT --- */}
           {activeMenu === "groups" && (
             <div className="p-8 space-y-6">
-              <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl">
-                <div>
-                  <h2 className="text-xl font-black text-[#2C2825]">
-                    Quản lý danh sách nhóm đồ án
-                  </h2>
-                  <p className="text-xs text-[#6B635B]">
-                    Theo dõi toàn bộ các nhóm, kiểm tra sĩ số và can thiệp thay
-                    đổi Leader hoặc thành viên khi cần thiết.
-                  </p>
-                </div>
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl">
+                <h2 className="text-xl font-black text-[#2C2825]">
+                  Quản lý danh sách nhóm đồ án
+                </h2>
+                <p className="text-xs text-[#6B635B]">
+                  Theo dõi toàn bộ các nhóm Capstone Project.
+                </p>
               </div>
 
               <input
@@ -1457,14 +1036,8 @@ export default function AdminDashboard() {
                       <th className="p-4 font-black uppercase">
                         Sĩ số thành viên
                       </th>
-                      <th className="p-4 font-black uppercase">
-                        Trạng thái nhóm
-                      </th>
-                      <th className="p-4 font-black uppercase">
-                        Trạng thái duyệt
-                      </th>
                       <th className="p-4 font-black uppercase text-right">
-                        Can thiệp Admin
+                        Thao tác
                       </th>
                     </tr>
                   </thead>
@@ -1474,12 +1047,7 @@ export default function AdminDashboard() {
                         const count =
                           g.memberCount ??
                           g.numberOfMembers ??
-                          g.currentMembers ??
-                          g.totalMembers ??
-                          (Array.isArray(g.members) ? g.members.length : 0) ??
-                          (Array.isArray(g.studentIds)
-                            ? g.studentIds.length
-                            : 0);
+                          (Array.isArray(g.members) ? g.members.length : 0);
                         const isValidSize = count >= 3 && count <= 5;
                         return (
                           <tr
@@ -1500,58 +1068,6 @@ export default function AdminDashboard() {
                                 {isValidSize ? "Hợp lệ" : "Chưa đạt chuẩn"})
                               </span>
                             </td>
-                            <td className="p-4 font-medium text-[#6B635B]">
-                              Hoạt động
-                            </td>
-
-                            <td className="p-4">
-                              {g.rosterStatus === "SUBMITTED" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setRosterReviewGroup(g);
-                                    setRosterReviewNote("");
-                                  }}
-                                  className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100"
-                                >
-                                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                  Chờ duyệt
-                                </button>
-                              ) : (
-                                <span
-                                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
-                                    g.rosterStatus === "APPROVED"
-                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                      : g.rosterStatus === "REJECTED"
-                                        ? "border-red-200 bg-red-50 text-red-700"
-                                        : g.rosterStatus === "DRAFT"
-                                          ? "border-orange-200 bg-orange-50 text-[#B96943]"
-                                          : "border-gray-200 bg-gray-50 text-gray-600"
-                                  }`}
-                                >
-                                  <span
-                                    className={`h-1.5 w-1.5 rounded-full ${
-                                      g.rosterStatus === "APPROVED"
-                                        ? "bg-emerald-500"
-                                        : g.rosterStatus === "REJECTED"
-                                          ? "bg-red-500"
-                                          : g.rosterStatus === "DRAFT"
-                                            ? "bg-[#C9784F]"
-                                            : "bg-gray-400"
-                                    }`}
-                                  />
-
-                                  {g.rosterStatus === "APPROVED"
-                                    ? "Đã duyệt"
-                                    : g.rosterStatus === "REJECTED"
-                                      ? "Đã từ chối"
-                                      : g.rosterStatus === "DRAFT"
-                                        ? "Chưa gửi duyệt"
-                                        : g.rosterStatus || "Chưa xác định"}
-                                </span>
-                              )}
-                            </td>
-
                             <td className="p-4 text-right">
                               <button
                                 type="button"
@@ -1567,7 +1083,7 @@ export default function AdminDashboard() {
                     ) : (
                       <tr>
                         <td
-                          colSpan="5"
+                          colSpan="4"
                           className="p-8 text-center text-[#6B635B] italic"
                         >
                           Không tìm thấy nhóm đồ án nào.
@@ -1580,280 +1096,65 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* --- EXPORT EXCEL REPORT --- */}
-
           {activeMenu === "export" && (
             <div className="min-h-full w-full bg-[#FBF8F4] p-5 text-[#020202] sm:p-7 xl:p-10">
               <div className="mx-auto w-full max-w-[1600px] space-y-8">
-                {/* Header */}
-                <section className="relative overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm">
-                  <div className="flex flex-col justify-between gap-5 p-6 sm:p-8 md:flex-row md:items-center">
-                    <div className="max-w-2xl">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-[#F8EAE0] px-3 py-1.5 text-[11px] font-bold text-[#A96745]">
-                        <span className="h-2 w-2 rounded-full bg-[#C98C68]" />
-                        QT15 · BÁO CÁO BÀN GIAO
-                      </span>
-
-                      <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">
-                        Xuất báo cáo ghép nhóm
-                      </h1>
-
-                      <p className="mt-2 max-w-xl text-sm leading-6 text-[#81766D]">
-                        Tổng hợp thông tin nhóm và tình trạng sinh viên thành
-                        file Excel, hỗ trợ kiểm tra và bàn giao dữ liệu nhanh
-                        chóng.
-                      </p>
-                    </div>
-
-                    <div className="hidden h-28 w-28 shrink-0 items-center justify-center rounded-3xl bg-[#F8EAE0] md:flex">
-                      <div className="flex h-20 w-16 flex-col gap-2 rounded-xl border border-[#E8D5C5] bg-white p-3 shadow-sm">
-                        <div className="h-3 rounded bg-[#D9A27F]" />
-                        <div className="h-2 rounded bg-[#EFE4DB]" />
-                        <div className="h-2 rounded bg-[#EFE4DB]" />
-                        <div className="h-2 rounded bg-[#EFE4DB]" />
-                        <div className="mt-auto h-2 w-7 rounded bg-[#D9A27F]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="h-1 bg-linear-to-r from-[#D9A27F] via-[#EBD3C2] to-[#F8EAE0]" />
+                <section className="relative overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm p-6 sm:p-8">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#F8EAE0] px-3 py-1.5 text-[11px] font-bold text-[#A96745]">
+                    QT15 · BÁO CÁO BÀN GIAO
+                  </span>
+                  <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">
+                    Xuất báo cáo ghép nhóm
+                  </h1>
+                  <p className="mt-2 text-sm text-[#81766D]">
+                    Tổng hợp thông tin nhóm và sinh viên thành file Excel.
+                  </p>
                 </section>
 
-                {/* Three sheet cards */}
-                <section className="space-y-4">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-[#B47C5C]">
-                      Tổng quan dữ liệu
-                    </p>
-                    <h2 className="mt-1 text-xl font-extrabold">
-                      Nội dung trong file Excel
-                    </h2>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {[
-                      {
-                        number: "01",
-                        title: "Danh sách nhóm",
-                        sheet: "Danh_sach_nhom",
-                        description:
-                          "Mã nhóm, học kỳ, trạng thái, sĩ số và thông tin từng thành viên.",
-                        icon: "▤",
-                      },
-                      {
-                        number: "02",
-                        title: "Chưa có nhóm",
-                        sheet: "Chua_co_nhom",
-                        description:
-                          "Sinh viên đủ điều kiện nhưng chưa tham gia nhóm.",
-                        icon: "♧",
-                      },
-                      {
-                        number: "03",
-                        title: "Không đủ điều kiện",
-                        sheet: "Khong_du_dieu_kien",
-                        description:
-                          "Sinh viên chưa đủ điều kiện và lý do tương ứng.",
-                        icon: "▧",
-                      },
-                    ].map((item) => (
-                      <article
-                        key={item.sheet}
-                        className="rounded-2xl border border-[#E9DED4] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F8EAE0] text-xl text-[#A96745]">
-                            {item.icon}
-                          </div>
-                          <span className="text-xs font-bold tracking-widest text-[#B9A99D]">
-                            {item.number}
-                          </span>
-                        </div>
-
-                        <h3 className="mt-4 font-extrabold">{item.title}</h3>
-                        <p className="mt-2 min-h-15 text-sm leading-5 text-[#81766D]">
-                          {item.description}
-                        </p>
-
-                        <div className="mt-4 border-t border-[#F0E8E1] pt-3">
-                          <span className="font-mono text-[11px] text-[#B47C5C]">
-                            {item.sheet}
-                          </span>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-
-                {/* Export area */}
                 <section className="grid items-start gap-5 lg:grid-cols-[1.15fr_0.85fr]">
                   <div className="rounded-3xl border border-[#E9DED4] bg-white p-6 shadow-sm sm:p-7">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F8EAE0] text-2xl text-[#A96745]">
-                        ↓
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-extrabold">
-                          Tạo file báo cáo
-                        </h2>
-                        <p className="mt-1 text-sm text-[#81766D]">
-                          Chọn học kỳ trước khi tải file.
-                        </p>
-                      </div>
-                    </div>
-
-                    <form
-                      onSubmit={handleExportExcel}
-                      className="mt-6 space-y-5"
-                    >
+                    <form onSubmit={handleExportExcel} className="space-y-5">
                       <div className="space-y-2">
-                        <label
-                          htmlFor="export-semester"
-                          className="text-xs font-bold uppercase tracking-wide text-[#6B635B]"
-                        >
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#6B635B]">
                           Học kỳ cần xuất báo cáo
                         </label>
-
                         <select
-                          id="export-semester"
                           value={exportSemester}
                           onChange={(e) => setExportSemester(e.target.value)}
-                          className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 text-sm outline-none transition focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
+                          className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 text-sm outline-none"
                         >
-                          <option value="">Tất cả học kỳ</option>
                           <option value="Fall2026">Fall 2026</option>
                           <option value="Spring2027">Spring 2027</option>
-                          <option value="Summer2027">Summer 2027</option>
-                          <option value="Fall2027">Fall 2027</option>
                         </select>
-
-                        <p className="text-xs text-[#968A80]">
-                          {exportSemester
-                            ? `Học kỳ đang chọn: ${exportSemester}`
-                            : "Xuất dữ liệu của tất cả học kỳ."}
-                        </p>
                       </div>
-
-                      <div className="rounded-2xl border border-[#EFE1D5] bg-[#FCF7F2] p-4">
-                        <p className="text-sm font-bold text-[#A96745]">
-                          Lưu ý khi xuất dữ liệu
-                        </p>
-                        <ul className="mt-3 space-y-2 text-sm leading-5 text-[#756B63]">
-                          <li>
-                            ✓ Thông tin được chia thành ba sheet riêng biệt.
-                          </li>
-                          <li>✓ MSSV được lưu dưới dạng văn bản.</li>
-                          <li>
-                            ✓ Có thể sử dụng bộ lọc trong Excel để tra cứu.
-                          </li>
-                        </ul>
-                      </div>
-
                       <button
                         type="submit"
                         disabled={exportingExcel}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff6f27] px-5 py-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff6f27] px-5 py-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943]"
                       >
-                        {exportingExcel ? (
-                          <>
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                            Đang tạo file Excel...
-                          </>
-                        ) : (
-                          <>↓ &nbsp; Tải xuống báo cáo (.xlsx)</>
-                        )}
+                        {exportingExcel
+                          ? "Đang tạo file Excel..."
+                          : "↓ Tải xuống báo cáo (.xlsx)"}
                       </button>
                     </form>
                   </div>
-
-                  {/* Quick guide */}
-                  <aside className="rounded-3xl border border-[#E9DED4] bg-[#fcefe3] p-6 sm:p-7">
-                    <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[#A96745]">
-                      Hướng dẫn nhanh
-                    </span>
-
-                    <h2 className="mt-4 text-xl font-extrabold">
-                      3 bước đơn giản
-                    </h2>
-
-                    <div className="mt-6 space-y-5">
-                      {[
-                        [
-                          "01",
-                          "Chọn học kỳ",
-                          "Chọn một học kỳ hoặc tất cả học kỳ.",
-                        ],
-                        [
-                          "02",
-                          "Xuất báo cáo",
-                          "Nhấn nút tải xuống để tạo file Excel.",
-                        ],
-                        [
-                          "03",
-                          "Kiểm tra dữ liệu",
-                          "Mở file và đối chiếu ba sheet.",
-                        ],
-                      ].map(([number, title, description]) => (
-                        <div key={number} className="flex gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E7D5C5] bg-white text-xs font-extrabold text-[#B77954]">
-                            {number}
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold">{title}</h3>
-                            <p className="mt-1 text-sm leading-5 text-[#81766D]">
-                              {description}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-7 rounded-xl border border-[#E7D5C5] bg-white/70 p-4">
-                      <p className="text-xs font-bold text-[#8E684F]">Gợi ý</p>
-                      <p className="mt-1 text-xs leading-5 text-[#81766D]">
-                        Kiểm tra học kỳ và thông tin sinh viên trước khi sử dụng
-                        báo cáo cho việc bàn giao.
-                      </p>
-                    </div>
-                  </aside>
                 </section>
               </div>
             </div>
           )}
 
-          {/* --- SETTINGS --- */}
-
           {activeMenu === "settings" && (
             <section className="p-6 space-y-6 lg:p-8">
-              {/* HEADER */}
               <div>
                 <span className="inline-flex items-center rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-[#E65100]">
                   CẤU HÌNH HỆ THỐNG
                 </span>
                 <h1 className="mt-3 text-2xl font-black text-[#2C2825]">
-                  Cấu hình thời hạn
+                  Cấu hình học kỳ
                 </h1>
-                <p className="mt-2 text-sm text-[#81766D]">
-                  Quản lý lịch học kỳ và thời gian đăng ký nhóm đồ án.
-                </p>
               </div>
 
-              {/* 1. CẤU HÌNH HỌC KỲ */}
               <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 shadow-sm sm:p-7">
-                <div className="mb-6 flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xl">
-                    📅
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-[#2C2825]">
-                      Ngày bắt đầu học kỳ
-                    </h2>
-                    <p className="mt-1 text-sm text-[#81766D]">
-                      Thiết lập lịch học kỳ để phục vụ việc lên lịch review.
-                    </p>
-                  </div>
-                </div>
-
                 <div className="grid gap-5 md:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-bold text-[#51463F]">
@@ -1863,13 +1164,14 @@ export default function AdminDashboard() {
                       type="text"
                       value={systemSettings.semester}
                       onChange={(e) =>
-                        updateSystemSetting("semester", e.target.value)
+                        setSystemSettings({
+                          ...systemSettings,
+                          semester: e.target.value,
+                        })
                       }
-                      placeholder="Ví dụ: Fall2026"
-                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100]"
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none"
                     />
                   </div>
-
                   <div>
                     <label className="mb-2 block text-sm font-bold text-[#51463F]">
                       Ngày bắt đầu học kỳ
@@ -1879,45 +1181,15 @@ export default function AdminDashboard() {
                       value={semesterStartDate}
                       onChange={(e) => setSemesterStartDate(e.target.value)}
                       disabled={semesterCalendarLoading || savingSemesterDate}
-                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100] disabled:opacity-60"
+                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none"
                     />
-                    {semesterCalendarLoading && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Đang tải lịch học kỳ...
-                      </p>
-                    )}
                   </div>
                 </div>
-
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      loadSemesterCalendar(systemSettings.semester)
-                    }
-                    disabled={
-                      semesterCalendarLoading || !systemSettings.semester.trim()
-                    }
-                    className="rounded-xl border border-[#E8E2D9] px-4 py-3 text-sm font-bold text-[#51463F] transition hover:bg-[#FBF9F5] disabled:opacity-50"
-                  >
-                    Tải lịch học kỳ
-                  </button>
-
+                <div className="mt-5 flex gap-3">
                   <button
                     type="button"
                     disabled={savingSemesterDate || !semesterStartDate}
                     onClick={async () => {
-                      if (
-                        !systemSettings.semester.trim() ||
-                        !semesterStartDate
-                      ) {
-                        showToast(
-                          "Vui lòng nhập mã học kỳ và ngày bắt đầu.",
-                          "error",
-                        );
-                        return;
-                      }
-
                       setSavingSemesterDate(true);
                       try {
                         await updateSemesterStartDate(
@@ -1927,167 +1199,22 @@ export default function AdminDashboard() {
                         showToast("Đã lưu ngày bắt đầu học kỳ thành công!");
                       } catch (error) {
                         showToast(
-                          error.response?.data?.message ||
-                            "Không thể lưu ngày bắt đầu học kỳ.",
+                          "Không thể lưu ngày bắt đầu học kỳ.",
                           "error",
                         );
                       } finally {
                         setSavingSemesterDate(false);
                       }
                     }}
-                    className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#D84315] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white"
                   >
                     {savingSemesterDate ? "Đang lưu..." : "Lưu ngày bắt đầu"}
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. QUẢN LÝ ĐỢT ĐĂNG KÝ NHÓM */}
-              <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 shadow-sm sm:p-7">
-                <div className="mb-6 flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-xl">
-                    ⏱️
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-[#2C2825]">
-                      Quản lý đợt đăng ký nhóm
-                    </h2>
-                    <p className="mt-1 text-sm text-[#81766D]">
-                      Thiết lập thời lượng và theo dõi thời gian đăng ký.
-                    </p>
-                  </div>
-                </div>
-
-                {/* THỜI GIAN ĐĂNG KÝ */}
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
-                      Thời gian bắt đầu
-                    </label>
-
-                    <input
-                      type="datetime-local"
-                      value={registrationStartInput}
-                      onChange={(e) =>
-                        setRegistrationStartInput(e.target.value)
-                      }
-                      disabled={isRegistrationOpen}
-                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100] disabled:opacity-60"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-[#51463F]">
-                      Thời gian kết thúc
-                    </label>
-
-                    <input
-                      type="datetime-local"
-                      value={registrationEndInput}
-                      onChange={(e) => setRegistrationEndInput(e.target.value)}
-                      disabled={isRegistrationOpen}
-                      className="w-full rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] px-4 py-3 outline-none focus:border-[#E65100] disabled:opacity-60"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-xs text-[#81766D]">
-                  Chọn ngày và giờ cụ thể. Hệ thống sẽ tính thời lượng đăng ký
-                  từ hai mốc này.
-                </p>
-
-                {/* COUNTDOWN */}
-                <div className="mt-6 rounded-2xl border border-orange-100 bg-orange-50/70 p-5 sm:p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-[#51463F]">
-                      Trạng thái đợt đăng ký
-                    </p>
-
-                    <span
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                        isRegistrationOpen
-                          ? "bg-emerald-100 text-emerald-700"
-                          : registrationRound?.status === "CLOSED" ||
-                              (registrationRound && remainingMs === 0)
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {isRegistrationOpen
-                        ? "● Đang mở"
-                        : registrationRound?.status === "CLOSED" ||
-                            (registrationRound && remainingMs === 0)
-                          ? "Đã đóng"
-                          : "Chưa bắt đầu"}
-                    </span>
-                  </div>
-
-                  <p className="mt-5 text-sm text-[#81766D]">
-                    Thời gian còn lại
-                  </p>
-                  <p className="mt-1 font-mono text-4xl font-black tracking-tight text-[#E65100] sm:text-5xl">
-                    {isRegistrationOpen ? countdownText : "00:00:00"}
-                  </p>
-
-                  {registrationRound && (
-                    <div className="mt-5 grid gap-3 border-t border-orange-200 pt-4 text-sm sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs text-[#81766D]">Bắt đầu</p>
-                        <p className="mt-1 font-semibold text-[#51463F]">
-                          {new Date(registrationRound.startTime).toLocaleString(
-                            "vi-VN",
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-[#81766D]">Kết thúc</p>
-                        <p className="mt-1 font-semibold text-[#51463F]">
-                          {new Date(registrationRound.endTime).toLocaleString(
-                            "vi-VN",
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ACTIONS */}
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.setItem(
-                        "adminSystemSettings",
-                        JSON.stringify(systemSettings),
-                      );
-                      handleStartRegistrationRound();
-                    }}
-                    disabled={
-                      isRegistrationOpen ||
-                      !Number.isFinite(
-                        Number(systemSettings.groupRegistrationHours),
-                      ) ||
-                      Number(systemSettings.groupRegistrationHours) <= 0
-                    }
-                    className="rounded-xl bg-[#E65100] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#D84315] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Bắt đầu đợt đăng ký
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleEndRegistrationRound}
-                    disabled={!isRegistrationOpen}
-                    className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Kết thúc đợt ngay
                   </button>
                 </div>
               </div>
             </section>
           )}
 
-          {/* --- PROFILE --- */}
           {activeMenu === "profile" && (
             <div className="p-8 w-full">
               <Profile />
@@ -2096,6 +1223,7 @@ export default function AdminDashboard() {
         </div>
       </main>
 
+      {/* MODAL THÊM/SỬA USER */}
       {isUserModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form
@@ -2126,7 +1254,7 @@ export default function AdminDashboard() {
               />
             </label>
             <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
-              Email trường
+              Email
               <input
                 type="email"
                 value={userForm.email}
@@ -2161,6 +1289,7 @@ export default function AdminDashboard() {
               >
                 <option value="STUDENT">Student</option>
                 <option value="LEADER">Leader</option>
+                <option value="MODERATOR">Moderator</option>
                 <option value="ADMIN">Admin</option>
               </select>
             </label>
@@ -2184,6 +1313,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* MODAL ĐỔI LEADER */}
       {leaderModalOpen && selectedGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form
@@ -2191,35 +1321,19 @@ export default function AdminDashboard() {
             className="w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-xl"
           >
             <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <h3 className="text-lg font-black text-[#2C2825]">
-                  Đổi Leader nhóm {selectedGroup.groupCode}
-                </h3>
-                <p className="mt-1 text-xs text-[#6B635B]">
-                  Chọn một thành viên đang hoạt động làm Leader mới.
-                </p>
-              </div>
-
+              <h3 className="text-lg font-black text-[#2C2825]">
+                Đổi Leader nhóm {selectedGroup.groupCode}
+              </h3>
               <button
                 type="button"
                 onClick={() => setLeaderModalOpen(false)}
-                disabled={changingLeader}
-                className="font-bold text-gray-400 hover:text-black"
+                className="font-bold text-gray-400"
               >
                 ✕
               </button>
             </div>
-
-            <div className="rounded-xl bg-orange-50 p-4 text-sm">
-              <p className="font-bold text-[#E65100]">Leader hiện tại</p>
-              <p className="mt-1">
-                {selectedGroup.members?.find((member) => member.isLeader)
-                  ?.userFullName || "Chưa xác định"}
-              </p>
-            </div>
-
             <label className="block space-y-2 text-sm font-bold">
-              Leader mới
+              Chọn Leader mới
               <select
                 value={newLeaderId}
                 onChange={(event) => setNewLeaderId(event.target.value)}
@@ -2235,215 +1349,29 @@ export default function AdminDashboard() {
                       member.userId,
                   )
                   .map((member) => (
-                    <option key={member.id} value={member.userId}>
+                    <option key={member.userId} value={member.userId}>
                       {member.userFullName} ({member.userEmail})
                     </option>
                   ))}
               </select>
             </label>
-
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-              Admin chọn một thành viên đang hoạt động làm Leader mới. Việc
-              Leader cũ rời nhóm sẽ được xử lý theo quy trình xin rời nhóm,
-              không tự động xóa thành viên trong thao tác đổi Leader.
-            </div>
-
             <div className="flex justify-end gap-3 border-t pt-4">
               <button
                 type="button"
                 onClick={() => setLeaderModalOpen(false)}
-                disabled={changingLeader}
                 className="rounded-xl bg-gray-100 px-5 py-2.5 text-xs font-bold"
               >
                 Hủy
               </button>
-
               <button
                 type="submit"
                 disabled={changingLeader || !newLeaderId}
-                className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-bold text-white"
               >
-                {changingLeader ? "Đang xử lý..." : "Xác nhận đổi Leader"}
+                {changingLeader ? "Đang xử lý..." : "Xác nhận"}
               </button>
             </div>
           </form>
-        </div>
-      )}
-
-      {rosterReviewGroup && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-black text-[#2C2825]">
-                Duyệt danh sách nhóm
-              </h3>
-
-              <button
-                type="button"
-                onClick={() => setRosterReviewGroup(null)}
-                disabled={reviewingRoster}
-                className="text-xl text-gray-400 hover:text-gray-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <p className="mb-4 text-sm text-gray-600">
-              Nhóm:{" "}
-              <strong className="text-[#E65100]">
-                {rosterReviewGroup.groupCode}
-              </strong>
-            </p>
-
-            <label className="mb-2 block text-sm font-bold">
-              Ghi chú / Lý do từ chối
-            </label>
-
-            <textarea
-              value={rosterReviewNote}
-              onChange={(e) => setRosterReviewNote(e.target.value)}
-              rows={3}
-              placeholder="Nhập ghi chú nếu cần..."
-              className="w-full rounded-xl border border-[#E8E2D9] p-3 text-sm outline-none focus:border-[#E65100]"
-              disabled={reviewingRoster}
-            />
-
-            <div className="mt-5 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setRosterReviewGroup(null)}
-                disabled={reviewingRoster}
-                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold"
-              >
-                Hủy bỏ
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleReviewRoster(false)}
-                disabled={reviewingRoster || !rosterReviewNote.trim()}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              >
-                Từ chối
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleReviewRoster(true)}
-                disabled={reviewingRoster}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {reviewingRoster ? "Đang xử lý..." : "Xác nhận duyệt"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {eligibilityConfirmUser && (
-        <div
-          className="fixed inset-0 z-100 flex items-center justify-center bg-[#2C2825]/40 p-4 backdrop-blur-sm"
-          onClick={() => {
-            if (!updatingEligibility) setEligibilityConfirmUser(null);
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="eligibility-modal-title"
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[#E8E2D9] bg-[#FBF9F5] shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {(() => {
-              const u = eligibilityConfirmUser;
-              const isCurrentlyEligible = u.eligible !== false;
-              const willBeEligible = !isCurrentlyEligible;
-
-              return (
-                <>
-                  <div className="flex items-start gap-4 border-b border-[#E8E2D9] bg-white p-6">
-                    <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl ${
-                        willBeEligible
-                          ? "bg-emerald-50 text-emerald-600"
-                          : "bg-orange-50 text-[#E65100]"
-                      }`}
-                    >
-                      {willBeEligible ? "✓" : "!"}
-                    </div>
-
-                    <div className="flex-1">
-                      <h2
-                        id="eligibility-modal-title"
-                        className="text-lg font-black text-[#2C2825]"
-                      >
-                        {willBeEligible
-                          ? "Gỡ cờ điều kiện?"
-                          : "Xác nhận chưa đủ điều kiện"}
-                      </h2>
-
-                      <p className="mt-1 text-sm leading-6 text-[#81766D]">
-                        Bạn có chắc muốn{" "}
-                        {willBeEligible ? "gỡ cờ cho" : "đánh cờ cho"} sinh viên
-                        này?
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 p-6">
-                    <div className="rounded-2xl border border-[#E8E2D9] bg-white p-4">
-                      <p className="text-sm font-extrabold text-[#2C2825]">
-                        {u.fullName || "Chưa có họ tên"}
-                      </p>
-                      <p className="mt-1 break-all text-xs text-[#81766D]">
-                        {u.email || "Chưa có email"}
-                      </p>
-                      {u.studentCode && (
-                        <p className="mt-2 text-xs font-bold text-[#A96745]">
-                          MSSV: {u.studentCode}
-                        </p>
-                      )}
-                    </div>
-
-                    {!willBeEligible && (
-                      <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-5 text-[#8C4B2D]">
-                        Nếu sinh viên đang là Trưởng nhóm, hệ thống sẽ xử lý
-                        việc chuyển Trưởng nhóm theo quy tắc của hệ thống.
-                      </div>
-                    )}
-
-                    <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-                      <button
-                        type="button"
-                        disabled={updatingEligibility}
-                        onClick={() => setEligibilityConfirmUser(null)}
-                        className="rounded-xl border border-[#E8E2D9] bg-white px-5 py-3 text-sm font-bold text-[#6B635B] transition hover:bg-[#F4EEE7] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Hủy
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={updatingEligibility}
-                        onClick={confirmToggleEligibility}
-                        className={`rounded-xl px-5 py-3 text-sm font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                          willBeEligible
-                            ? "bg-emerald-600 hover:bg-emerald-700"
-                            : "bg-[#E65100] hover:bg-[#D84315]"
-                        }`}
-                      >
-                        {updatingEligibility
-                          ? "Đang cập nhật..."
-                          : willBeEligible
-                            ? "Xác nhận gỡ cờ"
-                            : "Xác nhận đánh cờ"}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
         </div>
       )}
     </div>
