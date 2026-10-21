@@ -61,10 +61,23 @@ export const declineInvite = async (inviteId) => (await api.post(`/invitations/$
 
 
 // ==================== LEAVE GROUP REQUESTS ====================
+// ==================== LEAVE GROUP REQUESTS & DECISIONS ====================
 export const requestLeaveGroup = async (groupId, data) => (await api.post(`/groups/${groupId}/leave-requests`, data)).data;
 
 export const getGroupLeaveRequests = async (groupId) => (await api.get(`/groups/${groupId}/leave-requests`)).data;
 
-export const approveLeaveRequest = async (requestId) => (await api.post(`/leave-requests/${requestId}/approve`)).data;
+// Lấy danh sách complaints/leave-requests theo môn học cho Moderator/Admin
+export const getSubjectComplaints = async (subjectId, params) => (await api.get(`/subjects/${subjectId}/complaints`, { params })).data;
 
-export const rejectLeaveRequest = async (requestId, data) => (await api.post(`/leave-requests/${requestId}/reject`, data)).data;
+// Leader quyết định (phê duyệt / từ chối) yêu cầu rời nhóm
+export const leaderDecisionLeaveRequest = async (requestId, data) => (await api.post(`/leave-requests/${requestId}/leader-decision`, data)).data;
+
+// Moderator / Admin quyết định xử lý yêu cầu hoặc khiếu nại
+export const moderatorDecisionLeaveRequest = async (requestId, data) => (await api.post(`/leave-requests/${requestId}/moderator-decision`, data)).data;
+
+//===================================Subjects===================================//
+// Lấy danh sách môn học theo học kỳ từ Backend
+export const getSubjectsBySemester = async (semester) => {
+  const response = await api.get(`/semesters/${semester}/subjects`);
+  return response.data;
+};

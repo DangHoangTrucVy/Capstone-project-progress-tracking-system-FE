@@ -1,182 +1,253 @@
 import { useEffect, useState } from "react";
 import {
-  getImportedStudents,
+  getSemesters,
+  importStudents,
+  previewStudents,
+  importEligibilityFile,
+  previewEligibilityFile,
   updateStudentEligibility,
 } from "../../services/eligibilityService";
+import api from "../../services/api";
 import { apiError } from "../../utils/apiError";
 
-const example = JSON.stringify(
+const exampleJson = JSON.stringify(
   {
     students: [
       {
         email: "se170001@fpt.edu.vn",
         fullName: "Nguyễn Văn A",
         studentCode: "SE170001",
-        eligible: false,
-        reason: "Nợ học phí",
+        eligible: true,
+        reason: "Đủ điều kiện làm capstone",
       },
     ],
   },
   null,
   2,
 );
-const input = "rounded-xl border border-[#E8E2D9] p-3 text-sm bg-white";
 
-function StudentTable({ students }) {
+function ResultTable({ students }) {
+  if (!students || students.length === 0) return null;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+    <div className="mt-4 overflow-x-auto rounded-2xl border border-[#E8E2D9]">
+      <table className="w-full text-left text-xs">
         <thead>
-          <tr>
-            {[
-              "MSSV",
-              "Họ tên",
-              "Email",
-              "Điều kiện",
-              "Lý do",
-              "Kết quả / Ngày import",
-            ].map((label) => (
-              <th key={label} className="p-3">
-                {label}
-              </th>
-            ))}
+          <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
+            {["MSSV", "Họ và tên", "Email", "Trạng thái", "Lý do"].map(
+              (label) => (
+                <th key={label} className="p-3 font-bold uppercase">
+                  {label}
+                </th>
+              ),
+            )}
           </tr>
         </thead>
-        <tbody>
-          {students.map((s) => (
-            <tr key={s.userId || s.id || s.email} className="border-t">
-              <td className="p-3">{s.studentCode || "—"}</td>
-              <td className="p-3">{s.fullName}</td>
-              <td className="p-3">{s.email}</td>
-              <td className="p-3">
-                {s.eligible ? "Đủ điều kiện" : "Chưa đủ điều kiện"}
+        <tbody className="divide-y divide-[#E8E2D9] bg-white">
+          {students.map((s, idx) => (
+            <tr
+              key={s.userId || s.id || s.email || idx}
+              className="hover:bg-[#FBF9F5]/60 transition"
+            >
+              <td className="p-3 font-bold text-[#2C2825]">
+                {s.studentCode || s.mssv || "—"}
               </td>
-              <td className="p-3">
-                {s.ineligibleReason || s.reason || s.eligibilityReason || "—"}
+              <td className="p-3 font-semibold text-[#2C2825]">
+                {s.fullName || s.name || "—"}
               </td>
+              <td className="p-3 text-[#6B635B]">{s.email || "—"}</td>
               <td className="p-3">
-                {s.action ||
-                  (s.importedAt
-                    ? new Date(s.importedAt).toLocaleString("vi-VN")
-                    : "—")}
+                <span
+                  className={`px-2.5 py-1 rounded-lg font-bold text-[10px] ${s.eligible !== false ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}
+                >
+                  {s.eligible !== false ? "Đủ điều kiện" : "Không đủ điều kiện"}
+                </span>
+              </td>
+              <td className="p-3 text-[#6B635B]">
+                {s.reason || s.ineligibleReason || "—"}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      {!students.length && <p className="p-3">Không có sinh viên.</p>}
     </div>
   );
 }
 
 export default function EligibilityPanel({ onChanged }) {
-  const [json, setJson] = useState("");
-  const [file, setFile] = useState(null);
+  const [semesters, setSemesters] = useState([]);
+  const [selectedSemester, setSelectedSemester] = useState("");
+
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
   const [error, setError] = useState("");
-  const [items, setItems] = useState([]);
-  const [eligible, setEligible] = useState("");
-  const [query, setQuery] = useState("");
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [reload, setReload] = useState(0);
-  const [userId, setUserId] = useState("");
-  const [flag, setFlag] = useState("true");
-  const [reason, setReason] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [importResult, setImportResult] = useState(null);
 
-const [studentCode, setStudentCode] = useState("");
+  // Danh sách sinh viên theo học kỳ
+  const [semesterStudents, setSemesterStudents] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
+  // Form States
+  const [studentFile, setStudentFile] = useState(null);
+  const [jsonInput, setJsonInput] = useState("");
+  const [eligibilityFile, setEligibilityFile] = useState(null);
+
+  // Update single student eligibility state
+  const [singleStudentCode, setSingleStudentCode] = useState("");
+  const [singleEligibleFlag, setSingleEligibleFlag] = useState("true");
+  const [singleReason, setSingleReason] = useState("");
+
+  // 1. Lấy danh sách học kỳ từ Backend
+  useEffect(() => {
+    getSemesters()
+      .then((res) => {
+        const list = Array.isArray(res) ? res : res.content || [];
+        setSemesters(list);
+        if (list.length > 0) {
+          const firstSem = list[0].code || list[0].name || list[0];
+          setSelectedSemester(firstSem);
+        }
+      })
+      .catch((err) => setError(apiError(err)));
+  }, []);
+
+  // 2. Lấy danh sách sinh viên theo học kỳ được chọn
+  const fetchSemesterStudents = async (semCode) => {
+    if (!semCode) return;
+    setLoadingStudents(true);
+    try {
+      const res = await api.get(`/semesters/${semCode}/students`);
+      const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
+      setSemesterStudents(list);
+    } catch {
+      setSemesterStudents([]);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-    getImportedStudents({
-      page,
-      size: 20,
-      q: q || undefined,
-      eligible: eligible === "" ? undefined : eligible === "true",
-    })
-      .then((data) => {
-        if (!cancelled) {
-          setItems(data.content || []);
-          setTotalPages(data.totalPages || 0);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(apiError(err));
-          setItems([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [page, q, eligible, reload]);
+    if (selectedSemester) {
+      fetchSemesterStudents(selectedSemester);
+    }
+  }, [selectedSemester]);
 
-  const refresh = () => {
-    setLoading(true);
-    setReload((n) => n + 1);
-    onChanged?.();
-  };
-  const submit = async (event, kind) => {
-    event.preventDefault();
-    if (busy) return;
-    setBusy(true);
+  const clearMessages = () => {
     setError("");
-    setResult(null);
+    setSuccessMessage("");
+  };
+
+  // Xử lý Import danh sách sinh viên (File hoặc JSON)
+  const handleImportStudents = async (e, isPreview = false) => {
+    e.preventDefault();
+    if (busy || !selectedSemester) return;
+    setBusy(true);
+    clearMessages();
+    setImportResult(null);
+
     try {
-      let response;
-      if (kind === "file") {
-        if (!file) throw new Error("Vui lòng chọn file.");
-        const data = new FormData();
-        data.append("file", file);
-        response = await importEligibilityFile(data);
-      } else {
-        let data;
+      let res;
+      if (studentFile) {
+        const formData = new FormData();
+        formData.append("file", studentFile);
+        res = isPreview
+          ? await previewStudents(selectedSemester, formData)
+          : await importStudents(selectedSemester, formData);
+      } else if (jsonInput.trim()) {
+        let parsed;
         try {
-          data = JSON.parse(json);
+          parsed = JSON.parse(jsonInput);
         } catch {
-          throw new Error("JSON không hợp lệ. Vui lòng kiểm tra cú pháp.");
+          throw new Error(
+            "Định dạng JSON không hợp lệ. Vui lòng kiểm tra lại.",
+          );
         }
-        response = await importEligibilityJson(
-          Array.isArray(data) ? { students: data } : data,
+        const payload = Array.isArray(parsed) ? { students: parsed } : parsed;
+        res = isPreview
+          ? await previewStudents(selectedSemester, payload)
+          : await importStudents(selectedSemester, payload);
+      } else {
+        throw new Error(
+          "Vui lòng chọn file Excel/CSV hoặc nhập nội dung JSON.",
         );
       }
-      setResult(response);
-      refresh();
+
+      setImportResult(res);
+      setSuccessMessage(
+        isPreview
+          ? "Xem trước danh sách thành công!"
+          : "Import danh sách sinh viên vào học kỳ thành công!",
+      );
+      if (!isPreview) {
+        fetchSemesterStudents(selectedSemester);
+      }
+      onChanged?.();
     } catch (err) {
       setError(apiError(err));
     } finally {
       setBusy(false);
     }
   };
-  const update = async (event) => {
-    event.preventDefault();
 
-    if (busy || !studentCode.trim()) return;
+  // Xử lý Import file điều kiện sinh viên (Eligibility)
+  const handleImportEligibility = async (e, isPreview = false) => {
+    e.preventDefault();
+    if (busy || !selectedSemester || !eligibilityFile) return;
+    setBusy(true);
+    clearMessages();
+    setImportResult(null);
 
-    if (flag === "false" && !reason.trim()) {
+    try {
+      const formData = new FormData();
+      formData.append("file", eligibilityFile);
+
+      const res = isPreview
+        ? await previewEligibilityFile(selectedSemester, formData)
+        : await importEligibilityFile(selectedSemester, formData);
+
+      setImportResult(res);
+      setSuccessMessage(
+        isPreview
+          ? "Xem trước file điều kiện thành công!"
+          : "Import file điều kiện sinh viên thành công!",
+      );
+      if (!isPreview) {
+        fetchSemesterStudents(selectedSemester);
+      }
+      onChanged?.();
+    } catch (err) {
+      setError(apiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Xử lý cập nhật điều kiện lẻ cho 1 sinh viên
+  const handleUpdateSingleEligibility = async (e) => {
+    e.preventDefault();
+    if (busy || !singleStudentCode.trim() || !selectedSemester) return;
+
+    if (singleEligibleFlag === "false" && !singleReason.trim()) {
       setError("Vui lòng nhập lý do sinh viên chưa đủ điều kiện.");
       return;
     }
 
     setBusy(true);
-    setError("");
-    setResult(null);
+    clearMessages();
 
     try {
-      await updateStudentEligibility(studentCode.trim(), {
-        eligible: flag === "true",
-        reason: reason.trim(),
-      });
-      setStudentCode("");
-      setReason("");
-      refresh();
+      await updateStudentEligibility(
+        selectedSemester,
+        singleStudentCode.trim(),
+        {
+          eligible: singleEligibleFlag === "true",
+          reason: singleReason.trim(),
+        },
+      );
+      setSuccessMessage(`Đã cập nhật điều kiện cho MSSV: ${singleStudentCode}`);
+      setSingleStudentCode("");
+      setSingleReason("");
+      fetchSemesterStudents(selectedSemester);
+      onChanged?.();
     } catch (err) {
       setError(apiError(err));
     } finally {
@@ -186,458 +257,354 @@ const [studentCode, setStudentCode] = useState("");
 
   return (
     <section className="p-8 space-y-6 text-[#2C2825]">
-      <h1 className="text-xl font-bold">
-        Import & danh sách điều kiện sinh viên
-      </h1>
-      {error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">
-          {error}
-        </p>
-      )}
-
-      <form
-        onSubmit={(e) => submit(e, "file")}
-        className="overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm transition hover:shadow-md"
-      >
-        <div className="border-b border-[#F0E8E1] px-6 py-5 sm:px-7">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F8EAE0] text-[#B96943]">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <path d="m17 8-5-5-5 5" />
-                <path d="M12 3v12" />
-              </svg>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base font-black text-[#352D28]">
-                Import CSV / Excel
-              </h2>
-              <p className="mt-1 text-sm text-[#81766D]">
-                Tải danh sách sinh viên và cập nhật điều kiện hàng loạt.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {[".csv", ".xlsx", ".xls"].map((ext) => (
-                  <span
-                    key={ext}
-                    className="rounded-lg border border-[#E9DED4] bg-[#FCFAF7] px-2.5 py-1 text-xs font-semibold text-[#8D6B56]"
-                  >
-                    {ext}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
+      {/* Header & Chọn học kỳ */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
+        <div>
+          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-md">
+            QUẢN LÝ ĐẦU KỲ · IMPORT DỮ LIỆU
+          </span>
+          <h1 className="text-xl font-black mt-2">
+            Import Danh sách Sinh viên & Điều kiện
+          </h1>
+          <p className="text-xs text-[#6B635B] mt-1">
+            Tải lên danh sách sinh viên và thiết lập điều kiện tham gia đồ án
+            theo học kỳ.
+          </p>
         </div>
 
-        <div className="space-y-5 p-6 sm:p-7">
-          <label
-            htmlFor="eligibility-file"
-            className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#DFC5B2] bg-[#FCF8F4] px-5 py-8 text-center transition hover:border-[#C9784F] hover:bg-[#FAF0E8]"
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-[#6B635B]">Chọn học kỳ:</span>
+          <select
+            value={selectedSemester}
+            onChange={(e) => setSelectedSemester(e.target.value)}
+            className="p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#B96943] shadow-sm">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 16V4" />
-                <path d="m7 9 5-5 5 5" />
-                <path d="M20 16.5v2A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-2" />
-              </svg>
-            </span>
+            {semesters.map((sem, idx) => {
+              const semCode = sem.code || sem;
+              return (
+                <option key={idx} value={semCode}>
+                  {sem.name || semCode}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
 
-            <span className="mt-3 text-sm font-bold text-[#51463F]">
-              Chọn file từ máy tính
-            </span>
-            <span className="mt-1 text-xs text-[#968A80]">
-              Chọn file CSV hoặc Excel để bắt đầu import
-            </span>
+      {/* Thông báo lỗi / Thành công */}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-2xl bg-red-50 border border-red-200 p-4 text-xs font-bold text-red-700"
+        >
+          ❌ {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-xs font-bold text-emerald-700">
+          ✨ {successMessage}
+        </div>
+      )}
 
+      {/* 1. SECTION: IMPORT DANH SÁCH SINH VIÊN */}
+      <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 sm:p-7 space-y-6 shadow-sm">
+        <div>
+          <h2 className="text-base font-black text-[#2C2825]">
+            1. Import Danh sách Sinh viên chính thức
+          </h2>
+          <p className="text-xs text-[#6B635B] mt-1">
+            Cung cấp file (Excel/CSV) danh sách sinh viên.
+          </p>
+        </div>
+
+        <form
+          onSubmit={(e) => handleImportStudents(e, false)}
+          className="space-y-4"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#6B635B]">
+                Tải lên file danh sách (.csv, .xlsx)
+              </label>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                disabled={busy}
+                onChange={(e) => {
+                  setStudentFile(e.target.files?.[0] || null);
+                  setJsonInput("");
+                }}
+                className="block w-full cursor-pointer rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] p-3 text-xs text-[#6B635B]"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={busy || !studentFile}
+              className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              {busy ? "Đang xử lý..." : "✓ Xác nhận Import Sinh viên"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !studentFile}
+              onClick={(e) => handleImportStudents(e, true)}
+              className="px-5 py-3 bg-white border border-[#E8E2D9] hover:bg-gray-50 text-[#6B635B] text-xs font-bold rounded-xl disabled:opacity-50 cursor-pointer"
+            >
+              Xem trước (Preview)
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 2. SECTION: IMPORT ĐIỀU KIỆN SINH VIÊN (ELIGIBILITY) */}
+      <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 sm:p-7 space-y-6 shadow-sm">
+        <div>
+          <h2 className="text-base font-black text-[#2C2825]">
+            2. Import File Điều kiện sinh viên (Eligibility)
+          </h2>
+          <p className="text-xs text-[#6B635B] mt-1">
+            Cập nhật nhanh trạng thái đủ/chưa đủ điều kiện và lý do của sinh viên qua file.
+          </p>
+        </div>
+
+        <form
+          onSubmit={(e) => handleImportEligibility(e, false)}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
             <input
-              id="eligibility-file"
               type="file"
               accept=".csv,.xlsx,.xls"
               required
               disabled={busy}
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="mt-4 block w-full max-w-sm cursor-pointer rounded-xl border border-[#E9DED4] bg-white text-sm text-[#81766D] file:mr-3 file:cursor-pointer file:border-0 file:bg-[#F3E4D9] file:px-4 file:py-3 file:font-semibold file:text-[#92583B] hover:file:bg-[#EED8C8] disabled:opacity-50"
+              onChange={(e) => setEligibilityFile(e.target.files?.[0] || null)}
+              className="block w-full max-w-lg cursor-pointer rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] p-3 text-xs text-[#6B635B]"
             />
-          </label>
-
-          {file && (
-            <div className="flex items-center gap-3 rounded-xl border border-[#E5D9CE] bg-white p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8EAE0] text-xs font-black text-[#A96745]">
-                XLS
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-[#51463F]">
-                  {file.name}
-                </p>
-                <p className="mt-1 text-xs text-[#968A80]">
-                  {(file.size / 1024).toFixed(1)} KB
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setFile(null);
-                  const inputElement =
-                    document.getElementById("eligibility-file");
-                  if (inputElement) inputElement.value = "";
-                }}
-                disabled={busy}
-                className="rounded-lg px-3 py-2 text-xs font-semibold text-[#A96745] transition hover:bg-[#F8EAE0] disabled:opacity-50"
-              >
-                Bỏ file
-              </button>
-            </div>
-          )}
-
-          <div className="rounded-2xl border border-[#F0E2D5] bg-[#FCF8F4] p-4">
-            <p className="text-sm font-bold text-[#8D5639]">
-              Quy định dữ liệu import
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#81766D]">
-              Các cột gồm email, ho_ten, mssv, du_dieu_kien và ly_do. Chỉ dùng
-              MSSV để nhận diện khi sinh viên đã có tài khoản.
-            </p>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-[#F0E8E1] pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-[#968A80]">
-              Vui lòng kiểm tra file trước khi tải lên hệ thống.
-            </p>
-
+          <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={busy || !file}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C9784F] px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy || !eligibilityFile}
+              className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
             >
-              {busy ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  Đang xử lý...
-                </>
-              ) : (
-                <>
-                  <span>↑</span>
-                  Tải lên danh sách
-                </>
-              )}
+              {busy ? "Đang xử lý..." : "✓ Import File Điều kiện"}
             </button>
-          </div>
-        </div>
-      </form>
-
-      <form
-        onSubmit={(e) => submit(e, "json")}
-        className="overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm transition hover:shadow-md"
-      >
-        <div className="border-b border-[#F0E8E1] px-6 py-5 sm:px-7">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F8EAE0] text-[#B96943]">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m16 18 6-6-6-6" />
-                <path d="m8 6-6 6 6 6" />
-                <path d="m14 4-4 16" />
-              </svg>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base font-black text-[#352D28]">
-                Import JSON
-              </h2>
-              <p className="mt-1 text-sm text-[#81766D]">
-                Nhập dữ liệu sinh viên dưới dạng JSON để cập nhật điều kiện hàng
-                loạt.
-              </p>
-            </div>
-
-            <span className="shrink-0 rounded-lg bg-[#FCF0E7] px-3 py-1.5 text-xs font-bold text-[#A65D39]">
-              JSON
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-5 p-6 sm:p-7">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label
-                htmlFor="eligibility-json"
-                className="text-sm font-bold text-[#51463F]"
-              >
-                Nội dung dữ liệu
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setJson(example)}
-                disabled={busy}
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#A96745] transition hover:bg-[#F8EAE0] disabled:opacity-50"
-              >
-                Dùng dữ liệu mẫu
-              </button>
-            </div>
-
-            <textarea
-              id="eligibility-json"
-              className="min-h-65 w-full resize-y rounded-2xl border border-[#E9DED4] bg-[#FCFAF7] p-4 font-mono text-sm leading-6 text-[#51463F] outline-none transition placeholder:text-[#B3A69B] focus:border-[#C9784F] focus:bg-white focus:ring-4 focus:ring-[#C9784F]/10 disabled:cursor-not-allowed disabled:opacity-60"
-              rows={10}
-              placeholder={example}
-              value={json}
-              onChange={(e) => setJson(e.target.value)}
-              required
-              disabled={busy}
-              spellCheck={false}
-            />
-
-            <p className="text-xs leading-5 text-[#968A80]">
-              Hỗ trợ các trường: <code>email</code>, <code>fullName</code>,{" "}
-              <code>studentCode</code>, <code>eligible</code> và{" "}
-              <code>reason</code>.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[#F0E2D5] bg-[#FCF8F4] p-4">
-            <p className="text-sm font-bold text-[#8D5639]">Cấu trúc dữ liệu</p>
-            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap wrap-break-words font-mono text-xs leading-5 text-[#81766D]">
-              {`{
-  "students": [
-    {
-      "email": "se170001@fpt.edu.vn",
-      "fullName": "Nguyễn Văn A",
-      "studentCode": "SE170001",
-      "eligible": false,
-      "reason": "Nợ học phí"
-    }
-  ]
-}`}
-            </pre>
-          </div>
-
-          <div className="flex flex-col gap-3 border-t border-[#F0E8E1] pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-[#968A80]">
-              Kiểm tra cú pháp JSON trước khi gửi dữ liệu.
-            </p>
-
             <button
-              type="submit"
-              disabled={busy || !json.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C9784F] px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              disabled={busy || !eligibilityFile}
+              onClick={(e) => handleImportEligibility(e, true)}
+              className="px-5 py-3 bg-white border border-[#E8E2D9] hover:bg-gray-50 text-[#6B635B] text-xs font-bold rounded-xl disabled:opacity-50 cursor-pointer"
             >
-              {busy ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  Đang xử lý...
-                </>
-              ) : (
-                <>
-                  <span>↑</span>
-                  Import dữ liệu JSON
-                </>
-              )}
+              Xem trước Điều kiện (Preview)
             </button>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
 
-      {result && (
-        <div className="bg-white rounded-2xl border p-6 space-y-3">
-          <h2 className="font-bold">Kết quả import</h2>
-          <p>
-            Tạo: {result.created || 0} · Cập nhật: {result.updated || 0} · Gắn
-            cờ: {result.flagged || 0} · Gỡ cờ: {result.cleared || 0}
-          </p>
-          <StudentTable students={result.students || []} />
-          {!!result.invalid?.length && (
-            <div role="alert" className="text-red-700">
-              <h3>Dòng không hợp lệ</h3>
-              <ul>
-                {result.invalid.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      <form
-        onSubmit={update}
-        className="overflow-hidden rounded-3xl border border-[#E9DED4] bg-white shadow-sm"
-      >
-        <div className="border-b border-[#F0E8E1] p-6 sm:p-7">
-          <span className="rounded-full bg-[#F8EAE0] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[#A96745]">
-            Quản lý điều kiện
-          </span>
-
-          <h2 className="mt-3 text-xl font-black text-[#352D28]">
-            Cập nhật điều kiện sinh viên
+      {/* 3. SECTION: CẬP NHẬT ĐIỀU KIỆN ĐƠN LẺ */}
+      <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 sm:p-7 space-y-6 shadow-sm">
+        <div>
+          <h2 className="text-base font-black text-[#2C2825]">
+            3. Cập nhật thủ công cho từng Sinh viên
           </h2>
-
-          <p className="mt-2 text-sm leading-6 text-[#81766D]">
-            Nhập mã số sinh viên, chọn trạng thái và ghi rõ lý do để lưu vào danh
-            sách.
+          <p className="text-xs text-[#6B635B] mt-1">
+            Thay đổi trạng thái cờ điều kiện trực tiếp bằng Mã số sinh viên (MSSV).
           </p>
         </div>
 
-        <div className="grid gap-5 p-6 sm:p-7 lg:grid-cols-2">
-          <label className="space-y-2 text-sm font-semibold text-[#51463F]">
-            Mã số sinh viên
-            <input
-              aria-label="Mã số sinh viên"
-              className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 font-normal outline-none transition placeholder:text-[#B6AAA0] focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
-              value={studentCode}
-              onChange={(e) => setStudentCode(e.target.value)}
-              placeholder="Mã số sinh viên..."
-              required
-              disabled={busy}
-            />
-          </label>
+        <form onSubmit={handleUpdateSingleEligibility} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-xs font-bold text-[#6B635B]">
+              Mã số sinh viên (MSSV)
+              <input
+                className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] font-normal outline-none focus:border-[#E65100]"
+                value={singleStudentCode}
+                onChange={(e) => setSingleStudentCode(e.target.value)}
+                placeholder="VD: SE170001"
+                required
+                disabled={busy}
+              />
+            </label>
 
-          <label className="space-y-2 text-sm font-semibold text-[#51463F]">
-            Trạng thái điều kiện
-            <select
-              aria-label="Điều kiện mới"
-              className="w-full rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 font-normal outline-none transition focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20"
-              value={flag}
-              onChange={(e) => setFlag(e.target.value)}
-              disabled={busy}
-            >
-              <option value="true">Đủ điều kiện</option>
-              <option value="false">Chưa đủ điều kiện</option>
-            </select>
-          </label>
+            <label className="space-y-1 text-xs font-bold text-[#6B635B]">
+              Trạng thái điều kiện
+              <select
+                className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] font-normal outline-none focus:border-[#E65100]"
+                value={singleEligibleFlag}
+                onChange={(e) => setSingleEligibleFlag(e.target.value)}
+                disabled={busy}
+              >
+                <option value="true">Đủ điều kiện</option>
+                <option value="false">Chưa đủ điều kiện</option>
+              </select>
+            </label>
 
-          <label className="space-y-2 text-sm font-semibold text-[#51463F] lg:col-span-2">
-            Lý do cập nhật
-            <textarea
-              className="min-h-28 w-full resize-y rounded-xl border border-[#E5D9CE] bg-[#FCFAF7] px-4 py-3.5 font-normal outline-none transition placeholder:text-[#B6AAA0] focus:border-[#C98C68] focus:ring-2 focus:ring-[#D9A27F]/20 disabled:opacity-60"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={
-                flag === "false"
-                  ? "Ví dụ: Không đủ điều kiện làm đồ án do còn nợ học phí..."
-                  : "Nhập lý do cập nhật (nếu có)..."
-              }
-              required={flag === "false"}
-              disabled={busy}
-            />
-            <span className="block text-xs font-normal text-[#968A80]">
-              Khi chọn “Chưa đủ điều kiện”, Admin bắt buộc nhập lý do.
-            </span>
-          </label>
-        </div>
-
-        <div className="flex flex-col gap-3 border-t border-[#F0E8E1] bg-[#FCFAF7] p-6 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-          <p className="text-xs text-[#81766D]">
-            Thông tin cập nhật sẽ được làm mới trong danh sách sau khi lưu thành
-            công.
-          </p>
+            <label className="space-y-1 text-xs font-bold text-[#6B635B] sm:col-span-2">
+              Lý do cập nhật (Bắt buộc nếu chưa đủ điều kiện)
+              <textarea
+                className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FCFAF7] font-normal outline-none focus:border-[#E65100]"
+                value={singleReason}
+                onChange={(e) => setSingleReason(e.target.value)}
+                placeholder={
+                  singleEligibleFlag === "false"
+                    ? "Nhập lý do sinh viên chưa đủ điều kiện..."
+                    : "Nhập lý do (nếu có)..."
+                }
+                required={singleEligibleFlag === "false"}
+                disabled={busy}
+                rows={2}
+              />
+            </label>
+          </div>
 
           <button
             type="submit"
-            disabled={busy || !studentCode.trim()}
-            className="rounded-xl bg-[#C9784F] px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#B96943] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy || !singleStudentCode.trim()}
+            className="px-6 py-3 bg-[#2C2825] hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
           >
-            {busy ? "Đang cập nhật..." : "Lưu điều kiện"}
+            {busy ? "Đang lưu..." : "Lưu thay đổi điều kiện"}
+          </button>
+        </form>
+      </div>
+
+      {/* 4. SECTION: DANH SÁCH SINH VIÊN TRONG HỌC KỲ */}
+      <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 sm:p-7 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-black text-[#2C2825]">
+              Danh sách sinh viên trong học kỳ ({selectedSemester})
+            </h2>
+            <p className="text-xs text-[#6B635B] mt-1">
+              Tổng số: {semesterStudents.length} sinh viên đã được ghi nhận trên hệ thống.
+            </p>
+          </div>
+          <button
+            onClick={() => fetchSemesterStudents(selectedSemester)}
+            className="px-3 py-1.5 bg-orange-50 text-[#E65100] text-xs font-bold rounded-xl hover:bg-orange-100 cursor-pointer"
+          >
+            🔄 Làm mới danh sách
           </button>
         </div>
-      </form>
 
-      <div className="bg-white p-6 rounded-2xl border space-y-4">
-        <h2 className="font-bold">Sinh viên đã import</h2>
-        <form
-          className="flex flex-wrap gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError("");
-            setLoading(true);
-            setPage(0);
-            setQ(query.trim());
-            setReload((n) => n + 1);
-          }}
-        >
-          <input
-            className={input}
-            aria-label="Tìm sinh viên"
-            placeholder="Tên, email hoặc MSSV"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className={input}
-            aria-label="Lọc điều kiện"
-            value={eligible}
-            onChange={(e) => {
-              setError("");
-              setLoading(true);
-              setEligible(e.target.value);
-              setPage(0);
-            }}
-          >
-            <option value="">Tất cả điều kiện</option>
-            <option value="true">Đủ điều kiện</option>
-            <option value="false">Chưa đủ điều kiện</option>
-          </select>
-          <button className={input}>Tìm kiếm</button>
-        </form>
-        {loading ? <p>Đang tải...</p> : <StudentTable students={items} />}
-        <div className="flex gap-3 items-center">
-          <button
-            className={input}
-            disabled={loading || page === 0}
-            onClick={() => {
-              setLoading(true);
-              setPage((p) => p - 1);
-            }}
-          >
-            Trước
-          </button>
-          <span>
-            Trang {page + 1} / {Math.max(totalPages, 1)}
-          </span>
-          <button
-            className={input}
-            disabled={loading || page + 1 >= totalPages}
-            onClick={() => {
-              setLoading(true);
-              setPage((p) => p + 1);
-            }}
-          >
-            Sau
-          </button>
+        <div className="overflow-x-auto rounded-2xl border border-[#E8E2D9]">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
+                {["MSSV", "Họ tên", "Email", "Điều kiện", "Nhóm"].map((label) => (
+                  <th key={label} className="p-3 font-bold uppercase">{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E8E2D9] bg-white">
+              {loadingStudents ? (
+                <tr>
+                  <td colSpan="5" className="p-8 text-center text-[#6B635B]">
+                    Đang tải danh sách sinh viên...
+                  </td>
+                </tr>
+              ) : semesterStudents.length > 0 ? (
+                semesterStudents.map((s, idx) => (
+                  <tr key={s.id || idx} className="hover:bg-[#FBF9F5]/60 transition">
+                    <td className="p-3 font-bold text-[#2C2825]">{s.studentCode || s.mssv || "—"}</td>
+                    <td className="p-3 font-semibold text-[#2C2825]">{s.fullName || s.name || "—"}</td>
+                    <td className="p-3 text-[#6B635B]">{s.email || "—"}</td>
+                    <td className="p-3">
+                      <span className={`px-2.5 py-1 rounded-lg font-bold text-[10px] ${s.eligible !== false ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                        {s.eligible !== false ? "Đủ điều kiện" : "Không đủ điều kiện"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-[#6B635B]">{s.groupCode || "Chưa có"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="p-8 text-center text-[#6B635B] italic">
+                    Chưa có sinh viên nào trong học kỳ này.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* HIỂN THỊ KẾT QUẢ SAU KHI IMPORT / PREVIEW */}
+      {importResult && (
+        <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 space-y-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="font-black text-sm text-[#2C2825]">
+              📊 Kết quả xử lý từ hệ thống:
+            </h2>
+            <span
+              className={`px-3 py-1 text-[11px] font-bold rounded-lg ${importResult.committed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+            >
+              {importResult.committed
+                ? "✓ Đã commit vào DB"
+                : "🔍 Chế độ Xem trước (Preview)"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-2xl bg-[#FBF9F5] border border-[#E8E2D9] text-center">
+              <p className="text-[10px] uppercase font-bold text-[#6B635B]">
+                Tạo mới
+              </p>
+              <p className="text-lg font-black text-emerald-700 mt-1">
+                {importResult.newRows ?? importResult.created ?? 0}
+              </p>
+            </div>
+            <div className="p-3 rounded-2xl bg-[#FBF9F5] border border-[#E8E2D9] text-center">
+              <p className="text-[10px] uppercase font-bold text-[#6B635B]">
+                Cập nhật
+              </p>
+              <p className="text-lg font-black text-blue-700 mt-1">
+                {importResult.updatedRows ?? importResult.updated ?? 0}
+              </p>
+            </div>
+            <div className="p-3 rounded-2xl bg-[#FBF9F5] border border-[#E8E2D9] text-center">
+              <p className="text-[10px] uppercase font-bold text-[#6B635B]">
+                Không đổi
+              </p>
+              <p className="text-lg font-black text-gray-700 mt-1">
+                {importResult.unchangedRows ?? 0}
+              </p>
+            </div>
+            <div className="p-3 rounded-2xl bg-[#FBF9F5] border border-[#E8E2D9] text-center">
+              <p className="text-[10px] uppercase font-bold text-[#6B635B]">
+                Lỗi dòng
+              </p>
+              <p className="text-lg font-black text-red-600 mt-1">
+                {importResult.errorRows ?? 0}
+              </p>
+            </div>
+          </div>
+
+          {Array.isArray(importResult.errors) &&
+            importResult.errors.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-bold text-red-600">
+                  ⚠️ Chi tiết lỗi các dòng:
+                </p>
+                <div className="max-h-40 overflow-y-auto rounded-xl border border-red-200 bg-red-50 p-3 text-xs space-y-1">
+                  {importResult.errors.map((err, idx) => (
+                    <div key={idx} className="text-red-700">
+                      • <strong>Dòng {err.row}</strong> ({err.key}):{" "}
+                      {err.reason}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          <ResultTable
+            students={importResult.students || importResult.content || []}
+          />
+        </div>
+      )}
     </section>
   );
 }

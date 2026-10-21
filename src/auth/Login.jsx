@@ -1,21 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { login, loginWithGoogle, getGoogleConfig, getCampuses } from "../services/authService";
+import {
+  login,
+  loginWithGoogle,
+  getGoogleConfig,
+} from "../services/authService";
 import GoogleSignInButton from "./GoogleSignInButton";
 import { useNavigate } from "react-router-dom";
 import fptBg from "../assets/fpt-bg.jpg";
 
-const CAMPUS_LABELS = {
-  HA_NOI: "Hà Nội",
-  HO_CHI_MINH: "TP. Hồ Chí Minh",
-  DA_NANG: "Đà Nẵng",
-  CAN_THO: "Cần Thơ",
-  QUY_NHON: "Quy Nhơn",
-};
-
 const GOOGLE_ERRORS = {
-  REGISTRATION_REQUIRED: "Email của bạn chưa có trong danh sách đồ án được import từ phòng đào tạo.",
-  ACCOUNT_NOT_PROVISIONED: "Tài khoản chưa được cấp quyền. Vui lòng liên hệ Quản trị viên.",
-  CAMPUS_MISMATCH: "Tài khoản này thuộc cơ sở (campus) khác. Vui lòng chọn đúng cơ sở.",
+  REGISTRATION_REQUIRED:
+    "Email của bạn chưa có trong danh sách đồ án được import từ phòng đào tạo.",
+  ACCOUNT_NOT_PROVISIONED:
+    "Tài khoản chưa được cấp quyền. Vui lòng liên hệ Quản trị viên.",
   GOOGLE_NOT_CONFIGURED: "Máy chủ chưa cấu hình đăng nhập Google.",
   GOOGLE_UNAVAILABLE: "Không kết nối được Google lúc này, vui lòng thử lại.",
   GOOGLE_SIGN_IN_FAILED: "Xác thực Google thất bại, vui lòng thử lại.",
@@ -35,18 +32,12 @@ const Login = () => {
   });
 
   const [googleConfig, setGoogleConfig] = useState(null);
-  const [campuses, setCampuses] = useState(Object.keys(CAMPUS_LABELS));
-  const [campus, setCampus] = useState(() => localStorage.getItem("campus") || "");
-
   const navigate = useNavigate();
 
   useEffect(() => {
     getGoogleConfig()
       .then(setGoogleConfig)
       .catch(() => setGoogleConfig({ enabled: false }));
-    getCampuses()
-      .then((list) => Array.isArray(list) && list.length && setCampuses(list))
-      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -96,8 +87,9 @@ const Login = () => {
         status === 429
           ? "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ trong giây lát."
           : errorCode === "INVALID_CREDENTIALS"
-          ? "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại."
-          : error.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
+            ? "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại."
+            : error.response?.data?.message ||
+              "Đăng nhập thất bại. Vui lòng thử lại.";
       showToast(message, "error");
     } finally {
       setLoading(false);
@@ -118,15 +110,11 @@ const Login = () => {
     }, 1200);
   };
 
+  // Đăng nhập Google trực tiếp chỉ với idToken theo chuẩn Swagger
   const handleGoogleCredential = async (idToken) => {
-    if (!campus) {
-      showToast("Vui lòng chọn cơ sở (campus) của bạn trước khi đăng nhập bằng Google.", "error");
-      return;
-    }
     setLoading(true);
     try {
-      const result = await loginWithGoogle({ idToken, campus });
-      localStorage.setItem("campus", campus);
+      const result = await loginWithGoogle({ idToken });
       finishLogin(result);
     } catch (error) {
       const errorCode = error.response?.data?.errorCode;
@@ -134,14 +122,17 @@ const Login = () => {
         GOOGLE_ERRORS[errorCode] ||
           error.response?.data?.message ||
           "Đăng nhập Google thất bại. Email của bạn phải nằm trong danh sách đồ án được cấp phép.",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleError = useCallback((message) => showToast(message, "error"), []);
+  const handleGoogleError = useCallback(
+    (message) => showToast(message, "error"),
+    [],
+  );
 
   const navigateBasedOnRole = (userRole) => {
     const normalizedRole = String(userRole || "")
@@ -159,14 +150,12 @@ const Login = () => {
   };
 
   return (
-    <div 
+    <div
       className="relative flex h-screen w-full bg-cover bg-center items-center justify-center font-sans overflow-hidden p-4 md:p-6"
       style={{ backgroundImage: `url(${fptBg})` }}
     >
-      {/* Lớp phủ tối nhẹ tạo chiều sâu cho nền */}
       <div className="absolute inset-0 bg-neutral-900/50 backdrop-blur-[3px]"></div>
 
-      {/* Thông báo dạng Toast nổi */}
       {notification.show && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-2xl border border-neutral-100 animate-bounce">
           <div
@@ -185,10 +174,8 @@ const Login = () => {
         </div>
       )}
 
-      {/* Khung tổng thể căn chuẩn vừa vặn trong 1 màn hình */}
       <div className="relative z-10 w-full max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 border border-neutral-100">
-        
-        {/* CỘT TRÁI: Khu vực Form đăng nhập */}
+        {/* CỘT TRÁI: Form đăng nhập */}
         <div className="lg:col-span-6 p-7 sm:p-9 flex flex-col justify-between bg-white">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-[#E65100] rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-md shadow-orange-200">
@@ -205,49 +192,11 @@ const Login = () => {
                 Đăng nhập hệ thống
               </h1>
               <p className="text-xs text-neutral-500 leading-relaxed">
-                Sinh viên xác thực bằng Google; Quản trị viên và Điều phối viên dùng mật khẩu hệ thống.
+                Sinh viên xác thực bằng Google; Quản trị viên và Điều phối viên
+                dùng mật khẩu hệ thống.
               </p>
             </div>
 
-            {/* Phần dành cho Sinh viên đăng nhập Google */}
-            {googleConfig?.enabled ? (
-              <div className="space-y-2.5 rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-[#E65100]">Dành cho Sinh viên</span>
-                  <span className="text-[10px] text-neutral-400 font-medium">Bắt buộc chọn cơ sở</span>
-                </div>
-                <select
-                  value={campus}
-                  onChange={(e) => setCampus(e.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-xs text-neutral-800 outline-none transition focus:border-[#E65100] focus:ring-2 focus:ring-orange-100 cursor-pointer shadow-xs"
-                >
-                  <option value="" disabled>
-                    -- Chọn cơ sở (Campus) của bạn --
-                  </option>
-                  {campuses.map((c) => (
-                    <option key={c} value={c}>
-                      {CAMPUS_LABELS[c] || c}
-                    </option>
-                  ))}
-                </select>
-                <div className="pt-0.5">
-                  <GoogleSignInButton
-                    clientId={googleConfig.clientId}
-                    onCredential={handleGoogleCredential}
-                    onError={handleGoogleError}
-                    disabled={loading || !campus}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex items-center my-2">
-              <div className="grow border-t border-neutral-200"></div>
-              <span className="px-3 text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Hoặc tài khoản quản trị</span>
-              <div className="grow border-t border-neutral-200"></div>
-            </div>
-
-            {/* Phần đăng nhập bằng Email / Mật khẩu */}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-bold text-neutral-700">
@@ -291,25 +240,46 @@ const Login = () => {
                 disabled={loading}
                 className="w-full rounded-xl bg-[#E65100] py-3 text-xs font-bold text-white shadow-md shadow-orange-200 transition-all hover:bg-[#D84315] active:scale-[0.99] disabled:opacity-50 cursor-pointer mt-1"
               >
-                {loading ? "Đang xác thực..." : "Đăng nhập Quản trị / Điều phối"}
+                {loading
+                  ? "Đang xác thực..."
+                  : "Đăng nhập Quản trị / Điều phối"}
               </button>
             </form>
+
+            <div className="flex items-center my-2">
+              <div className="grow border-t border-neutral-200"></div>
+              <span className="px-3 text-[10px] text-neutral-400 uppercase font-bold tracking-wider">
+                Hoặc đăng nhập bằng Google
+              </span>
+              <div className="grow border-t border-neutral-200"></div>
+            </div>
+            {googleConfig?.enabled ? (
+              <div>
+                <div className="flex justify-center">
+                  <GoogleSignInButton
+                    clientId={googleConfig.clientId}
+                    onCredential={handleGoogleCredential}
+                    onError={handleGoogleError}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex justify-between items-center text-[11px] text-neutral-400 pt-3 border-t border-neutral-100">
             <p>© 2026 Đại học FPT</p>
-            <span className="font-medium">Phiên bản chính thức v2.9</span>
+            <span className="font-medium">Phiên bản v2.9</span>
           </div>
         </div>
 
-        {/* CỘT PHẢI: Khung banner giới thiệu thương hiệu phong cách chuyên nghiệp */}
+        {/* CỘT PHẢI: Banner giới thiệu */}
         <div className="lg:col-span-6 bg-linear-to-br from-[#E65100] to-[#D84315] p-7 sm:p-9 text-white flex flex-col justify-between relative overflow-hidden shadow-inner">
-          {/* Họa tiết trang trí nền mờ */}
           <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
 
           <div className="space-y-2 z-10">
             <span className="px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-[10px] font-extrabold rounded-lg uppercase tracking-wider inline-block">
-               Cổng thông tin Capstone
+              Cổng thông tin Capstone
             </span>
             <h3 className="text-xl sm:text-2xl font-black leading-snug tracking-tight">
               Hệ thống ghép nhóm Đồ án tốt nghiệp chuyên ngành
@@ -318,16 +288,28 @@ const Login = () => {
 
           <div className="my-5 z-10 space-y-3">
             <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-sm">
-              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">✓</div>
-              <p className="text-xs font-medium leading-relaxed">Ghép nhóm chuyên ngành khép kín đảm bảo tính chính xác cao.</p>
+              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">
+                ✓
+              </div>
+              <p className="text-xs font-medium leading-relaxed">
+                Ghép nhóm chuyên ngành khép kín đảm bảo tính chính xác cao.
+              </p>
             </div>
             <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-sm">
-              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">✓</div>
-              <p className="text-xs font-medium leading-relaxed">Quy mô nhóm chuẩn mực từ 3 đến 5 thành viên chính thức.</p>
+              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">
+                ✓
+              </div>
+              <p className="text-xs font-medium leading-relaxed">
+                Quy mô nhóm chuẩn mực từ 3 đến 5 thành viên chính thức.
+              </p>
             </div>
             <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/15 flex items-center gap-3.5 shadow-sm">
-              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">✓</div>
-              <p className="text-xs font-medium leading-relaxed">Điều phối và kiểm duyệt minh bạch toàn bộ học kỳ bởi Moderator.</p>
+              <div className="w-7 h-7 rounded-xl bg-white text-[#E65100] font-black flex items-center justify-center shrink-0 text-xs shadow-xs">
+                ✓
+              </div>
+              <p className="text-xs font-medium leading-relaxed">
+                Điều phối và kiểm duyệt minh bạch toàn bộ học kỳ bởi Moderator.
+              </p>
             </div>
           </div>
 
@@ -336,7 +318,6 @@ const Login = () => {
             <span>Hệ thống quản lý khép kín</span>
           </div>
         </div>
-
       </div>
     </div>
   );

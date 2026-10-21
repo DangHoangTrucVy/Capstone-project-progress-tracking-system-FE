@@ -7,8 +7,7 @@ import {
   submitRoster,
   requestLeaveGroup,
   getGroupLeaveRequests,
-  approveLeaveRequest,
-  rejectLeaveRequest,
+  leaderDecisionLeaveRequest,
 } from "../../services/groupService";
 
 export default function GroupManagementPanel({
@@ -50,9 +49,6 @@ export default function GroupManagementPanel({
 
     try {
       const latest = await getGroupById(groupData.id);
-
-      console.log("GROUP STATUS FROM API:", latest);
-
       setLatestGroup(latest);
     } catch (err) {
       console.error("Không tải được trạng thái nhóm:", err);
@@ -181,13 +177,8 @@ export default function GroupManagementPanel({
       confirmText: "Chốt danh sách",
       danger: true,
       action: async () => {
-        // Gửi danh sách lên Admin trước.
         await submitRoster(groupData.id);
-
-        // Nếu API submitRoster chưa tự khóa nhóm,
-        // gọi lockGroup tại đây.
         await lockGroup(groupData.id);
-
         await refreshGroupStatus();
 
         if (onGroupUpdated) {
@@ -224,7 +215,6 @@ export default function GroupManagementPanel({
       });
 
       setLeaveReason("");
-
       await fetchLeaveRequests();
 
       setNotice({
@@ -243,17 +233,18 @@ export default function GroupManagementPanel({
     }
   };
 
-  // Leader duyệt đơn rời nhóm
+  // Leader duyệt đơn rời nhóm (dùng leaderDecisionLeaveRequest theo chuẩn Swagger)
   const handleApproveLeave = (requestId) => {
     setDialog({
       title: "Xác nhận cho phép rời nhóm",
       message: "Bạn có đồng ý cho phép thành viên này rời nhóm không?",
       confirmText: "Cho phép",
       action: async () => {
-        await approveLeaveRequest(requestId);
+        await leaderDecisionLeaveRequest(requestId, {
+          approved: true,
+        });
 
         await fetchLeaveRequests();
-
         if (onGroupUpdated) await onGroupUpdated();
 
         setNotice({
@@ -264,7 +255,7 @@ export default function GroupManagementPanel({
     });
   };
 
-  // Leader từ chối đơn rời nhóm
+  // Leader từ chối đơn rời nhóm (dùng leaderDecisionLeaveRequest theo chuẩn Swagger)
   const handleRejectLeave = (requestId) => {
     setDialogInput("");
 
@@ -281,7 +272,8 @@ export default function GroupManagementPanel({
           throw new Error("Vui lòng nhập lý do từ chối.");
         }
 
-        await rejectLeaveRequest(requestId, {
+        await leaderDecisionLeaveRequest(requestId, {
+          approved: false,
           reason: trimmedReason,
         });
 
@@ -307,11 +299,12 @@ export default function GroupManagementPanel({
           Bạn có yêu cầu rời nhóm đang chờ xử lý.
         </p>
       )}
+
       {/* 1. Khu vực điều khiển trạng thái dành cho Leader */}
       {isLeader && (
         <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
           <h3 className="text-xs font-black uppercase text-[#6B635B]">
-            Quản lý trạng thái nhóm{" "}
+            Quản lý trạng thái nhóm
           </h3>
           <div className="flex flex-wrap gap-3">
             <button
@@ -417,13 +410,6 @@ export default function GroupManagementPanel({
                             {new Date(req.createdAt).toLocaleString("vi-VN")}
                           </p>
                         )}
-
-                        {req.decidedAt && (
-                          <p className="text-xs text-[#8A8178]">
-                            Ngày phản hồi:{" "}
-                            {new Date(req.decidedAt).toLocaleString("vi-VN")}
-                          </p>
-                        )}
                       </div>
 
                       <span
@@ -452,7 +438,7 @@ export default function GroupManagementPanel({
                         <button
                           type="button"
                           onClick={() => handleApproveLeave(req.id)}
-                          className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg"
+                          className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg cursor-pointer"
                         >
                           Cho phép
                         </button>
@@ -460,7 +446,7 @@ export default function GroupManagementPanel({
                         <button
                           type="button"
                           onClick={() => handleRejectLeave(req.id)}
-                          className="px-3 py-2 bg-red-50 text-red-600 text-xs font-bold rounded-lg"
+                          className="px-3 py-2 bg-red-50 text-red-600 text-xs font-bold rounded-lg cursor-pointer"
                         >
                           Từ chối
                         </button>
@@ -474,7 +460,7 @@ export default function GroupManagementPanel({
         </div>
       )}
 
-      {/* 3. Form xin rời nhóm dành cho Thành viên hoặc Leader muốn xin rời */}
+      {/* 3. Form xin rời nhóm */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div>
           <h3 className="text-xs font-black uppercase text-[#6B635B]">
@@ -482,8 +468,8 @@ export default function GroupManagementPanel({
           </h3>
           <p className="text-[11px] text-[#6B635B]">
             {isLeader
-              ? "Yêu cầu của Leader được chuyển tới Admin và giảng viên hướng dẫn. Bạn vẫn là Leader cho tới khi Admin duyệt yêu cầu và thay Leader."
-              : "Yêu cầu rời nhóm được gửi tới Trưởng nhóm khi nhóm chưa khóa và còn trong thời hạn lập nhóm. Nếu nhóm đã khóa, vui lòng liên hệ giảng viên hướng dẫn hoặc Admin."}
+              ? "Yêu cầu của Leader được chuyển tới Admin. Bạn vẫn là Leader cho tới khi Admin duyệt yêu cầu."
+              : "Yêu cầu rời nhóm được gửi tới Trưởng nhóm khi nhóm chưa khóa."}
           </p>
         </div>
         <form onSubmit={handleRequestLeave} className="space-y-3">

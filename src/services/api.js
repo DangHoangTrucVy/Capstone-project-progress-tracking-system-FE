@@ -1,19 +1,22 @@
 import axios from "axios";
 
-// Khởi tạo instance axios
 const api = axios.create({
-    baseURL: "http://localhost:8080/api/v1", // Hoặc URL API backend của bạn
+    baseURL: "https://usd-plugins-mesa-geneva.trycloudflare.com/api/v1",
     headers: {
         "Content-Type": "application/json",
     },
 });
 
-// Thêm Interceptor để tự động đính kèm Token nếu có
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("token");
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        // Nếu là các API auth công khai (như campuses, config, login), tuyệt đối KHÔNG đính kèm Token
+        const isPublicAuthRoute = config.url && config.url.includes("/auth/") && !config.url.includes("/auth/me");
+
+        if (!isPublicAuthRoute) {
+            const token = localStorage.getItem("accessToken");
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
         }
         return config;
     },
