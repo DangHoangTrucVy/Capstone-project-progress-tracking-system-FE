@@ -13,7 +13,11 @@ export default function ModeratorScopes() {
   const [activeScope, setActiveScope] = useState(null);
   const [newDeadline, setNewDeadline] = useState("");
 
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -39,8 +43,12 @@ export default function ModeratorScopes() {
   const loadScopes = async (semester) => {
     setLoading(true);
     try {
-      const res = await api.get(`/semesters/${semester}/scopes`).catch(() => ({ data: [] }));
-      const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
+      const res = await api
+        .get(`/semesters/${semester}/scopes`)
+        .catch(() => ({ data: [] }));
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data.content || res.data.items || [];
       setScopes(list);
     } catch {
       setScopes([]);
@@ -55,26 +63,7 @@ export default function ModeratorScopes() {
     setModalOpen(true);
   };
 
-//  const handleSaveDeadline = async (e) => {
-//     e.preventDefault();
-//     if (!activeScope || !newDeadline) return;
-
-//     try {
-//       // Chuyển đổi ngày giờ sang chuẩn ISO string để backend Java nhận diện chính xác tuyệt đối
-//       const formattedDeadline = new Date(newDeadline).toISOString();
-
-//       await api.post(`/scopes/${activeScope.id || activeScope.scopeId}/extend`, {
-//         deadline: formattedDeadline,
-//       });
-//       showToast("Cập nhật / Gia hạn deadline thành công!");
-//       setModalOpen(false);
-//       loadScopes(selectedSemester);
-//     } catch (error) {
-//       showToast(error.response?.data?.message || "Không thể đổi deadline.", "error");
-//     }
-//   };
-
-const handleSaveDeadline = async (e) => {
+ const handleSaveDeadline = async (e) => {
     e.preventDefault();
     if (!activeScope || !newDeadline) return;
 
@@ -82,33 +71,59 @@ const handleSaveDeadline = async (e) => {
       const formattedDeadline = new Date(newDeadline).toISOString();
       const scopeId = activeScope.id || activeScope.scopeId;
 
-      // Nếu đang ở trạng thái PREPARING thì dùng API set deadline ban đầu, ngược lại mới dùng extend
-      if (activeScope.phase === "PREPARING") {
-        await api.put(`/scopes/${scopeId}/deadline`, { deadline: formattedDeadline });
-      } else {
-        await api.post(`/scopes/${scopeId}/extend`, { deadline: formattedDeadline });
-      }
+      // Luôn gọi API extend hoặc cập nhật deadline kèm trigger mở khoá từ backend
+      await api.post(`/scopes/${scopeId}/extend`, {
+        deadline: formattedDeadline,
+      });
 
-      showToast("Cấu hình deadline thành công!");
+      showToast("Đã mở và gia hạn deadline thành công!");
       setModalOpen(false);
       loadScopes(selectedSemester);
     } catch (error) {
-      showToast(error.response?.data?.message || "Không thể cập nhật deadline.", "error");
+      showToast(
+        error.response?.data?.message || "Không thể cập nhật deadline.",
+        "error",
+      );
     }
   };
-  
+
+  // const handleSaveDeadline = async (e) => {
+  //     e.preventDefault();
+  //     if (!activeScope || !newDeadline) return;
+
+  //     try {
+  //       const formattedDeadline = new Date(newDeadline).toISOString();
+  //       const scopeId = activeScope.id || activeScope.scopeId;
+
+  //       // Luôn gọi API gia hạn/cập nhật hoặc kiểm tra lại endpoint backend hỗ trợ chuyển trạng thái
+  //       await api.post(`/scopes/${scopeId}/extend`, { deadline: formattedDeadline });
+
+  //       showToast("Cập nhật deadline thành công!");
+  //       setModalOpen(false);
+  //       loadScopes(selectedSemester);
+  //     } catch (error) {
+  //       showToast(error.response?.data?.message || "Không thể cập nhật deadline.", "error");
+  //     }
+  //   };
+
   return (
     <div className="p-8 space-y-6">
       {toast.show && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white ${toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"}`}>
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white ${toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"}`}
+        >
           {toast.message}
         </div>
       )}
 
       <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs">
         <div>
-          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">MODERATOR · PHẠM VI NGÀNH & DEADLINE</span>
-          <h1 className="text-xl font-black text-[#2C2825] mt-1">Cấu hình thời gian & Deadline theo từng ngành</h1>
+          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
+            MODERATOR · PHẠM VI NGÀNH & DEADLINE
+          </span>
+          <h1 className="text-xl font-black text-[#2C2825] mt-1">
+            Cấu hình thời gian & Deadline theo từng ngành
+          </h1>
         </div>
         <select
           value={selectedSemester}
@@ -117,7 +132,11 @@ const handleSaveDeadline = async (e) => {
         >
           {semesters.map((sem, idx) => {
             const code = sem.code || sem;
-            return <option key={idx} value={code}>{code}</option>;
+            return (
+              <option key={idx} value={code}>
+                {code}
+              </option>
+            );
           })}
         </select>
       </div>
@@ -126,7 +145,9 @@ const handleSaveDeadline = async (e) => {
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-              <th className="p-4 font-black uppercase">Ngành học (Major Scope)</th>
+              <th className="p-4 font-black uppercase">
+                Ngành học (Major Scope)
+              </th>
               <th className="p-4 font-black uppercase">Giai đoạn hiện tại</th>
               <th className="p-4 font-black uppercase">Deadline</th>
               <th className="p-4 font-black uppercase text-right">Thao tác</th>
@@ -134,13 +155,28 @@ const handleSaveDeadline = async (e) => {
           </thead>
           <tbody className="divide-y divide-[#E8E2D9]">
             {loading ? (
-              <tr><td colSpan="4" className="p-12 text-center text-[#6B635B]">Đang tải danh sách phạm vi...</td></tr>
+              <tr>
+                <td colSpan="4" className="p-12 text-center text-[#6B635B]">
+                  Đang tải danh sách phạm vi...
+                </td>
+              </tr>
             ) : scopes.length > 0 ? (
               scopes.map((scope) => (
-                <tr key={scope.id || scope.scopeId} className="hover:bg-[#FBF9F5]/70 transition">
-                  <td className="p-4 font-bold text-[#E65100]">{scope.majorName || scope.major}</td>
-                  <td className="p-4 font-semibold text-[#2C2825]">{scope.phase || "Đang mở ghép nhóm"}</td>
-                  <td className="p-4 text-[#6B635B]">{scope.deadline ? new Date(scope.deadline).toLocaleString() : "Deadline chung học kỳ"}</td>
+                <tr
+                  key={scope.id || scope.scopeId}
+                  className="hover:bg-[#FBF9F5]/70 transition"
+                >
+                  <td className="p-4 font-bold text-[#E65100]">
+                    {scope.majorName || scope.major}
+                  </td>
+                  <td className="p-4 font-semibold text-[#2C2825]">
+                    {scope.phase || "Đang mở ghép nhóm"}
+                  </td>
+                  <td className="p-4 text-[#6B635B]">
+                    {scope.deadline
+                      ? new Date(scope.deadline).toLocaleString()
+                      : "Deadline chung học kỳ"}
+                  </td>
                   <td className="p-4 text-right">
                     <button
                       onClick={() => handleOpenExtendModal(scope)}
@@ -152,7 +188,14 @@ const handleSaveDeadline = async (e) => {
                 </tr>
               ))
             ) : (
-              <tr><td colSpan="4" className="p-12 text-center text-[#6B635B] italic">Chưa có phạm vi ngành nào trong học kỳ này.</td></tr>
+              <tr>
+                <td
+                  colSpan="4"
+                  className="p-12 text-center text-[#6B635B] italic"
+                >
+                  Chưa có phạm vi ngành nào trong học kỳ này.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -161,10 +204,22 @@ const handleSaveDeadline = async (e) => {
       {/* MODAL GIA HẠN DEADLINE */}
       {modalOpen && activeScope && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={handleSaveDeadline} className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs">
+          <form
+            onSubmit={handleSaveDeadline}
+            className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
+          >
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-sm font-black text-[#2C2825]">Gia hạn deadline ngành: {activeScope.majorName || activeScope.major}</h3>
-              <button type="button" onClick={() => setModalOpen(false)} className="font-bold text-gray-400">✕</button>
+              <h3 className="text-sm font-black text-[#2C2825]">
+                Gia hạn deadline ngành:{" "}
+                {activeScope.majorName || activeScope.major}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="font-bold text-gray-400"
+              >
+                ✕
+              </button>
             </div>
             <label className="block space-y-1 font-bold">
               Chọn mốc thời điểm deadline mới (Ít nhất sau 48h):
@@ -177,8 +232,19 @@ const handleSaveDeadline = async (e) => {
               />
             </label>
             <div className="flex justify-end gap-2 border-t pt-3">
-              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-gray-100 font-bold rounded-xl">Hủy</button>
-              <button type="submit" className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl">Xác nhận gia hạn</button>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl"
+              >
+                Xác nhận gia hạn
+              </button>
             </div>
           </form>
         </div>
