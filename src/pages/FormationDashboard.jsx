@@ -23,22 +23,23 @@ async function fetchDashboard(code, account) {
       const currentSubject = mine.find(item => item.semesterCode === code)?.subjects?.[0];
       if (!currentSubject) return { semesters: mine, data: {} };
       const subjectPath = { subjectId: currentSubject.subjectId };
-      const [openGroups, requests, leaveRequests, transfers] = await Promise.all([
+      const [openGroups, requests, leaveRequests, transfers, timing] = await Promise.all([
         call("openGroups", { path: subjectPath }), call("myRequests", { path: subjectPath }),
-        call("myLeaveRequests"), call("myTransfers"),
+        call("myLeaveRequests"), call("myTransfers"), call("subject", { path: subjectPath }),
       ]);
       const group = currentSubject.group ? await call("group", { path: { groupId: currentSubject.group.id } }) : null;
       const groupRequests = group && currentSubject.group.leader
         ? await call("groupRequests", { path: { groupId: group.id } }) : [];
       const groupLeaveRequests = group && currentSubject.group.leader
         ? await call("groupLeaveRequests", { path: { groupId: group.id } }) : [];
-      return { semesters: mine, data: { openGroups, requests, leaveRequests, transfers, group, groupRequests, groupLeaveRequests } };
+      return { semesters: mine, data: { openGroups, requests, leaveRequests, transfers, timing, group, groupRequests, groupLeaveRequests } };
     } else {
-      const [students, groups, scopes, statistics] = await Promise.all([
+      const [students, groups, scopes, statistics, subjects] = await Promise.all([
         allRows("students", { semester: code }), allRows("groups", { semester: code }),
         call("scopes", { path: { semester: code } }), call("statistics", { path: { semester: code } }),
+        call("subjects", { path: { semester: code } }),
       ]);
-      return { data: { students, groups, scopes, statistics } };
+      return { data: { students, groups, scopes, statistics, subjects } };
     }
   }
 
@@ -162,7 +163,19 @@ export default function FormationDashboard() {
         <option key={row.enrollmentId} value={row.enrollmentId}>{row.studentCode} — {row.fullName}</option>)}</select></label>
         <label>Điều kiện<select name="eligibility"><option>ELIGIBLE</option><option>INELIGIBLE</option><option>UNDECIDED</option></select></label>
         <Input label="Lý do" name="reason" /><button disabled={busy || !shownStudents.length}>Cập nhật</button></form></section>}
-    {!student && tab === "scopes" && <section><h2>Deadline và chốt theo ngành</h2>{(data.scopes || []).map(scope =>
+    {!student && tab === "scopes" && <section><h2>Deadline và chốt theo ngành</h2>
+      {(data.subjects || []).map(configuration => <section key={configuration.id}>
+        <h3>Thời hạn Apply / Invite: {configuration.requestTtlMinutes} phút</h3>
+        <p>Hạn tối thiểu khi đặt deadline mới: {configuration.minDeadlineNoticeMinutes} phút từ hiện tại.</p>
+        <p>Chỉnh thời hạn này áp dụng cho đơn/mời mới. Deadline ghép nhóm chỉ thay đổi khi bạn tự lưu bên dưới.</p>
+        <form key={configuration.id + "-" + configuration.requestTtlMinutes} onSubmit={e => submit(e, values =>
+          mutate("updateSubject", {subjectId: configuration.id}, {requestTtlMinutes: Number(values.requestTtlMinutes)}))}>
+          <label>Hạn đơn/mời (phút)<input name="requestTtlMinutes" type="number" min="1" max="20160" step="1" defaultValue={configuration.requestTtlMinutes} required /></label>
+          <button disabled={busy}>Lưu thời hạn đơn/mời</button>
+          <button type="button" disabled={busy} onClick={() => run(() => mutate("updateSubject", {subjectId:configuration.id}, {requestTtlMinutes:10}), "Đã đổi hạn đơn/mời mới thành 10 phút.")}>Dùng 10 phút</button>
+          <button type="button" disabled={busy} onClick={() => run(() => mutate("updateSubject", {subjectId:configuration.id}, {requestTtlMinutes:15}), "Đã đổi hạn đơn/mời mới thành 15 phút.")}>Dùng 15 phút</button>
+        </form>
+      </section>)}{(data.scopes || []).map(scope =>
       <section key={scope.id}><h3>{scope.majorCode} — {scope.phase}</h3><p>Deadline: {scope.deadline || "Chưa đặt"}</p>
         <form onSubmit={e => submit(e, values => mutate("deadline", {scopeId:scope.id}, {deadline:new Date(values.deadline).toISOString()}))}>
           <Input label="Deadline riêng" name="deadline" type="datetime-local" /><button disabled={busy}>Lưu deadline</button></form>
@@ -212,6 +225,7 @@ export default function FormationDashboard() {
       })}><Input label="Mã Moderator" name="moderatorId" /><button disabled={busy}>Phân công</button></form>
       </section>}
     {student && <p className="muted">Điều kiện: {subject?.eligibility || "Chưa có"} · Giai đoạn: {subject?.phase || "Chưa có"}{own?.readOnly ? " · Học kỳ cũ, chỉ xem" : ""}</p>}
+    {student && data.timing && <p className="muted">Thời hạn Apply / Invite: {data.timing.requestTtlMinutes} phút kể từ khi gửi.</p>}
     {student && tab === "groups" && <section><h2>{data.group ? "Nhóm của tôi" : "Bạn chưa có nhóm"}</h2>
       {data.group ? <><p>{data.group.code} — {data.group.name} · {data.group.size}/5 · {data.group.state}</p>
         <Table rows={data.group.members || []} columns={[["MSSV",member=>member.studentCode],["Họ tên",member=>member.fullName],["Vai trò",member=>member.leader?"Leader":"Thành viên"]]} />
@@ -229,7 +243,7 @@ export default function FormationDashboard() {
           ["Tham gia",group=><button disabled={busy || !subject?.canAct} onClick={()=>run(()=>mutate("apply",{groupId:group.id},{message:"Xin tham gia nhóm"}))}>Apply</button>]]} /></>}
     </section>}
     {student && tab === "requests" && <section><h2>Apply / Invite</h2><Table rows={[...asList(data.requests),...asList(data.groupRequests)].filter((r,i,all)=>all.findIndex(x=>x.id===r.id)===i)} columns={[
-      ["Loại",r=>r.type],["Nhóm",r=>r.groupCode],["MSSV",r=>r.student?.studentCode],["Trạng thái",r=>r.status],
+      ["Loại",r=>r.type],["Nhóm",r=>r.groupCode],["MSSV",r=>r.student?.studentCode],["Trạng thái",r=>r.status],["Hết hạn",r=>r.expiresAt ? new Date(r.expiresAt).toLocaleString("vi-VN") : ""],
       ["Xử lý",r=>r.status==="PENDING"?<div className="row">
         {((r.type === "APPLY" && ownGroup?.leader && r.groupId === ownGroup.id) || (r.type === "INVITE" && r.student?.userId === user?.id)) && <button disabled={busy} onClick={()=>run(()=>mutate("accept",{requestId:r.id}))}>Chấp nhận</button>}
         {((r.type === "APPLY" && ownGroup?.leader && r.groupId === ownGroup.id) || (r.type === "INVITE" && r.student?.userId === user?.id)) && <button disabled={busy} onClick={()=>run(()=>mutate("reject",{requestId:r.id}))}>Từ chối</button>}

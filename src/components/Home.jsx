@@ -22,7 +22,7 @@ const Home = () => {
       heading: "Quản trị hệ thống và cấu hình đầu kỳ",
       features: [
         "Import danh sách sinh viên và quản lý cờ điều kiện tham gia",
-        "Cấu hình thời hạn đơn Apply và Invite (mặc định 48 giờ)",
+        "Cấu hình thời hạn đơn Apply và Invite theo phút",
         "Can thiệp chỉnh sửa danh sách nhóm và thay đổi Leader sau khi đã khóa",
       ],
       btnText: "Đăng nhập với vai trò Admin",
@@ -194,7 +194,7 @@ const Home = () => {
             </div>
             <div className="group cursor-default">
               <div className="text-3xl sm:text-4xl font-black text-[#E65100] group-hover:scale-110 transition-transform">
-                48h
+                Tùy chỉnh
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
                 Thời hạn phản hồi đơn / lời mời

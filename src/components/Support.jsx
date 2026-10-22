@@ -12,7 +12,7 @@ export default function Support() {
         },
         {
             q: "Giới hạn gửi đơn Apply và nhận Invite diễn ra như thế nào?",
-            a: "Sinh viên tự do được phép giữ tối đa 3 đơn Apply đang chờ xử lý cùng lúc. Nếu đơn bị từ chối, thu hồi hoặc hết hạn (mặc định sau 48 giờ), hệ thống sẽ trả lại lượt để bạn nộp đơn khác. Riêng các lời mời (Invite) nhận từ nhóm khác không bị tính vào giới hạn này."
+            a: "Sinh viên tự do được phép giữ tối đa 3 đơn Apply đang chờ xử lý cùng lúc. Nếu đơn bị từ chối, thu hồi hoặc hết hạn (theo thời hạn đang cấu hình cho học kỳ), hệ thống sẽ trả lại lượt để bạn nộp đơn khác. Riêng các lời mời (Invite) nhận từ nhóm khác không bị tính vào giới hạn này."
         },
         {
             q: "Làm thế nào để thay đổi nhân sự hoặc rời nhóm trước khi khóa danh sách (Locked)?",

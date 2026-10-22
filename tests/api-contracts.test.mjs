@@ -9,7 +9,10 @@ const { operations, call, allRows } = await import("data:text/javascript;base64,
 test("Every frontend operation exists on the running backend, with the same method", async () => {
   const response = await fetch(process.env.OPENAPI_URL || "http://localhost:8081/v3/api-docs");
   assert.equal(response.status, 200);
-  const { paths } = await response.json();
+  const { paths, components } = await response.json();
+  assert.ok(components.schemas.SubjectRequest.properties.requestTtlMinutes);
+  assert.equal(components.schemas.SubjectRequest.properties.requestTtlHours, undefined);
+  assert.ok(components.schemas.SubjectResponse.properties.minDeadlineNoticeMinutes);
   for (const [name, [method, path]] of Object.entries(operations)) {
     assert.ok(paths["/api/v1" + path]?.[method], name + ": " + method + " " + path);
   }
