@@ -1,8 +1,12 @@
 import React from "react";
 
 export default function Overview({ groupData, isLeader }) {
-  const semesterName = groupData?.semester || "Fall2026";
-  const groupCode = groupData?.groupCode || "N/A";
+  const semesterName = groupData?.semesterCode || groupData?.semester || "SU27";
+  const groupCode = groupData?.groupCode || groupData?.code || "N/A";
+  const majorName =
+    groupData?.majorName ||
+    groupData?.majorCode ||
+    "Khoa Công nghệ thông tin · Đại học FPT";
   const memberCount = groupData?.members?.length || 0;
   const isValidTeamSize = memberCount >= 3 && memberCount <= 5;
 
@@ -18,13 +22,17 @@ export default function Overview({ groupData, isLeader }) {
               Mã nhóm: {groupCode}
             </span>
             <span className="px-3 py-1 bg-gray-100 text-[#6B635B] font-bold rounded-full">
-              Khoa Công nghệ thông tin · Đại học FPT
+              {majorName}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`font-extrabold px-3 py-1 rounded-full text-[11px] border ${isValidTeamSize ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-700 bg-amber-50 border-amber-200"}`}>
-              {isValidTeamSize ? "✓ NHÓM ĐẠT SĨ SỐ HỢP LỆ (3–5 NGƯỜI)" : "⚠️ SĨ SỐ CHƯA ĐẠT CHUẨN (CẦN 3–5 NGƯỜI)"}
+            <span
+              className={`font-extrabold px-3 py-1 rounded-full text-[11px] border ${isValidTeamSize ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-amber-700 bg-amber-50 border-amber-200"}`}
+            >
+              {isValidTeamSize
+                ? "✓ NHÓM ĐẠT SĨ SỐ HỢP LỆ (3–5 NGƯỜI)"
+                : "⚠️ SĨ SỐ CHƯA ĐẠT CHUẨN (CẦN 3–5 NGƯỜI)"}
             </span>
           </div>
         </div>
@@ -35,26 +43,49 @@ export default function Overview({ groupData, isLeader }) {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-1">
-              <span className="text-[10px] text-[#6B635B] font-bold">Quy mô nhóm</span>
-              <p className="text-sm font-black text-[#2C2825]">{memberCount} / 5 thành viên</p>
+              <span className="text-[10px] text-[#6B635B] font-bold">
+                Quy mô nhóm
+              </span>
+              <p className="text-sm font-black text-[#2C2825]">
+                {memberCount} / 5 thành viên
+              </p>
             </div>
             <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-1">
-              <span className="text-[10px] text-[#6B635B] font-bold">Vai trò của bạn</span>
-              <p className="text-sm font-black text-[#E65100]">{isLeader ? "👑 Trưởng nhóm " : "👤 Thành viên "}</p>
+              <span className="text-[10px] text-[#6B635B] font-bold">
+                Vai trò của bạn
+              </span>
+              <p className="text-sm font-black text-[#E65100]">
+                {isLeader ? "👑 Trưởng nhóm " : "👤 Thành viên "}
+              </p>
             </div>
             <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] space-y-1">
-              <span className="text-[10px] text-[#6B635B] font-bold">Trạng thái hệ thống</span>
-              <p className="text-sm font-black text-emerald-600">Đang hoạt động</p>
+              <span className="text-[10px] text-[#6B635B] font-bold">
+                Trạng thái hệ thống
+              </span>
+              <p className="text-sm font-black text-emerald-600">
+                Đang hoạt động
+              </p>
             </div>
           </div>
         </div>
 
         <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-200 text-xs space-y-2">
-          <p className="font-black text-[#E65100]">Lưu ý quan trọng giai đoạn đầu kỳ:</p>
+          <p className="font-black text-[#E65100]">
+            Lưu ý quan trọng giai đoạn đầu kỳ:
+          </p>
           <ul className="list-disc pl-4 space-y-1 text-[#6B635B]">
-            <li>Mỗi sinh viên chỉ thuộc tối đa một nhóm chính thức tại một thời điểm trong cùng đợt luận án.</li>
-            <li>Trưởng nhóm có quyền xét duyệt đơn gửi yêu cầu hoặc gửi lời mời trực tiếp cho các thành viên.</li>
-            <li>Hãy đảm bảo nhóm đạt từ 3 đến 5 thành viên trước thời điểm khóa danh sách của Admin.</li>
+            <li>
+              Mỗi sinh viên chỉ thuộc tối đa một nhóm chính thức tại một thời
+              điểm trong cùng đợt luận án.
+            </li>
+            <li>
+              Trưởng nhóm có quyền xét duyệt đơn gửi yêu cầu hoặc gửi lời mời
+              trực tiếp cho các thành viên.
+            </li>
+            <li>
+              Hãy đảm bảo nhóm đạt từ 3 đến 5 thành viên trước thời điểm khóa
+              danh sách của Admin.
+            </li>
           </ul>
         </div>
       </div>

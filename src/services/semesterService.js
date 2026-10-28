@@ -59,3 +59,9 @@ export const extendScope = async (scopeId, data) => {
     const response = await api.post(`/scopes/${scopeId}/extend`, data);
     return response.data;
 };
+
+// Delete a semester: DELETE /api/v1/semesters/{semester}
+export const deleteSemester = async (semester) => {
+    const response = await api.delete(`/semesters/${semester}`);
+    return response.data;
+};

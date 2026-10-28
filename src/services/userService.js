@@ -75,3 +75,8 @@ export const createUser = async (data) => {
     const response = await api.post("/users", data);
     return response.data;
 };
+
+export const createModerator = async (data) => {
+    const response = await api.post("/users/moderators", data);
+    return response.data;
+};

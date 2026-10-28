@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import api from "../../services/api";
 import Overview from "./Overview";
 import MemberGroup from "./MemberGroup";
 import CreateGroup from "./CreateGroup";
@@ -6,12 +7,7 @@ import StudentProfileAndApply from "./StudentProfileAndApply";
 import GroupApplications from "./GroupApplications";
 import GroupManagementPanel from "./GroupManagementPanel";
 import Profile from "../../auth/Profile";
-import {
-  getAllGroups,
-  getGroupById,
-  getMyApplications,
-  getMyInvites,
-} from "../../services/groupService";
+import { getGroupById } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import NotificationBell from "../../components/NotificationBell";
 
@@ -29,22 +25,48 @@ export default function StudentDashboard() {
       localStorage.setItem("role", user.role);
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Lấy trực tiếp groupId đã lưu nếu có
-      const cachedGroupId = localStorage.getItem("groupId");
+      let cachedGroupId = localStorage.getItem("groupId");
+
+      if (!cachedGroupId) {
+        try {
+          const semRes = await api.get("/semesters").catch(() => ({ data: [] }));
+          const semesters = semRes.data?.content || semRes.data || [];
+          
+          if (semesters.length > 0) {
+            const currentSem = semesters[0].code || semesters[0];
+            const subRes = await api.get(`/semesters/${currentSem}/subjects`).catch(() => ({ data: [] }));
+            const subjects = subRes.data?.content || subRes.data || [];
+
+            for (const sub of subjects) {
+              try {
+                const groupRes = await api.get(`/subjects/${sub.id}/groups`).catch(() => api.get(`/subjects/${sub.id}/open-groups`));
+                const groupsList = groupRes.data?.content || groupRes.data || [];
+                
+                const myGroup = groupsList.find(g => 
+                  g.leaderId === user.id || 
+                  (g.members && g.members.some(m => String(m.userId || m.id) === String(user.id)))
+                );
+
+                if (myGroup && (myGroup.id || myGroup.groupId)) {
+                  cachedGroupId = myGroup.id || myGroup.groupId;
+                  localStorage.setItem("groupId", cachedGroupId);
+                  break;
+                }
+              } catch (e) {}
+            }
+          }
+        } catch (scanErr) {
+          console.error("Không thể tự động tìm nhóm:", scanErr);
+        }
+      }
+
       if (cachedGroupId) {
         try {
           const group = await getGroupById(cachedGroupId);
-          if (
-            group &&
-            group.members?.some(
-              (m) => String(m.userId) === String(user.id) && m.status === "ACTIVE"
-            )
-          ) {
+          if (group && group.id) {
             setGroupData(group);
             setHasGroup(true);
-            setActiveTab((tab) =>
-              ["create", "profile_apply"].includes(tab) ? "overview" : tab
-            );
+            setActiveTab("overview");
             setGroupError("");
             return;
           }
@@ -53,7 +75,6 @@ export default function StudentDashboard() {
         }
       }
 
-      // Nếu chưa có cache hợp lệ, đưa sinh viên về trạng thái chưa có nhóm để chọn môn/tạo nhóm
       setGroupData(null);
       setHasGroup(false);
       setActiveTab("create");
@@ -64,24 +85,21 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(checkUserGroup, 0);
-    window.addEventListener("focus", checkUserGroup);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("focus", checkUserGroup);
-    };
+    checkUserGroup();
   }, []);
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("user");
+    localStorage.removeItem("role");
     window.location.href = "/login";
   };
 
   if (groupError)
     return (
-      <div role="alert" className="p-8">
+      <div role="alert" className="p-8 text-center text-red-600 font-bold bg-[#FBF9F5] min-h-screen flex flex-col justify-center items-center">
         <p>{groupError}</p>
-        <button onClick={checkUserGroup}>Thử lại</button>
+        <button onClick={checkUserGroup} className="mt-3 px-4 py-2 bg-[#E65100] text-white rounded-xl text-xs">Thử lại</button>
       </div>
     );
 
@@ -100,7 +118,11 @@ export default function StudentDashboard() {
       m.id === currentUser?.id,
   );
 
-  const isLeader = Boolean(currentMemberInfo?.isLeader);
+  const isLeader = Boolean(
+    currentMemberInfo?.isLeader ||
+    currentUser?.role?.toUpperCase().includes("LEADER") ||
+    groupData?.leaderId === currentUser?.id,
+  );
   const groupMemberCount = groupData?.members?.length ?? 0;
   const isValidTeamSize = groupMemberCount >= 3 && groupMemberCount <= 5;
 
@@ -113,27 +135,25 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans">
-      {/* SIDEBAR BÊN TRÁI */}
-      <aside className="w-72 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0">
+    <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans overflow-hidden">
+      {/* SIDEBAR BÊN TRÁI - THIẾT KẾ TINH TẾ, SANG TRỌNG */}
+      <aside className="w-76 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0 shadow-sm">
         <div className="space-y-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 bg-[#E65100] rounded-2xl flex items-center justify-center text-white font-bold shadow-md">
-              <div className="w-4 h-4 border-2 border-white rounded-lg flex items-center justify-center text-[9px]">
-                ✓
-              </div>
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 bg-linear-to-br from-[#E65100] to-orange-600 rounded-2xl flex items-center justify-center text-white font-bold shadow-md shadow-orange-500/20">
+              ✓
             </div>
             <div>
               <h2 className="font-extrabold text-sm tracking-tight text-[#2C2825]">
                 Quản Lý Sinh Viên
               </h2>
-              <p className="text-[10px] text-[#6B635B]">
-                Hệ thống quản lý MatchPoint FPT.
+              <p className="text-[11px] text-[#6B635B]">
+                MatchPoint FPT Capstone.
               </p>
             </div>
           </div>
 
-          <div className="bg-[#F8F6F0] p-4 rounded-2xl border border-[#E8E2D9] space-y-3">
+          <div className="bg-[#FBF9F5] p-4 rounded-2xl border border-[#E8E2D9]/80 space-y-2.5 shadow-xs">
             <div className="flex justify-between items-center text-xs">
               <span className="font-bold text-[#6B635B]">Mã nhóm:</span>
               <span className="font-black text-[#E65100]">
@@ -150,7 +170,7 @@ export default function StudentDashboard() {
               </span>
             </div>
 
-            <div className="pt-2 border-t border-[#E8E2D9] flex justify-between items-center text-xs">
+            <div className="pt-2 border-t border-[#E8E2D9]/60 flex justify-between items-center text-xs">
               <span className="font-bold text-[#6B635B]">Chức vụ:</span>
               <span
                 className={`px-2.5 py-1 text-[10px] font-black rounded-lg ${
@@ -171,13 +191,13 @@ export default function StudentDashboard() {
           </div>
 
           {hasGroup || isLeader ? (
-            <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
+            <nav className="space-y-1.5 text-xs font-bold text-[#6B635B]">
               <button
                 onClick={() => setActiveTab("overview")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                   activeTab === "overview"
-                    ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                    : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
                 <span>📊</span>
@@ -186,37 +206,23 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("members")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                   activeTab === "members"
-                    ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                    : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
                 <span>👥</span>
                 <span>Thành viên nhóm (3–5 người)</span>
               </button>
 
-              {/* {isLeader && (
-                <button
-                  onClick={() => setActiveTab("applications")}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
-                    activeTab === "applications"
-                      ? "bg-[#E65100] text-white shadow-md"
-                      : "hover:bg-[#F8F6F0]"
-                  }`}
-                >
-                  <span>📝</span>
-                  <span>Xét duyệt đơn Apply</span>
-                </button>
-              )} */}
-
               {hasGroup && (
                 <button
                   onClick={() => setActiveTab("applications")}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition ${
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                     activeTab === "applications"
-                      ? "bg-[#E65100] text-white shadow-md"
-                      : "hover:bg-[#F8F6F0]"
+                      ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                      : "hover:bg-[#FBF9F5] text-[#6B635B]"
                   }`}
                 >
                   <span>📝</span>
@@ -226,10 +232,10 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("management")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                   activeTab === "management"
-                    ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                    : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
                 <span>🔒</span>
@@ -238,10 +244,10 @@ export default function StudentDashboard() {
 
               <button
                 onClick={() => setActiveTab("settings")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                   activeTab === "settings"
-                    ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                    : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
                 <span>⚙️</span>
@@ -249,24 +255,24 @@ export default function StudentDashboard() {
               </button>
             </nav>
           ) : (
-            <nav className="space-y-1 text-xs font-bold text-[#6B635B]">
+            <nav className="space-y-1.5 text-xs font-bold text-[#6B635B]">
               <button
                 onClick={() => setActiveTab("create")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                   activeTab === "create"
-                    ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                    : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
                 <span>🚀</span>
-                <span>Tạo / Tìm nhóm & Profile</span>
+                <span>Tạo nhóm</span>
               </button>
               <button
                 onClick={() => setActiveTab("settings")}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer ${
                   activeTab === "settings"
-                    ? "bg-[#E65100] text-white shadow-md"
-                    : "hover:bg-[#F8F6F0]"
+                    ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
+                    : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
                 <span>⚙️</span>
@@ -276,16 +282,16 @@ export default function StudentDashboard() {
           )}
         </div>
 
-        <div className="pt-4 border-t border-[#E8E2D9] space-y-3">
+        <div className="pt-4 border-t border-[#E8E2D9] space-y-3.5">
           <div className="flex items-center space-x-3">
             {currentUser?.avatarUrl ? (
               <img
                 src={currentUser.avatarUrl}
                 alt="Avatar"
-                className="w-9 h-9 rounded-xl object-cover"
+                className="w-10 h-10 rounded-xl object-cover border border-[#E8E2D9]"
               />
             ) : (
-              <div className="w-9 h-9 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs">
+              <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs shadow-xs">
                 {getInitials(currentUser?.fullName)}
               </div>
             )}
@@ -301,7 +307,7 @@ export default function StudentDashboard() {
 
           <button
             onClick={handleLogout}
-            className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-all duration-200 text-center cursor-pointer"
+            className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-all duration-200 text-center cursor-pointer shadow-2xs"
           >
             Đăng xuất
           </button>
@@ -310,24 +316,24 @@ export default function StudentDashboard() {
 
       {/* NỘI DUNG CHÍNH BÊN PHẢI */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
-        <header className="h-20 bg-white border-b border-[#E8E2D9] px-10 flex justify-between items-center text-xs shrink-0">
-          <div className="flex items-center space-x-4">
-            <span className="font-extrabold text-[#E65100] bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100">
+        <header className="h-18 bg-white border-b border-[#E8E2D9] px-8 flex justify-between items-center text-xs shrink-0 shadow-2xs">
+          <div className="flex items-center space-x-3">
+            <span className="font-extrabold text-[#E65100] bg-orange-50/80 px-3 py-1.5 rounded-xl border border-orange-100/80 shadow-2xs">
               Đợt Lập Nhóm Đầu Kỳ
             </span>
             <span className="text-gray-300">/</span>
-            <span className="font-bold text-[#2C2825]">
+            <span className="font-bold text-[#6B635B]">
               Khoa CNTT - Đại học FPT
             </span>
           </div>
 
           <div className="flex items-center space-x-4">
-            <button onClick={checkUserGroup} className="text-[#E65100]">
+            <button onClick={checkUserGroup} className="text-[#E65100] font-bold hover:underline cursor-pointer">
               Làm mới nhóm
             </button>
             <NotificationBell />
 
-            <div className="text-right hidden sm:block pl-2 border-l border-[#E8E2D9]">
+            <div className="text-right hidden sm:block pl-3 border-l border-[#E8E2D9]">
               <p className="font-extrabold text-[#2C2825] text-xs">
                 {currentUser?.fullName || "Đang tải..."}
               </p>
@@ -335,7 +341,7 @@ export default function StudentDashboard() {
             </div>
 
             <span
-              className={`px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${
                 !hasGroup
                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                   : isLeader
@@ -347,33 +353,34 @@ export default function StudentDashboard() {
                 ? "🎓 STUDENT"
                 : isLeader
                   ? "👑 Nhóm trưởng"
-                  : "👤Thành viên"}
+                  : "👤 Thành viên"}
             </span>
           </div>
         </header>
 
-        {/* Banner cảnh báo sĩ số nhóm */}
-        <div
-          className={`mb-6  p-5 shadow-sm ${isValidTeamSize ? "bg-emerald-50/60 border-emerald-200 text-emerald-900" : "bg-amber-50/60 border-amber-200 text-amber-900"}`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider">
-                Trạng thái sĩ số nhóm
-              </p>
-              <h2 className="mt-1 text-sm font-black">
-                {isValidTeamSize
-                  ? `Nhóm đã đạt sĩ số hợp lệ (${groupMemberCount}/5 thành viên)`
-                  : `Nhóm hiện có ${groupMemberCount}/5 thành viên (Yêu cầu tối thiểu 3 thành viên)`}
-              </h2>
+        {hasGroup && (
+          <div
+            className={`mx-8 mt-6 p-4 rounded-2xl border shadow-xs ${isValidTeamSize ? "bg-emerald-50/70 border-emerald-200 text-emerald-900" : "bg-amber-50/70 border-amber-200 text-amber-900"}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider opacity-80">
+                  Trạng thái sĩ số nhóm
+                </p>
+                <h2 className="mt-0.5 text-xs font-black">
+                  {isValidTeamSize
+                    ? `Nhóm đã đạt sĩ số hợp lệ (${groupMemberCount}/5 thành viên)`
+                    : `Nhóm hiện có ${groupMemberCount}/5 thành viên (Yêu cầu tối thiểu 3 thành viên)`}
+                </h2>
+              </div>
+              <span
+                className={`px-3 py-1 text-[11px] font-bold rounded-xl shadow-2xs ${isValidTeamSize ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"}`}
+              >
+                {isValidTeamSize ? "✓ Đạt chuẩn" : "⚠️ Cần bổ sung thành viên"}
+              </span>
             </div>
-            <span
-              className={`px-3 py-1 text-xs font-bold rounded-xl ${isValidTeamSize ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"}`}
-            >
-              {isValidTeamSize ? "✓ Đạt chuẩn" : "⚠️ Cần bổ sung thành viên"}
-            </span>
           </div>
-        </div>
+        )}
 
         <div className="p-8 max-w-7xl mx-auto w-full">
           {hasGroup || isLeader ? (
@@ -392,10 +399,6 @@ export default function StudentDashboard() {
                   onGroupUpdated={checkUserGroup}
                 />
               )}
-              {/* {activeTab === "applications" && isLeader && (
-                <GroupApplications groupId={groupData?.id} />
-              )} */}
-
               {activeTab === "applications" && hasGroup && (
                 <GroupApplications
                   groupId={groupData?.id}
@@ -403,7 +406,6 @@ export default function StudentDashboard() {
                   currentUserId={currentUser?.id}
                 />
               )}
-              
               {activeTab === "management" && (
                 <GroupManagementPanel
                   groupData={groupData}
@@ -415,22 +417,21 @@ export default function StudentDashboard() {
               {activeTab === "settings" && <Profile />}
             </>
           ) : (
-            // Giao diện cho sinh viên thường chưa có nhóm...
             <>
               {activeTab === "settings" ? (
                 <Profile />
               ) : (
                 <div className="space-y-6">
-                  {/* Tab chuyển đổi cho sinh viên chưa có nhóm: gom thành 3 mục trên 1 dòng */}
-                  <div className="flex justify-center mb-6">
-                    <div className="bg-[#F3EFEA] p-1.5 rounded-2xl max-w-2xl w-full grid grid-cols-2 gap-2 shadow-inner">
+                  {/* THANH TAB CHUYỂN ĐỔI ĐƯỢC THIẾT KẾ LẠI SANG TRỌNG HƠN */}
+                  <div className="flex justify-center mb-2">
+                    <div className="bg-white p-1.5 rounded-2xl max-w-md w-full grid grid-cols-2 gap-2 border border-[#E8E2D9] shadow-xs">
                       <button
                         type="button"
                         onClick={() => setActiveTab("create")}
-                        className={`py-3 text-xs font-bold rounded-xl transition cursor-pointer text-center ${
+                        className={`py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer text-center ${
                           activeTab === "create"
-                            ? "bg-white text-[#2C2825] shadow-md"
-                            : "text-[#6B635B]"
+                            ? "bg-[#E65100] text-white shadow-sm"
+                            : "text-[#6B635B] hover:bg-[#FBF9F5]"
                         }`}
                       >
                         🚀 Tạo nhóm mới
@@ -438,13 +439,13 @@ export default function StudentDashboard() {
                       <button
                         type="button"
                         onClick={() => setActiveTab("profile_apply")}
-                        className={`py-3 text-xs font-bold rounded-xl transition cursor-pointer text-center ${
+                        className={`py-2.5 text-xs font-extrabold rounded-xl transition-all cursor-pointer text-center ${
                           activeTab === "profile_apply"
-                            ? "bg-white text-[#2C2825] shadow-md"
-                            : "text-[#6B635B]"
+                            ? "bg-[#E65100] text-white shadow-sm"
+                            : "text-[#6B635B] hover:bg-[#FBF9F5]"
                         }`}
                       >
-                        📝 Profile & Apply nhóm
+                        🔍 Tìm nhóm đang tuyển
                       </button>
                     </div>
                   </div>
@@ -454,22 +455,33 @@ export default function StudentDashboard() {
                       onJoinedGroup={async (groupId) => {
                         try {
                           const group = await getGroupById(groupId);
-
                           setGroupData(group);
                           setHasGroup(true);
-
-                          // Quan trọng: chuyển sang dashboard nhóm
                           setActiveTab("overview");
                         } catch (err) {
-                          console.error(
-                            "Không thể tải group sau khi Accept:",
-                            err?.response?.data || err,
-                          );
+                          console.error("Không thể tải group sau khi Accept:", err);
                         }
                       }}
                     />
                   ) : (
-                    <CreateGroup onGroupCreated={() => checkUserGroup()} />
+                    <CreateGroup
+                      onGroupCreated={async (newGroupId) => {
+                        if (newGroupId) {
+                          try {
+                            const group = await getGroupById(newGroupId);
+                            if (group) {
+                              setGroupData(group);
+                              setHasGroup(true);
+                              setActiveTab("overview");
+                            }
+                          } catch {
+                            await checkUserGroup();
+                          }
+                        } else {
+                          await checkUserGroup();
+                        }
+                      }}
+                    />
                   )}
                 </div>
               )}
