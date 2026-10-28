@@ -192,7 +192,7 @@ export default function Profile() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-[#8A7768]">Mã số sinh viên</p>
                     <p className="mt-1 wrap-break-words text-sm font-bold">
-                      {user?.studentCode || "Chưa cập nhật"}
+                      {user?.studentCode || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -202,9 +202,9 @@ export default function Profile() {
                     🏛
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-[#8A7768]">Ngành (Major)</p>
+                    <p className="text-xs text-[#8A7768]">Ngành </p>
                     <p className="mt-1 text-sm font-bold">
-                      {user?.major || user?.majorName || "Chưa cập nhật ngành"}
+                      {user?.major || user?.majorName || "Software Engineering"}
                     </p>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export default function Profile() {
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#C94A08]">
-                  Account information
+                  Thông tin tài khoản
                 </span>
                 <h2 className="mt-1 text-xl font-black">
                   Thông tin chi tiết
@@ -265,7 +265,7 @@ export default function Profile() {
 
               <InfoField
                 label="Mã số sinh viên"
-                value={user?.studentCode}
+                value={user?.studentCode || "N/A"}
                 icon="🎓"
               />
 
@@ -276,8 +276,8 @@ export default function Profile() {
               />
 
               <InfoField
-                label="Ngành (Major)"
-                value={user?.major || user?.majorName}
+                label="Ngành "
+                value={user?.major || user?.majorName || "Software Engineering"}
                 icon="🏛"
               />
 

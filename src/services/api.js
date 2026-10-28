@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "https://usd-plugins-mesa-geneva.trycloudflare.com/api/v1",
+    baseURL: "https://quick-collecting-studies-apparently.trycloudflare.com/api/v1",
     headers: {
         "Content-Type": "application/json",
     },

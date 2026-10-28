@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getUsers, createUser, updateUser } from "../../services/userService";
+import {
+  getUsers,
+  createUser,
+  updateUser,
+  createModerator,
+} from "../../services/userService";
 import NotificationBell from "../../components/NotificationBell";
 import {
   getAllGroups,
@@ -7,7 +12,17 @@ import {
   replaceGroupLeader,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
-import { getSemesters, updateStudentEligibility } from "../../services/eligibilityService";
+import {
+  getSemesters,
+  updateStudentEligibility,
+} from "../../services/eligibilityService";
+import {
+  createSemester,
+  updateSemester,
+  deleteSemester,
+  assignModerator,
+} from "../../services/semesterService";
+import { exportSemesterExcel } from "../../services/moderatorService"; // 👈 Thêm service xuất Excel
 import Profile from "../../auth/Profile";
 import EligibilityPanel from "./EligibilityPanel";
 import LeaderLeaveRequests from "./LeaderLeaveRequests";
@@ -57,6 +72,35 @@ export default function AdminDashboard() {
   const [semesterStudents, setSemesterStudents] = useState([]);
   const [loadingSemesterStudents, setLoadingSemesterStudents] = useState(false);
 
+  // Danh sách Moderator phục vụ phân công
+  const [moderators, setModerators] = useState([]);
+
+  // States cho Modal Tạo/Sửa học kỳ
+  const [semesterModalOpen, setSemesterModalOpen] = useState(false);
+  const [isEditingSemester, setIsEditingSemester] = useState(false);
+  const [submittingSemester, setSubmittingSemester] = useState(false);
+
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const formatDate = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const openingDate = new Date();
+  openingDate.setDate(now.getDate() - 1);
+  const deadlineDate = new Date();
+  deadlineDate.setDate(now.getDate() + 5);
+  const toLocalISOString = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const [semesterForm, setSemesterForm] = useState({
+    code: "SU27",
+    name: "Summer 2027",
+    startDate: formatDate(now),
+    endDate: formatDate(deadlineDate),
+    formationOpensAt: toLocalISOString(openingDate),
+    defaultDeadline: toLocalISOString(deadlineDate),
+    moderatorId: "",
+  });
+
   // Toast thông báo
   const [toast, setToast] = useState({
     show: false,
@@ -69,6 +113,27 @@ export default function AdminDashboard() {
     setTimeout(() => {
       setToast((prev) => ({ ...prev, show: false }));
     }, 3000);
+  };
+
+  // 💡 Hàm xử lý xuất Excel theo học kỳ
+  const handleExportSemester = async (semesterCode) => {
+    if (!semesterCode) {
+      showToast("Vui lòng chọn học kỳ để xuất file.", "error");
+      return;
+    }
+    try {
+      const blobData = await exportSemesterExcel(semesterCode);
+      const url = window.URL.createObjectURL(new Blob([blobData]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Danh_sach_ghep_nhom_${semesterCode}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast(`Tải xuống file Excel kỳ ${semesterCode} thành công!`);
+    } catch (error) {
+      showToast(`Không thể xuất file Excel cho kỳ ${semesterCode}.`, "error");
+    }
   };
 
   const openLeaderModal = async (group) => {
@@ -134,7 +199,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState(""); // Dùng để lọc vai trò & trạng thái ở tab Tài khoản
+  const [selectedRole, setSelectedRole] = useState("");
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
@@ -143,32 +208,45 @@ export default function AdminDashboard() {
     email: "",
     fullName: "",
     password: "",
-    role: "STUDENT",
+    phone: "",
+    role: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch dữ liệu tổng quan cho toàn hệ thống (Lấy size lớn để gom đủ tất cả tài khoản các kỳ)
+  // Fetch dữ liệu tổng quan cho toàn hệ thống
   const fetchAdminData = async () => {
     try {
       const currentUser = await getCurrentUser().catch(() => null);
       setUser(currentUser);
 
-      // 1. Lấy tất cả tài khoản toàn hệ thống (gọi size lớn để tránh bị phân trang ẩn mất số liệu)
       const usersRes = await getUsers({ size: 1000 }).catch(() => []);
       const userList = usersRes?.content || usersRes || [];
       setUsers(userList);
 
-      // 2. Lấy toàn bộ danh sách nhóm của tất cả các kỳ
+      const modList = userList.filter((u) => {
+        const r = String(u.role || "").toUpperCase();
+        return r.includes("MODERATOR") || r.includes("LECTURER");
+      });
+      setModerators(modList);
+
       const groupsRes = await getAllGroups().catch(() => []);
-      const groupList = Array.isArray(groupsRes) ? groupsRes : groupsRes.content || groupsRes.items || [];
+      const groupList = Array.isArray(groupsRes)
+        ? groupsRes
+        : groupsRes?.content || groupsRes?.items || groupsRes?.data || [];
       setGroups(groupList);
 
-      // 3. Lấy danh sách học kỳ
       const semRes = await getSemesters({ size: 1000 }).catch(() => []);
-      const semList = Array.isArray(semRes) ? semRes : semRes.content || [];
-      setSemesters(semList);
-      if (semList.length > 0 && !accountSemester) {
-        const firstCode = semList[0].code || semList[0].name || semList[0];
+      const semList = Array.isArray(semRes)
+        ? semRes
+        : semRes?.data || semRes?.content || semRes?.items || [];
+      const finalSemList = Array.isArray(semList)
+        ? semList
+        : [semList].filter(Boolean);
+
+      setSemesters(finalSemList);
+      if (finalSemList.length > 0 && !accountSemester) {
+        const firstCode =
+          finalSemList[0].code || finalSemList[0].name || finalSemList[0];
         setAccountSemester(firstCode);
       }
     } catch (error) {
@@ -182,13 +260,66 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  // Fetch danh sách sinh viên theo học kỳ được chọn ở tab Tài khoản
+  const handleSaveSemesterFromModal = async (e) => {
+    e.preventDefault();
+    if (submittingSemester) return;
+    setSubmittingSemester(true);
+    try {
+      const payload = {
+        code: semesterForm.code,
+        name: semesterForm.name,
+        startDate: semesterForm.startDate,
+        endDate: semesterForm.endDate,
+        formationOpensAt: new Date(semesterForm.formationOpensAt).toISOString(),
+        defaultDeadline: new Date(semesterForm.defaultDeadline).toISOString(),
+      };
+
+      if (isEditingSemester) {
+        await updateSemester(semesterForm.code, payload);
+        showToast(
+          `Đã cập nhật thông tin học kỳ ${semesterForm.code} thành công!`,
+        );
+      } else {
+        await createSemester(payload);
+        showToast(`Đã tạo học kỳ mới ${semesterForm.code} thành công!`);
+      }
+
+      if (semesterForm.moderatorId) {
+        await assignModerator(semesterForm.code, {
+          moderatorId: semesterForm.moderatorId,
+        });
+      }
+
+      setSemesterModalOpen(false);
+      await fetchAdminData();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Thực hiện thất bại.", "error");
+    } finally {
+      setSubmittingSemester(false);
+    }
+  };
+
+  const handleDeleteSemester = async (code) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa học kỳ ${code} không?`))
+      return;
+    try {
+      await deleteSemester(code);
+      showToast(`Đã xóa học kỳ ${code} thành công.`);
+      await fetchAdminData();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Xóa học kỳ thất bại.", "error");
+    }
+  };
+
   useEffect(() => {
     if (activeMenu === "accounts" && accountSemester) {
       setLoadingSemesterStudents(true);
-      api.get(`/semesters/${accountSemester}/students`)
+      api
+        .get(`/semesters/${accountSemester}/students`)
         .then((res) => {
-          const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
+          const list = Array.isArray(res.data)
+            ? res.data
+            : res.data.content || res.data.items || [];
           setSemesterStudents(list);
         })
         .catch(() => setSemesterStudents([]))
@@ -196,36 +327,10 @@ export default function AdminDashboard() {
     }
   }, [activeMenu, accountSemester]);
 
-  const handleToggleEligibility = async (u) => {
-    const studentCode = u.studentCode || u.mssv;
-    if (!studentCode || !accountSemester) {
-      showToast("Không tìm thấy MSSV hoặc học kỳ.", "error");
-      return;
-    }
-    const newEligible = u.eligible === false ? true : false;
-    let reason = "";
-    if (!newEligible) {
-      reason = window.prompt("Nhập lý do chưa đủ điều kiện:") || "";
-      if (!reason.trim()) return;
-    }
-
-    try {
-      await updateStudentEligibility(accountSemester, studentCode, {
-        eligible: newEligible,
-        reason: reason.trim(),
-      });
-      showToast("Cập nhật trạng thái điều kiện thành công!");
-      const res = await api.get(`/semesters/${accountSemester}/students`);
-      setSemesterStudents(Array.isArray(res.data) ? res.data : res.data.content || []);
-    } catch (err) {
-      showToast(err.response?.data?.message || "Cập nhật thất bại.", "error");
-    }
-  };
-
   const handleOpenCreateUser = () => {
     setIsEditingUser(false);
     setEditingUserId(null);
-    setUserForm({ email: "", fullName: "", password: "", role: "STUDENT" });
+    setUserForm({ email: "", fullName: "", password: "", role: "MODERATOR" });
     setIsUserModalOpen(true);
   };
 
@@ -235,11 +340,13 @@ export default function AdminDashboard() {
     try {
       const payload = { ...userForm };
       if (isEditingUser && !payload.password) delete payload.password;
+
       if (isEditingUser) {
         await updateUser(editingUserId, payload);
         showToast("Cập nhật tài khoản thành công!");
       } else {
-        await createUser(payload);
+        const { role, ...moderatorPayload } = payload;
+        await createModerator(moderatorPayload);
         showToast("Tạo tài khoản thành công!");
       }
       setIsUserModalOpen(false);
@@ -271,34 +378,6 @@ export default function AdminDashboard() {
   const manageableUsers = users
     .map((account) => ({ ...account, role: getManagedRole(account.role) }))
     .filter((account) => manageableRoles.includes(account.role));
-
-  // Lọc danh sách sinh viên theo học kỳ kết hợp bộ lọc vai trò và trạng thái
-  const filteredSemesterStudents = semesterStudents.filter((s) => {
-    const matchesSearch =
-      !searchQuery ||
-      (s.fullName && s.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (s.email && s.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (s.studentCode && s.studentCode.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const isEligible = s.eligible !== false;
-    let matchesRole = true;
-
-    if (selectedRole === "ELIGIBLE") {
-      matchesRole = isEligible;
-    } else if (selectedRole === "NOT_ELIGIBLE") {
-      matchesRole = !isEligible;
-    } else if (selectedRole === "STUDENT") {
-      matchesRole = getManagedRole(s.role) === "STUDENT" || !s.role;
-    } else if (selectedRole === "LEADER") {
-      matchesRole = getManagedRole(s.role) === "LEADER";
-    } else if (selectedRole === "ADMIN") {
-      matchesRole = getManagedRole(s.role) === "ADMIN";
-    } else if (selectedRole === "MODERATOR") {
-      matchesRole = getManagedRole(s.role) === "MODERATOR";
-    }
-
-    return matchesSearch && matchesRole;
-  });
 
   if (loading) {
     return (
@@ -368,6 +447,7 @@ export default function AdminDashboard() {
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
               Quản lý học kỳ & sinh viên
             </p>
+
             <button
               onClick={() => {
                 setActiveMenu("eligibility");
@@ -384,6 +464,20 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => {
+                setActiveMenu("semesters");
+                setSearchQuery("");
+              }}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+                activeMenu === "semesters"
+                  ? "bg-[#E65100] text-white shadow-md"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>🗓️</span>
+              <span>Quản lý học kỳ</span>
+            </button>
+            <button
+              onClick={() => {
                 setActiveMenu("accounts");
                 setSearchQuery("");
               }}
@@ -394,7 +488,7 @@ export default function AdminDashboard() {
               }`}
             >
               <span>👤</span>
-              <span>Tài khoản & Cờ điều kiện</span>
+              <span>Tài khoản </span>
             </button>
             <button
               onClick={() => {
@@ -424,25 +518,6 @@ export default function AdminDashboard() {
               <span>👥</span>
               <span>Danh sách nhóm</span>
             </button>
-
-            <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
-              Cấu hình
-            </p>
-            <button
-              onClick={() => {
-                setActiveMenu("settings");
-                setSearchQuery("");
-              }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
-                activeMenu === "settings"
-                  ? "bg-[#E65100] text-white shadow-md"
-                  : "hover:bg-[#F8F6F0]"
-              }`}
-            >
-              <span>⚙️</span>
-              <span>Cấu hình học kỳ</span>
-            </button>
-
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
               Cá nhân
             </p>
@@ -520,7 +595,7 @@ export default function AdminDashboard() {
                     Giám sát tổng quan toàn hệ thống
                   </span>
                   <h1 className="text-xl font-black text-[#2C2825] mt-1">
-                    Thống kê tổng hợp toàn bộ các kỳ (Tài khoản & Nhóm đồ án)
+                    Thống kê tổng hợp toàn bộ các kỳ
                   </h1>
                 </div>
                 <button
@@ -531,7 +606,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {[
                   {
                     label: "Tổng tài khoản",
@@ -540,24 +615,20 @@ export default function AdminDashboard() {
                     bg: "bg-blue-50 text-blue-600",
                   },
                   {
-                    label: "Tổng số nhóm (Tất cả kỳ)",
-                    value: groups.length,
+                    label: "Tổng số nhóm đồ án ",
+                    value: semesters.reduce(
+                      (sum, sem) => sum + (sem.groupCount || 0),
+                      0,
+                    ),
                     icon: "👥",
                     bg: "bg-orange-50 text-[#E65100]",
                   },
                   {
-                    label: "Sinh viên (Student)",
+                    label: "Sinh viên",
                     value: manageableUsers.filter((u) => u.role === "STUDENT")
                       .length,
                     icon: "🎓",
                     bg: "bg-emerald-50 text-emerald-600",
-                  },
-                  {
-                    label: "Trưởng nhóm (Leader)",
-                    value: manageableUsers.filter((u) => u.role === "LEADER")
-                      .length,
-                    icon: "⭐",
-                    bg: "bg-purple-50 text-purple-600",
                   },
                 ].map((metric) => (
                   <div
@@ -581,6 +652,72 @@ export default function AdminDashboard() {
                 ))}
               </div>
 
+              {/* MODERATOR PHỤ TRÁCH QUẢN LÝ NHÓM */}
+              <div className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-xs space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-black text-[#2C2825]">
+                      👑 Giảng viên hướng dẫn và quản lý nhóm theo học kỳ
+                    </h3>
+                    <p className="text-[11px] text-[#6B635B]">
+                      Danh sách giảng viên được phân công phụ trách quản lý các
+                      nhóm đồ án trong từng học kỳ.
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-lg border border-purple-100">
+                    {semesters.length} Kỳ hoạt động
+                  </span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {semesters.length > 0 ? (
+                    semesters.map((sem, idx) => {
+                      const code = sem.code || sem;
+                      const name = sem.name || code;
+                      const mod = sem.moderator;
+                      const groupCount = sem.groupCount || 0;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-4 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] space-y-2"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-black text-xs text-[#E65100]">
+                              {code} — {name}
+                            </span>
+                            <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-[10px] font-bold rounded">
+                              {groupCount} nhóm
+                            </span>
+                          </div>
+                          <div className="text-xs space-y-1 pt-1 border-t border-[#E8E2D9]">
+                            <p className="text-[#6B635B] font-bold">
+                              Giảng viên phụ trách:
+                            </p>
+                            {mod?.fullName ? (
+                              <p className="font-black text-[#2C2825] flex items-center gap-1.5">
+                                <span>👤</span> {mod.fullName}{" "}
+                                <span className="text-[10px] text-gray-500 font-normal">
+                                  ({mod.email})
+                                </span>
+                              </p>
+                            ) : (
+                              <p className="text-amber-600 font-bold italic">
+                                ⚠️ Chưa phân công giảng viên
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-full py-6 text-center text-[#6B635B] italic text-xs">
+                      Chưa có dữ liệu học kỳ.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-xs space-y-4">
                   <h3 className="text-sm font-black text-[#2C2825]">
@@ -597,13 +734,6 @@ export default function AdminDashboard() {
                                 (u) => u.role === "STUDENT",
                               ).length,
                               fill: "#3B82F6",
-                            },
-                            {
-                              name: "Leader",
-                              value: manageableUsers.filter(
-                                (u) => u.role === "LEADER",
-                              ).length,
-                              fill: "#10B981",
                             },
                             {
                               name: "Moderator",
@@ -714,15 +844,208 @@ export default function AdminDashboard() {
             />
           )}
 
+          {/* TAB QUẢN LÝ HỌC KỲ - CÓ NÚT XUẤT EXCEL TỪNG KỲ Ở TRÊN CÙNG */}
+          {activeMenu === "semesters" && (
+            <div className="p-8 space-y-6">
+              <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs flex-wrap gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-[#2C2825]">
+                    Danh sách Học kỳ trong hệ thống
+                  </h2>
+                  <p className="text-xs text-[#6B635B]">
+                    Theo dõi các kỳ học, mốc thời gian chi tiết và trạng thái.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {semesters.length > 0 && (
+                    <select
+                      className="p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
+                      onChange={(e) => {
+                        handleExportSemester(e.target.value);
+                        e.target.value = "";
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>
+                        ↓ Xuất Excel theo kỳ...
+                      </option>
+                      {semesters.map((sem, idx) => {
+                        const code = sem.code || sem;
+                        return (
+                          <option key={idx} value={code}>
+                            Kỳ {code}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                  <button
+                    onClick={() => {
+                      setIsEditingSemester(false);
+                      setSemesterForm({
+                        code: "SU27",
+                        name: "Summer 2027",
+                        startDate: formatDate(now),
+                        endDate: formatDate(deadlineDate),
+                        formationOpensAt: toLocalISOString(openingDate),
+                        defaultDeadline: toLocalISOString(deadlineDate),
+                        moderatorId: "",
+                      });
+                      setSemesterModalOpen(true);
+                    }}
+                    className="px-5 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
+                  >
+                    + Tạo học kỳ mới
+                  </button>
+                </div>
+              </div>
+
+              {/* Bảng hiển thị danh sách học kỳ */}
+              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
+                      <th className="p-4 font-black uppercase w-12 text-center">
+                        STT
+                      </th>
+                      <th className="p-4 font-black uppercase">Mã kì</th>
+                      <th className="p-4 font-black uppercase">Học Kỳ</th>
+                      <th className="p-4 font-black uppercase">
+                        Thời gian bắt đầu
+                      </th>
+                      <th className="p-4 font-black uppercase">
+                        Thời gian kết thúc
+                      </th>
+                      <th className="p-4 font-black uppercase">Mở nhóm </th>
+                      <th className="p-4 font-black uppercase">Trạng thái</th>
+                      <th className="p-4 font-black uppercase text-right">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E8E2D9]">
+                    {semesters.length > 0 ? (
+                      semesters.map((sem, index) => {
+                        const code = sem.code || sem;
+                        const name = sem.name || code;
+                        const formatDateTimeStr = (dt) => {
+                          if (!dt) return "—";
+                          try {
+                            const d = new Date(dt);
+                            if (isNaN(d.getTime())) return dt;
+                            return d.toLocaleString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            });
+                          } catch {
+                            return dt;
+                          }
+                        };
+
+                        return (
+                          <tr
+                            key={index}
+                            className="hover:bg-[#FBF9F5]/70 transition"
+                          >
+                            <td className="p-4 text-center font-bold text-[#6B635B]">
+                              {index + 1}
+                            </td>
+                            <td className="p-4 font-bold font-mono text-[#E65100]">
+                              {code}
+                            </td>
+                            <td className="p-4 font-bold text-[#2C2825]">
+                              {name}
+                            </td>
+                            <td className="p-4 text-[#6B635B] font-medium">
+                              {formatDateTimeStr(sem.startDate)}
+                            </td>
+                            <td className="p-4 text-[#6B635B] font-medium">
+                              {formatDateTimeStr(sem.endDate)}
+                            </td>
+                            <td className="p-4 text-[11px] text-[#6B635B] space-y-0.5">
+                              <div>
+                                Mở: {formatDateTimeStr(sem.formationOpensAt)}
+                              </div>
+                              <div>
+                                Đóng: {formatDateTimeStr(sem.defaultDeadline)}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <span className="px-2.5 py-1 font-bold rounded-lg text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                Hoạt động
+                              </span>
+                            </td>
+                            <td className="p-4 text-right space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsEditingSemester(true);
+                                  setSemesterForm({
+                                    code: sem.code || code,
+                                    name: sem.name || name,
+                                    startDate: sem.startDate
+                                      ? sem.startDate.slice(0, 10)
+                                      : "",
+                                    endDate: sem.endDate
+                                      ? sem.endDate.slice(0, 10)
+                                      : "",
+                                    formationOpensAt: sem.formationOpensAt
+                                      ? sem.formationOpensAt.slice(0, 16)
+                                      : toLocalISOString(now),
+                                    defaultDeadline: sem.defaultDeadline
+                                      ? sem.defaultDeadline.slice(0, 16)
+                                      : toLocalISOString(deadlineDate),
+                                    moderatorId:
+                                      sem.moderator?.id ||
+                                      sem.moderator?.userId ||
+                                      "",
+                                  });
+                                  setSemesterModalOpen(true);
+                                }}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg cursor-pointer"
+                              >
+                                ✏️ Sửa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSemester(code)}
+                                className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg cursor-pointer"
+                              >
+                                🗑️ Xóa
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          className="p-12 text-center text-[#6B635B] italic"
+                        >
+                          Chưa có học kỳ nào trong hệ thống.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {activeMenu === "accounts" && (
             <div className="p-8 space-y-6">
               <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs">
                 <div>
                   <h2 className="text-xl font-black text-[#2C2825]">
-                    Quản lý tài khoản & Cờ điều kiện theo học kỳ
+                    Quản lý toàn bộ tài khoản hệ thống
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Chọn học kỳ và lọc theo trạng thái hoặc vai trò để quản lý sinh viên.
+                    Quản lý tất cả tài khoản Admin, Moderator, Leader và
+                    Student.
                   </p>
                 </div>
                 <button
@@ -733,35 +1056,16 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {/* Bộ lọc Học kỳ & Vai trò/Trạng thái */}
               <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex justify-between items-center gap-4 flex-wrap shadow-xs">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-xs font-bold text-[#E65100]">📅 Chọn học kỳ:</span>
-                  <select
-                    value={accountSemester}
-                    onChange={(e) => setAccountSemester(e.target.value)}
-                    className="p-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
-                  >
-                    {semesters.map((sem, idx) => {
-                      const code = sem.code || sem;
-                      const name = sem.name || code;
-                      return (
-                        <option key={idx} value={code}>
-                          {name}
-                        </option>
-                      );
-                    })}
-                  </select>
-
-                  <span className="text-xs font-bold text-[#6B635B] ml-2">Lọc trạng thái & vai trò:</span>
+                  <span className="text-xs font-bold text-[#6B635B]">
+                    Lọc vai trò:
+                  </span>
                   {[
                     { label: "Tất cả", value: "" },
-                    { label: "Đủ điều kiện", value: "ELIGIBLE" },
-                    { label: "Không đủ điều kiện", value: "NOT_ELIGIBLE" },
                     { label: "Student", value: "STUDENT" },
-                    { label: "Leader", value: "LEADER" },
-                    { label: "Admin", value: "ADMIN" },
                     { label: "Moderator", value: "MODERATOR" },
+                    { label: "Admin", value: "ADMIN" },
                   ].map((roleObj) => (
                     <button
                       key={roleObj.value}
@@ -782,68 +1086,106 @@ export default function AdminDashboard() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="🔍 Tìm MSSV, tên, email..."
+                    placeholder="🔍 Tìm tên, email, số điện thoại..."
                     className="w-full px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                   />
                 </div>
               </div>
 
-              {/* Bảng hiển thị danh sách sinh viên theo học kỳ */}
               <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase w-16 text-center">STT</th>
-                      <th className="p-4 font-black uppercase">MSSV</th>
+                      <th className="p-4 font-black uppercase w-16 text-center">
+                        STT
+                      </th>
                       <th className="p-4 font-black uppercase">Họ và tên</th>
                       <th className="p-4 font-black uppercase">Email</th>
-                      <th className="p-4 font-black uppercase">Trạng thái điều kiện</th>
-                      <th className="p-4 font-black uppercase text-left">Thao tác</th>
+                      <th className="p-4 font-black uppercase">
+                        Số điện thoại
+                      </th>
+                      <th className="p-4 font-black uppercase">
+                        Vai trò (Role)
+                      </th>
+                      <th className="p-4 font-black uppercase text-left">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E8E2D9]">
-                    {loadingSemesterStudents ? (
-                      <tr>
-                        <td colSpan="6" className="p-12 text-center text-[#6B635B]">
-                          Đang tải danh sách sinh viên học kỳ {accountSemester}...
-                        </td>
-                      </tr>
-                    ) : filteredSemesterStudents.length > 0 ? (
-                      filteredSemesterStudents.map((u, index) => {
-                        const isEligible = u.eligible !== false;
-                        return (
-                          <tr key={u.id || u.studentCode || u.email} className="hover:bg-[#FBF9F5]/70 transition">
-                            <td className="p-4 text-center font-bold text-[#6B635B]">{index + 1}</td>
-                            <td className="p-4 font-bold text-[#E65100]">{u.studentCode || u.mssv || "—"}</td>
-                            <td className="p-4 font-bold text-[#2C2825]">{u.fullName || u.name}</td>
+                    {(() => {
+                      const filteredUsers = manageableUsers.filter((u) => {
+                        const matchesSearch =
+                          !searchQuery ||
+                          (u.fullName &&
+                            u.fullName
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase())) ||
+                          (u.email &&
+                            u.email
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase())) ||
+                          (u.phone &&
+                            u.phone
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase()));
+
+                        const matchesRole =
+                          !selectedRole || u.role === selectedRole;
+                        return matchesSearch && matchesRole;
+                      });
+
+                      if (filteredUsers.length > 0) {
+                        return filteredUsers.map((u, index) => (
+                          <tr
+                            key={u.id || u.email}
+                            className="hover:bg-[#FBF9F5]/70 transition"
+                          >
+                            <td className="p-4 text-center font-bold text-[#6B635B]">
+                              {index + 1}
+                            </td>
+                            <td className="p-4 font-bold text-[#2C2825]">
+                              {u.fullName || u.name || "—"}
+                            </td>
                             <td className="p-4 text-[#6B635B]">{u.email}</td>
+                            <td className="p-4 text-[#6B635B]">
+                              {u.phone || "—"}
+                            </td>
                             <td className="p-4">
-                              <span className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${isEligible ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600 border border-red-200"}`}>
-                                {isEligible ? "Đủ điều kiện" : "📌 Không đủ điều kiện"}
+                              <span
+                                className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${
+                                  u.role === "ADMIN"
+                                    ? "bg-red-50 text-red-600 border border-red-200"
+                                    : u.role === "MODERATOR"
+                                      ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                      : u.role === "LEADER"
+                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                        : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}
+                              >
+                                {u.role || "STUDENT"}
                               </span>
                             </td>
                             <td className="p-4 text-left">
-                              <button
-                                onClick={() => handleToggleEligibility(u)}
-                                className={`px-3 py-1.5 font-bold rounded-xl text-xs transition cursor-pointer border shadow-xs ${
-                                  isEligible
-                                    ? "bg-red-50 text-red-600 border-red-200"
-                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                }`}
-                              >
-                                {isEligible ? "📌 Gắn cờ" : "🟢 Gỡ cờ"}
-                              </button>
+                              <span className="text-[11px] text-[#6B635B] italic">
+                                Hệ thống
+                              </span>
+                            </td>
+                          </tr>
+                        ));
+                      } else {
+                        return (
+                          <tr>
+                            <td
+                              colSpan="6"
+                              className="p-12 text-center text-[#6B635B] italic"
+                            >
+                              Không tìm thấy tài khoản nào phù hợp.
                             </td>
                           </tr>
                         );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="p-12 text-center text-[#6B635B] italic">
-                          Không tìm thấy sinh viên nào trong học kỳ {accountSemester}.
-                        </td>
-                      </tr>
-                    )}
+                      }
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -952,6 +1294,193 @@ export default function AdminDashboard() {
         </div>
       </main>
 
+      {/* MODAL TẠO / SỬA HỌC KỲ */}
+      {semesterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn overflow-y-auto">
+          <form
+            onSubmit={handleSaveSemesterFromModal}
+            className="w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-[#E8E2D9] p-6 space-y-4 text-xs my-8"
+          >
+            <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
+              <h3 className="text-sm font-black text-[#2C2825]">
+                {isEditingSemester
+                  ? "✏️ Cập nhật thông tin học kỳ"
+                  : "⚙️ Tạo học kỳ mới & Phân công Moderator"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSemesterModalOpen(false)}
+                className="w-7 h-7 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-bold text-[#6B635B]">
+                  Mã học kỳ (Code)
+                </label>
+                <input
+                  type="text"
+                  value={semesterForm.code}
+                  disabled={isEditingSemester}
+                  onChange={(e) =>
+                    setSemesterForm({ ...semesterForm, code: e.target.value })
+                  }
+                  required
+                  placeholder="VD: SU27"
+                  className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold mt-1 focus:outline-none focus:border-[#E65100] disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-[#6B635B]">
+                  Tên học kỳ (Name)
+                </label>
+                <input
+                  type="text"
+                  value={semesterForm.name}
+                  onChange={(e) =>
+                    setSemesterForm({ ...semesterForm, name: e.target.value })
+                  }
+                  required
+                  placeholder="VD: Summer 2027"
+                  className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold mt-1 focus:outline-none focus:border-[#E65100]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-bold text-[#6B635B]">Ngày bắt đầu</label>
+                <input
+                  type="date"
+                  value={semesterForm.startDate}
+                  onChange={(e) =>
+                    setSemesterForm({
+                      ...semesterForm,
+                      startDate: e.target.value,
+                    })
+                  }
+                  required
+                  className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold mt-1 focus:outline-none focus:border-[#E65100]"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-[#6B635B]">
+                  Ngày kết thúc
+                </label>
+                <input
+                  type="date"
+                  value={semesterForm.endDate}
+                  onChange={(e) =>
+                    setSemesterForm({
+                      ...semesterForm,
+                      endDate: e.target.value,
+                    })
+                  }
+                  required
+                  className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold mt-1 focus:outline-none focus:border-[#E65100]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-bold text-[#6B635B]">
+                  Thời điểm mở nhóm
+                </label>
+                <input
+                  type="datetime-local"
+                  value={semesterForm.formationOpensAt}
+                  onChange={(e) =>
+                    setSemesterForm({
+                      ...semesterForm,
+                      formationOpensAt: e.target.value,
+                    })
+                  }
+                  required
+                  className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold mt-1 focus:outline-none focus:border-[#E65100]"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-[#6B635B]">
+                  Deadline mặc định
+                </label>
+                <input
+                  type="datetime-local"
+                  value={semesterForm.defaultDeadline}
+                  onChange={(e) =>
+                    setSemesterForm({
+                      ...semesterForm,
+                      defaultDeadline: e.target.value,
+                    })
+                  }
+                  required
+                  className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold mt-1 focus:outline-none focus:border-[#E65100]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-[#6B635B]">
+                Phân công Moderator phụ trách kỳ
+              </label>
+              <select
+                value={semesterForm.moderatorId}
+                onChange={(e) =>
+                  setSemesterForm({
+                    ...semesterForm,
+                    moderatorId: e.target.value,
+                  })
+                }
+                className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#2C2825] outline-none cursor-pointer focus:border-[#E65100]"
+              >
+                <option value="">-- Chọn Moderator (Tuỳ chọn) --</option>
+                {moderators.map((mod) => (
+                  <option
+                    key={mod.id || mod.userId}
+                    value={mod.id || mod.userId}
+                  >
+                    {mod.fullName} ({mod.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 p-3.5 rounded-xl text-orange-900 space-y-1">
+              <p className="font-black">📌 Ghi chú hướng dẫn:</p>
+              <p className="text-[11px] leading-relaxed">
+                • Quản lý mốc thời gian và cấu hình ghép nhóm theo chuẩn v2.9.
+                <br />• Bạn có thể thay đổi thông tin hoặc gán lại Moderator phụ
+                trách học kỳ bất cứ lúc nào.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[#E8E2D9] pt-3">
+              <button
+                type="button"
+                onClick={() => setSemesterModalOpen(false)}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                disabled={submittingSemester}
+                className="px-6 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {submittingSemester
+                  ? "Đang xử lý..."
+                  : isEditingSemester
+                    ? "💾 Lưu thay đổi"
+                    : "🚀 Xác nhận tạo học kỳ"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* MODAL THÊM/SỬA USER */}
       {isUserModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -979,6 +1508,18 @@ export default function AdminDashboard() {
                   setUserForm({ ...userForm, fullName: event.target.value })
                 }
                 required
+                className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal"
+              />
+            </label>
+            <label className="block space-y-1 text-xs font-bold text-[#2C2825]">
+              Số điện thoại
+              <input
+                type="text"
+                value={userForm.phone}
+                onChange={(event) =>
+                  setUserForm({ ...userForm, phone: event.target.value })
+                }
+                placeholder="Nhập số điện thoại..."
                 className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal"
               />
             </label>
@@ -1016,10 +1557,7 @@ export default function AdminDashboard() {
                 }
                 className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal"
               >
-                <option value="STUDENT">Student</option>
-                <option value="LEADER">Leader</option>
                 <option value="MODERATOR">Moderator</option>
-                <option value="ADMIN">Admin</option>
               </select>
             </label>
             <div className="flex justify-end gap-3 border-t border-[#F0EBE1] pt-4">

@@ -357,7 +357,9 @@ export default function ModeratorDashboard() {
                       Tổng số nhóm
                     </p>
                     <p className="text-2xl font-black text-[#E65100] mt-1">
-                      {stats.total?.totalGroups || stats.totalGroups || groups.length}
+                      {stats.total?.totalGroups ||
+                        stats.totalGroups ||
+                        groups.length}
                     </p>
                   </div>
                   <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] shadow-xs">
@@ -365,7 +367,11 @@ export default function ModeratorDashboard() {
                       Nhóm dưới 3 người
                     </p>
                     <p className="text-2xl font-black text-red-600 mt-1">
-                      {stats.under3GroupsCount || stats.total?.under3GroupsCount || 0}
+                      {stats?.under3GroupsCount ??
+                        stats?.total?.under3GroupsCount ??
+                        groups.filter(
+                          (g) => (g.members?.length || g.memberCount || 0) < 3,
+                        ).length}
                     </p>
                   </div>
                   <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] shadow-xs">
@@ -373,7 +379,9 @@ export default function ModeratorDashboard() {
                       Sinh viên chưa có nhóm
                     </p>
                     <p className="text-2xl font-black text-amber-600 mt-1">
-                     {stats.total?.withoutGroup || stats.unassignedStudents || 0}
+                      {stats.total?.withoutGroup ||
+                        stats.unassignedStudents ||
+                        0}
                     </p>
                   </div>
                 </div>
@@ -440,7 +448,7 @@ export default function ModeratorDashboard() {
                             className="hover:bg-[#FBF9F5]/70 transition"
                           >
                             <td className="p-4 font-bold text-[#E65100]">
-                              {g.groupCode}
+                              {g.groupCode || g.name}
                             </td>
                             <td className="p-4">
                               <span

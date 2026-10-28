@@ -4,16 +4,24 @@ import {
   inviteToGroup,
   removeGroupMember,
 } from "../../services/groupService";
-import { getIneligibleStudents } from "../../services/eligibilityService";
 
 export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
   const [groupData, setGroupData] = useState(null);
   const [memberInput, setMemberInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [ineligibleStudents, setIneligibleStudents] = useState([]);
 
   const [dialog, setDialog] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  // Hàm kiểm tra linh hoạt xem một thành viên có phải leader không
+  const checkIfLeader = (member) => {
+    return Boolean(
+      member?.isLeader ||
+      member?.role === "LEADER" ||
+      member?.userId === groupData?.leaderId ||
+      member?.id === groupData?.leaderId,
+    );
+  };
 
   const showNotice = (message, type = "success") => {
     setDialog({
@@ -40,94 +48,25 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
       danger,
     });
   };
-  // =====================================================
-  // LẤY GROUP + DANH SÁCH SINH VIÊN KHÔNG ĐỦ ĐIỀU KIỆN
-  // =====================================================
+
   const fetchGroupDetails = useCallback(async () => {
     if (!groupId) return;
 
     try {
-      const [groupRes, ineligibleRes] = await Promise.all([
-        getGroupById(groupId),
-        getIneligibleStudents().catch(() => []),
-      ]);
-
-      const ineligibleList =
-        ineligibleRes?.content || ineligibleRes?.items || ineligibleRes || [];
-
-      setIneligibleStudents(
-        Array.isArray(ineligibleList) ? ineligibleList : [],
-      );
-
+      const groupRes = await getGroupById(groupId);
       setGroupData(groupRes);
     } catch (err) {
       console.error("Lỗi lấy thông tin nhóm:", err);
     }
   }, [groupId]);
 
-  // =====================================================
-  // LOAD LẦN ĐẦU + TỰ ĐỘNG KIỂM TRA LẠI
-  // =====================================================
   useEffect(() => {
     fetchGroupDetails();
-
-    // Cứ 5 giây kiểm tra lại.
-    // Admin đánh dấu không đủ điều kiện ở máy khác
-    // thì Leader sẽ tự thấy danh sách cập nhật.
-    const interval = setInterval(() => {
-      fetchGroupDetails();
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, [fetchGroupDetails]);
 
-  // =====================================================
-  // KIỂM TRA MEMBER CÓ BỊ ĐÁNH DẤU INELIGIBLE KHÔNG
-  // =====================================================
-  const isMemberIneligible = (member) => {
-    const memberId = member?.userId || member?.studentId || member?.id;
+  // Danh sách thành viên lấy trực tiếp từ nhóm
+  const membersList = groupData?.members || [];
 
-    const memberEmail = (
-      member?.userEmail ||
-      member?.email ||
-      ""
-    ).toLowerCase();
-
-    const memberStudentCode = String(
-      member?.studentCode || member?.userStudentCode || "",
-    ).toLowerCase();
-
-    return ineligibleStudents.some((student) => {
-      const studentId = student?.userId || student?.studentId || student?.id;
-
-      const studentEmail = (
-        student?.email ||
-        student?.userEmail ||
-        ""
-      ).toLowerCase();
-
-      const studentCode = String(
-        student?.studentCode || student?.userStudentCode || "",
-      ).toLowerCase();
-
-      return (
-        (memberId && studentId && String(memberId) === String(studentId)) ||
-        (memberEmail && studentEmail && memberEmail === studentEmail) ||
-        (memberStudentCode && studentCode && memberStudentCode === studentCode)
-      );
-    });
-  };
-
-  // =====================================================
-  // CHỈ HIỂN THỊ MEMBER ĐỦ ĐIỀU KIỆN
-  // =====================================================
-  const activeMembers = (groupData?.members || []).filter(
-    (member) => !isMemberIneligible(member),
-  );
-
-  // =====================================================
-  // THÊM MEMBER
-  // =====================================================
   const handleInviteMember = async (e) => {
     e.preventDefault();
 
@@ -138,7 +77,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
 
     if (loading || !groupId || !memberInput.trim()) return;
 
-    if (activeMembers.length >= 5) {
+    if (membersList.length >= 5) {
       showNotice(
         "Nhóm đã đạt số lượng tối đa (5 thành viên). Không thể thêm mới!",
         "error",
@@ -171,9 +110,6 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
     }
   };
 
-  // =====================================================
-  // XÓA MEMBER
-  // =====================================================
   const handleRemoveMember = (memberId) => {
     if (!isLeader) {
       showNotice("Chỉ có Trưởng nhóm mới có quyền xóa thành viên!", "error");
@@ -187,7 +123,6 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
       danger: true,
       action: async () => {
         await removeGroupMember(groupId, memberId);
-
         await fetchGroupDetails();
 
         if (onGroupUpdated) {
@@ -199,25 +134,17 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
     });
   };
 
-  // =====================================================
-  // COUNT
-  // =====================================================
-  const memberCount = activeMembers.length;
-
+  const memberCount = membersList.length;
   const isValidSize = memberCount >= 3 && memberCount <= 5;
 
-  // =====================================================
-  // UI
-  // =====================================================
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn text-[#2C2825]">
       {/* HEADER */}
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
         <div>
           <h2 className="text-lg font-black text-[#2C2825]">
             Thành viên nhóm ({memberCount}/5 người)
           </h2>
-
           <p className="text-xs text-[#6B635B] mt-1">
             Yêu cầu quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.
           </p>
@@ -239,11 +166,11 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
       {isLeader && (
         <form
           onSubmit={handleInviteMember}
-          className="bg-white p-6 rounded-3xl border border-[#E8E2D9] space-y-3"
+          className="bg-white p-6 rounded-3xl border border-[#E8E2D9] space-y-3 shadow-sm"
         >
           <label
             htmlFor="member-invite-code"
-            className="block text-sm font-bold"
+            className="block text-xs font-bold uppercase text-[#6B635B]"
           >
             Mời sinh viên bằng MSSV
           </label>
@@ -255,14 +182,14 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
               required
               disabled={loading}
               placeholder="Nhập MSSV"
-              className="border rounded-xl px-4 py-2 flex-1"
+              className="border border-[#E8E2D9] bg-[#FBF9F5] rounded-xl px-4 py-2.5 text-xs flex-1 outline-none focus:border-[#E65100]"
             />
             <button
               type="submit"
               disabled={
                 loading || !groupId || !memberInput.trim() || memberCount >= 5
               }
-              className="bg-[#E65100] text-white rounded-xl px-4 py-2 disabled:opacity-50"
+              className="bg-[#E65100] text-white rounded-xl px-5 py-2.5 text-xs font-bold shadow-md hover:bg-[#D84315] disabled:opacity-50 cursor-pointer transition"
             >
               {loading ? "Đang gửi..." : "Gửi lời mời"}
             </button>
@@ -277,24 +204,24 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
       {/* DANH SÁCH */}
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] space-y-6 shadow-sm">
         {/* GROUP CODE */}
-        <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200 flex justify-between items-center">
+        <div className="p-4 bg-orange-50/60 rounded-2xl border border-orange-200 flex justify-between items-center">
           <div>
-            <p className="text-[10px] font-bold text-orange-600 uppercase">
+            <p className="text-[10px] font-black text-orange-600 uppercase tracking-wider">
               Mã nhóm
             </p>
-
-            <h4 className="text-sm font-black text-[#2C2825]">
-              {groupData?.groupCode || "Đang tải..."}
+            <h4 className="text-sm font-black text-[#2C2825] mt-0.5">
+              {groupData?.groupCode || groupData?.code || "Đang tải..."}
             </h4>
           </div>
 
           <button
             type="button"
             onClick={async () => {
-              if (!groupData?.groupCode) return;
+              const codeToCopy = groupData?.groupCode || groupData?.code;
+              if (!codeToCopy) return;
 
               try {
-                await navigator.clipboard.writeText(groupData.groupCode);
+                await navigator.clipboard.writeText(codeToCopy);
                 showNotice("Đã sao chép mã nhóm!");
               } catch {
                 showNotice(
@@ -303,7 +230,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                 );
               }
             }}
-            className="px-3 py-1.5 bg-white border border-orange-200 text-xs font-bold rounded-xl text-[#E65100] shadow-xs hover:bg-orange-50 transition cursor-pointer"
+            className="px-3.5 py-1.5 bg-white border border-orange-200 text-xs font-bold rounded-xl text-[#E65100] shadow-xs hover:bg-orange-50 transition cursor-pointer"
           >
             Sao chép mã
           </button>
@@ -315,51 +242,57 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
             <h3 className="text-xs font-black uppercase text-[#6B635B]">
               Danh sách thành viên hiện tại
             </h3>
-
-            <span className="text-[10px] text-gray-400">Tự động cập nhật</span>
+            <span className="text-[10px] text-[#9E958C]">Tự động cập nhật</span>
           </div>
 
-          {activeMembers.length > 0 ? (
-            activeMembers.map((m) => (
-              <div
-                key={m.id || m.userId}
-                className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center"
-              >
-                <div>
-                  <h4 className="text-xs font-bold text-[#2C2825]">
-                    {m.userFullName || m.fullName || "Thành viên"}
-                  </h4>
+          {membersList.length > 0 ? (
+            membersList.map((m) => {
+              const isMemberLeader = checkIfLeader(m);
+              return (
+                <div
+                  key={m.id || m.userId}
+                  className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs"
+                >
+                  <div>
+                    <h4 className="font-black text-[#2C2825]">
+                      {m.userFullName || m.fullName || "Thành viên"}
+                    </h4>
+                    <p className="text-[11px] text-[#6B635B] mt-1.5">
+                      MSSV:{" "}
+                      {m.studentCode ||
+                        m.userStudentCode ||
+                        m.email ||
+                        m.userEmail ||
+                        m.userId}
+                    </p>
+                  </div>
 
-                  <p className="text-[10px] text-[#6B635B]">
-                    {m.userEmail || m.email || m.userId}
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <span
-                    className={`px-3 py-1 text-[10px] font-bold rounded-full ${
-                      m.isLeader
-                        ? "bg-emerald-50 text-emerald-600"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {m.isLeader ? "👑 Trưởng nhóm " : "👤 Thành viên"}
-                  </span>
-
-                  {isLeader && !m.isLeader && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(m.id || m.userId)}
-                      className="text-red-500 font-bold text-xs hover:underline bg-red-50 px-2.5 py-1 rounded-lg cursor-pointer"
+                  <div className="flex items-center space-x-3">
+                    <span
+                      className={`px-3 py-1 text-[10px] font-extrabold rounded-full ${
+                        isMemberLeader
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-gray-100 text-gray-700"
+                      }`}
                     >
-                      Xóa
-                    </button>
-                  )}
+                      {isMemberLeader ? "👑 Trưởng nhóm" : "👤 Thành viên"}
+                    </span>
+
+                    {isLeader && !isMemberLeader && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(m.id || m.userId)}
+                        className="text-red-600 font-bold text-xs hover:underline bg-red-50 px-3 py-1.5 rounded-xl cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
-            <p className="text-xs text-center text-[#6B635B] py-4">
+            <p className="text-xs text-center text-[#6B635B] py-4 italic">
               Chưa có thành viên nào trong nhóm.
             </p>
           )}
@@ -370,19 +303,18 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
             <div
               role="dialog"
               aria-modal="true"
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-[#E8E2D9]"
             >
               <div className="flex items-start justify-between gap-4">
                 <h3 className="text-base font-black text-[#2C2825]">
                   {dialog.title}
                 </h3>
-
                 <button
                   type="button"
                   aria-label="Đóng"
                   disabled={processing}
                   onClick={() => setDialog(null)}
-                  className="text-2xl leading-none text-[#6B635B] hover:text-black"
+                  className="text-2xl leading-none text-[#6B635B] hover:text-black cursor-pointer"
                 >
                   ×
                 </button>
@@ -398,7 +330,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                     type="button"
                     disabled={processing}
                     onClick={() => setDialog(null)}
-                    className="rounded-xl border border-[#E8E2D9] px-4 py-2.5 text-sm font-bold text-[#6B635B] hover:bg-[#F8F6F0]"
+                    className="rounded-xl border border-[#E8E2D9] px-5 py-2.5 text-sm font-bold text-[#6B635B] hover:bg-[#F8F6F0] cursor-pointer"
                   >
                     Hủy bỏ
                   </button>
@@ -430,7 +362,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                       setProcessing(false);
                     }
                   }}
-                  className={`rounded-xl px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 ${
+                  className={`rounded-xl px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50 cursor-pointer ${
                     dialog.danger
                       ? "bg-red-600 hover:bg-red-700"
                       : "bg-[#E65100] hover:bg-[#D84315]"

@@ -159,12 +159,9 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
           <h1 className="mt-2 text-xl font-black sm:text-2xl">
             Yêu cầu rời nhóm & Khiếu nại chờ xử lý
           </h1>
-          <p className="mt-1 text-sm text-[#8A8178]">
-            Chọn môn học để xem danh sách yêu cầu theo chuẩn UUID.
-          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <span className="text-xs font-bold text-[#6B635B]">Môn học:</span>
           {subjects.length > 0 ? (
             <select
@@ -190,7 +187,7 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
               className="w-64 p-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-mono text-[#E65100] outline-none"
             />
           )}
-        </div>
+        </div> */}
 
         <button
           type="button"
