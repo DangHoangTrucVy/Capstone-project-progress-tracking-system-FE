@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
-import { getSemesters, updateStudentEligibility } from "../../services/eligibilityService";
+import {
+  getSemesters,
+  updateStudentEligibility,
+} from "../../services/eligibilityService";
 
 export default function EligibilityPanel({ onChanged }) {
   const [semesters, setSemesters] = useState([]);
@@ -8,6 +11,9 @@ export default function EligibilityPanel({ onChanged }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
+  
+  // 🔍 State cho bộ lọc trạng thái điều kiện: "ALL" | "ELIGIBLE" | "INELIGIBLE"
+  const [eligibilityFilter, setEligibilityFilter] = useState("ALL");
 
   // States cho luồng 1: Import danh sách ban đầu
   const [initialFile, setInitialFile] = useState(null);
@@ -18,10 +24,20 @@ export default function EligibilityPanel({ onChanged }) {
   const [ineligibleFile, setIneligibleFile] = useState(null);
   const [importingIneligible, setImportingIneligible] = useState(false);
 
-  // 💡 States cho Modal Custom nhập lý do (thay thế window.prompt)
+  // States cho Modal Custom nhập lý do (thay thế window.prompt)
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
   const [targetStudent, setTargetStudent] = useState(null);
   const [ineligibleReason, setIneligibleReason] = useState("");
+
+  // State Toast Notification chuyên nghiệp
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
 
   // 1. Tải danh sách học kỳ khi mở trang
   useEffect(() => {
@@ -48,7 +64,9 @@ export default function EligibilityPanel({ onChanged }) {
     setLoading(true);
     try {
       const res = await api.get(`/semesters/${semCode}/students`);
-      const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data.content || res.data.items || [];
       setStudents(list);
     } catch {
       setStudents([]);
@@ -61,7 +79,7 @@ export default function EligibilityPanel({ onChanged }) {
   const handleImportInitial = async (e) => {
     e.preventDefault();
     if (!initialFile || !selectedSemester) {
-      alert("Vui lòng chọn học kỳ và file danh sách ban đầu!");
+      showToast("Vui lòng chọn học kỳ và file danh sách ban đầu!", "error");
       return;
     }
 
@@ -70,15 +88,22 @@ export default function EligibilityPanel({ onChanged }) {
 
     setImportingInitial(true);
     try {
-      await api.post(`/semesters/${selectedSemester}/import-students`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert("Import danh sách ban đầu thành công!");
+      await api.post(
+        `/semesters/${selectedSemester}/imports/students`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+      showToast("Import danh sách ban đầu thành công!");
       setInitialFile(null);
       loadStudents(selectedSemester);
       if (onChanged) onChanged();
     } catch (error) {
-      alert(error.response?.data?.message || "Import danh sách ban đầu thất bại.");
+      showToast(
+        error.response?.data?.message || "Import danh sách ban đầu thất bại.",
+        "error",
+      );
     } finally {
       setImportingInitial(false);
     }
@@ -88,7 +113,7 @@ export default function EligibilityPanel({ onChanged }) {
   const handleImportIneligible = async (e) => {
     e.preventDefault();
     if (!ineligibleFile || !selectedSemester) {
-      alert("Vui lòng chọn học kỳ và file cập nhật Ineligible!");
+      showToast("Vui lòng chọn học kỳ và file cập nhật điều kiện!", "error");
       return;
     }
 
@@ -97,69 +122,107 @@ export default function EligibilityPanel({ onChanged }) {
 
     setImportingIneligible(true);
     try {
-      await api.post(`/semesters/${selectedSemester}/import-ineligible`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert("Cập nhật danh sách Ineligible thành công! Hệ thống đã tự động quét và gắn cờ.");
+      await api.post(
+        `/semesters/${selectedSemester}/imports/eligibility`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+      showToast(
+        "Cập nhật danh sách điều kiện thành công! Hệ thống đã tự động quét.",
+      );
       setIneligibleFile(null);
       setShowIneligibleModal(false);
       loadStudents(selectedSemester);
       if (onChanged) onChanged();
     } catch (error) {
-      alert(error.response?.data?.message || "Cập nhật Ineligible thất bại.");
+      showToast(
+        error.response?.data?.message || "Cập nhật danh sách thất bại.",
+        "error",
+      );
     } finally {
       setImportingIneligible(false);
     }
   };
 
   // 5. Khi bấm nút Gắn/Gỡ cờ
+  
   const handleToggleClick = (student) => {
-    const isEligible = student.eligible !== false;
+    const isEligible = student.eligibility !== "INELIGIBLE";
 
     if (isEligible) {
-      // Nếu đang đủ điều kiện -> Muốn gắn cờ Ineligible -> Mở Custom Modal nhập lý do
+      // Đang đủ điều kiện -> Muốn gắn cờ Ineligible -> Mở Modal nhập lý do
       setTargetStudent(student);
       setIneligibleReason("");
       setReasonModalOpen(true);
     } else {
-      // Nếu đang chưa đủ điều kiện -> Muốn gỡ cờ về Đủ điều kiện -> Xác nhận nhanh
-      handleConfirmEligibilityChange(student, true, "");
+      // 🛠️ Đang chưa đủ điều kiện -> Muốn gỡ cờ về Đủ điều kiện -> Gọi hàm với chuỗi "ELIGIBLE"
+      handleConfirmEligibilityChange(student, "ELIGIBLE", "Gỡ cờ đủ điều kiện");
     }
   };
 
-  // 6. Gửi API cập nhật trạng thái sau khi xác nhận
-  const handleConfirmEligibilityChange = async (student, newEligible, reasonText) => {
-    const studentCode = student.studentCode || student.mssv;
-    if (!studentCode || !selectedSemester) return;
+  const handleConfirmEligibilityChange = async (
+    student,
+    newEligibleOrStatus,
+    reasonText,
+  ) => {
+    const enrollmentId = student.id || student.enrollmentId;
+    if (!enrollmentId) {
+      showToast("Không tìm thấy ID ghi danh của sinh viên này.", "error");
+      return;
+    }
 
-    if (!newEligible && !reasonText.trim()) {
-      alert("Vui lòng nhập lý do chưa đủ điều kiện.");
+    // Xác định giá trị gửi lên (nếu là chuỗi dùng luôn, nếu là boolean thì quy đổi)
+    let eligibilityValue = "ELIGIBLE";
+    if (typeof newEligibleOrStatus === "string") {
+      eligibilityValue = newEligibleOrStatus;
+    } else {
+      eligibilityValue = newEligibleOrStatus ? "ELIGIBLE" : "INELIGIBLE";
+    }
+
+    if (eligibilityValue === "INELIGIBLE" && !reasonText.trim()) {
+      showToast("Vui lòng nhập lý do chưa đủ điều kiện.", "error");
       return;
     }
 
     try {
-      await updateStudentEligibility(selectedSemester, studentCode, {
-        eligible: newEligible,
-        reason: reasonText.trim(),
+      await updateStudentEligibility(enrollmentId, {
+        eligibility: eligibilityValue, // Gửi chuỗi "ELIGIBLE" hoặc "INELIGIBLE"
+        reason: reasonText ? reasonText.trim() : "",
       });
-      alert("Cập nhật trạng thái thành công!");
+
+      showToast("Cập nhật trạng thái thành công!");
       setReasonModalOpen(false);
       setTargetStudent(null);
       loadStudents(selectedSemester);
       if (onChanged) onChanged();
     } catch (err) {
-      alert(err.response?.data?.message || "Cập nhật thất bại.");
+      showToast(err.response?.data?.message || "Cập nhật thất bại.", "error");
     }
   };
 
+  // 🔍 Lọc sinh viên theo từ khóa (tên, email, MSSV) và trạng thái điều kiện
   const filteredStudents = students.filter((s) => {
-    if (!searchKeyword) return true;
+    // 1. Lọc theo từ khóa tìm kiếm
     const keyword = searchKeyword.toLowerCase();
-    return (
+    const matchesKeyword =
+      !searchKeyword ||
       (s.fullName && s.fullName.toLowerCase().includes(keyword)) ||
       (s.email && s.email.toLowerCase().includes(keyword)) ||
-      (s.studentCode && s.studentCode.toLowerCase().includes(keyword))
-    );
+      (s.studentCode && s.studentCode.toLowerCase().includes(keyword)) ||
+      (s.mssv && s.mssv.toLowerCase().includes(keyword));
+
+    // 2. Lọc theo trạng thái điều kiện
+    const isEligible = s.eligibility !== "INELIGIBLE";
+    let matchesEligibility = true;
+    if (eligibilityFilter === "ELIGIBLE") {
+      matchesEligibility = isEligible;
+    } else if (eligibilityFilter === "INELIGIBLE") {
+      matchesEligibility = !isEligible;
+    }
+
+    return matchesKeyword && matchesEligibility;
   });
 
   return (
@@ -168,7 +231,7 @@ export default function EligibilityPanel({ onChanged }) {
       <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs flex-wrap gap-4">
         <div>
           <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-            QUẢN LÝ ĐIỀU KIỆN SINH VIEN
+            QUẢN LÝ ĐIỀU KIỆN SINH VIÊN
           </span>
           <h1 className="text-xl font-black text-[#2C2825] mt-1">
             Import danh sách & Cập nhật trạng thái sinh viên
@@ -198,8 +261,12 @@ export default function EligibilityPanel({ onChanged }) {
       <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs space-y-3">
         <div className="flex justify-between items-center flex-wrap gap-2">
           <div>
-            <h3 className="text-sm font-black text-[#2C2825]">1. Import danh sách sinh viên ban đầu</h3>
-            <p className="text-[11px] text-[#6B635B]">Đưa toàn bộ danh sách sinh viên chuẩn bị vào kỳ luận án lên hệ thống để bắt đầu tạo nhóm.</p>
+            <h3 className="text-sm font-black text-[#2C2825]">
+              1. Import danh sách sinh viên ban đầu
+            </h3>
+            <p className="text-[11px] text-[#6B635B]">
+              Đưa toàn bộ danh sách sinh viên chuẩn bị vào kỳ luận án lên hệ thống để bắt đầu tạo nhóm.
+            </p>
           </div>
           <button
             type="button"
@@ -210,7 +277,10 @@ export default function EligibilityPanel({ onChanged }) {
           </button>
         </div>
 
-        <form onSubmit={handleImportInitial} className="flex items-center gap-4 flex-wrap pt-2">
+        <form
+          onSubmit={handleImportInitial}
+          className="flex items-center gap-4 flex-wrap pt-2"
+        >
           <input
             type="file"
             accept=".xlsx, .xls, .csv"
@@ -236,7 +306,7 @@ export default function EligibilityPanel({ onChanged }) {
                 Cập nhật danh sách
               </span>
               <h3 className="text-sm font-black text-amber-950 mt-1">
-                2. Import danh sách sinh viên đã đủ điều kiện
+                2. Import danh sách sinh viên <u>chưa đủ điều kiện</u>
               </h3>
             </div>
             <button
@@ -254,7 +324,10 @@ export default function EligibilityPanel({ onChanged }) {
             <p>• Hệ thống sẽ tự động quét, <b>gắn cờ Không Đủ Điều Kiện</b> và tự động loại các sinh viên có trong file ra khỏi nhóm hiện tại của họ.</p>
           </div>
 
-          <form onSubmit={handleImportIneligible} className="flex items-center gap-4 flex-wrap pt-1">
+          <form
+            onSubmit={handleImportIneligible}
+            className="flex items-center gap-4 flex-wrap pt-1"
+          >
             <input
               type="file"
               accept=".xlsx, .xls, .csv"
@@ -266,14 +339,14 @@ export default function EligibilityPanel({ onChanged }) {
               disabled={importingIneligible || !ineligibleFile}
               className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
             >
-              {importingIneligible ? "Đang cập nhật Ineligible..." : "Xác nhận Import danh sách"}
+              {importingIneligible ? "Đang cập nhật..." : "Xác nhận Import danh sách"}
             </button>
           </form>
         </div>
       )}
 
-      {/* Thanh tìm kiếm */}
-      <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex items-center justify-between shadow-xs">
+      {/* Thanh tìm kiếm & Bộ lọc trạng thái điều kiện */}
+      <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex items-center justify-between shadow-xs flex-wrap gap-4">
         <input
           type="text"
           value={searchKeyword}
@@ -281,9 +354,23 @@ export default function EligibilityPanel({ onChanged }) {
           placeholder="🔍 Tìm kiếm theo tên, email hoặc MSSV..."
           className="w-full md:w-96 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
         />
-        <span className="text-xs font-bold text-[#6B635B]">
-          Tổng số: {filteredStudents.length} sinh viên
-        </span>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-[#6B635B]">Lọc trạng thái:</span>
+          <select
+            value={eligibilityFilter}
+            onChange={(e) => setEligibilityFilter(e.target.value)}
+            className="px-4 py-2.5 text-xs font-bold bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="ELIGIBLE">✓ Đủ điều kiện</option>
+            <option value="INELIGIBLE">✕ Chưa đủ điều kiện</option>
+          </select>
+
+          <span className="text-xs font-bold text-[#6B635B] ml-2">
+            Tổng số: {filteredStudents.length} sinh viên
+          </span>
+        </div>
       </div>
 
       {/* Bảng danh sách sinh viên */}
@@ -296,7 +383,9 @@ export default function EligibilityPanel({ onChanged }) {
               <th className="p-4 font-black uppercase">Họ và tên</th>
               <th className="p-4 font-black uppercase">Email</th>
               <th className="p-4 font-black uppercase">Trạng thái điều kiện</th>
-              <th className="p-4 font-black uppercase text-right">Thao tác riêng từng dòng</th>
+              <th className="p-4 font-black uppercase text-right">
+                Thao tác riêng từng dòng
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E8E2D9]">
@@ -308,19 +397,30 @@ export default function EligibilityPanel({ onChanged }) {
               </tr>
             ) : filteredStudents.length > 0 ? (
               filteredStudents.map((student, index) => {
-                const isEligible = student.eligible !== false;
+                const isEligible = student.eligibility !== "INELIGIBLE";
                 return (
-                  <tr key={student.id || student.studentCode || index} className="hover:bg-[#FBF9F5]/70 transition">
-                    <td className="p-4 text-center font-bold text-[#6B635B]">{index + 1}</td>
-                    <td className="p-4 font-bold font-mono text-[#E65100]">{student.studentCode || student.mssv}</td>
-                    <td className="p-4 font-bold text-[#2C2825]">{student.fullName}</td>
+                  <tr
+                    key={student.id || student.studentCode || index}
+                    className="hover:bg-[#FBF9F5]/70 transition"
+                  >
+                    <td className="p-4 text-center font-bold text-[#6B635B]">
+                      {index + 1}
+                    </td>
+                    <td className="p-4 font-bold font-mono text-[#E65100]">
+                      {student.studentCode || student.mssv}
+                    </td>
+                    <td className="p-4 font-bold text-[#2C2825]">
+                      {student.fullName}
+                    </td>
                     <td className="p-4 text-[#6B635B]">{student.email}</td>
                     <td className="p-4">
-                      <span className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${
-                        isEligible 
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                          : "bg-red-50 text-red-600 border border-red-200"
-                      }`}>
+                      <span
+                        className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${
+                          isEligible
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-red-50 text-red-600 border border-red-200"
+                        }`}
+                      >
                         {isEligible ? "✓ Đủ điều kiện" : "✕ Chưa đủ điều kiện"}
                       </span>
                     </td>
@@ -329,12 +429,14 @@ export default function EligibilityPanel({ onChanged }) {
                         type="button"
                         onClick={() => handleToggleClick(student)}
                         className={`px-3.5 py-1.5 font-bold rounded-xl text-xs cursor-pointer transition ${
-                          isEligible 
-                            ? "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200" 
+                          isEligible
+                            ? "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
                             : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
                         }`}
                       >
-                        {isEligible ? "Gắn cờ Ineligible" : "Gỡ cờ (Đủ điều kiện)"}
+                        {isEligible
+                          ? "Gắn cờ Ineligible"
+                          : "Gỡ cờ (Đủ điều kiện)"}
                       </button>
                     </td>
                   </tr>
@@ -342,8 +444,11 @@ export default function EligibilityPanel({ onChanged }) {
               })
             ) : (
               <tr>
-                <td colSpan="6" className="p-12 text-center text-[#6B635B] italic">
-                  Không tìm thấy sinh viên nào trong học kỳ này.
+                <td
+                  colSpan="6"
+                  className="p-12 text-center text-[#6B635B] italic"
+                >
+                  Không tìm thấy sinh viên nào phù hợp với bộ lọc.
                 </td>
               </tr>
             )}
@@ -351,14 +456,13 @@ export default function EligibilityPanel({ onChanged }) {
         </table>
       </div>
 
-      {/* 💡 CUSTOM MODAL (POPUP GIỮA MÀN HÌNH VỚI NỀN MỜ) */}
+      {/* 💡 CUSTOM MODAL (POPUP NHẬP LÝ DO) */}
       {reasonModalOpen && targetStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#E8E2D9] p-6 space-y-5 text-xs">
-            
             <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
               <h3 className="text-sm font-black text-[#2C2825]">
-                Gắn cờ Chưa đủ điều kiện (Ineligible)
+                Gắn cờ Chưa đủ điều kiện
               </h3>
               <button
                 type="button"
@@ -372,13 +476,15 @@ export default function EligibilityPanel({ onChanged }) {
             <div className="space-y-1">
               <p className="font-bold text-[#6B635B]">Sinh viên:</p>
               <p className="font-black text-sm text-[#2C2825]">
-                {targetStudent.fullName} ({targetStudent.studentCode || targetStudent.mssv})
+                {targetStudent.fullName} (
+                {targetStudent.studentCode || targetStudent.mssv})
               </p>
             </div>
 
             <div className="space-y-2">
               <label className="block font-bold text-[#2C2825]">
-                Nhập lý do chưa đủ điều kiện <span className="text-red-500">*</span>:
+                Nhập lý do chưa đủ điều kiện{" "}
+                <span className="text-red-500">*</span>:
               </label>
               <input
                 type="text"
@@ -400,13 +506,37 @@ export default function EligibilityPanel({ onChanged }) {
               </button>
               <button
                 type="button"
-                onClick={() => handleConfirmEligibilityChange(targetStudent, false, ineligibleReason)}
+                onClick={() =>
+                  handleConfirmEligibilityChange(
+                    targetStudent,
+                    false,
+                    ineligibleReason,
+                  )
+                }
                 className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-sm cursor-pointer"
               >
                 Xác nhận gắn cờ
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
+      {/* 🚀 TOAST NOTIFICATION CHUYÊN NGHIỆP */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white border border-[#E8E2D9] rounded-2xl shadow-xl text-xs transition-all">
+          <span
+            className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${
+              toast.type === "error" ? "bg-red-500" : "bg-emerald-500"
+            }`}
+          >
+            {toast.type === "error" ? "✕" : "✓"}
+          </span>
+          <div>
+            <p className="font-black text-[#2C2825]">
+              {toast.type === "error" ? "Thông báo lỗi" : "Thành công"}
+            </p>
+            <p className="text-[#6B635B]">{toast.message}</p>
           </div>
         </div>
       )}

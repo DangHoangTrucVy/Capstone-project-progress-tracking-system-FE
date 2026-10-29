@@ -48,9 +48,12 @@ export const previewEligibilityFile = async (semester, formData) => {
   return response.data;
 };
 
-// Cập nhật trạng thái điều kiện của sinh viên lẻ
-export const updateStudentEligibility = async (semester, studentCode, data) => {
-  const response = await api.put(`/semesters/${semester}/students/${studentCode}/eligibility`, data);
+
+export const updateStudentEligibility = async (enrollmentId, data) => {
+  const response = await api.put(`/enrollments/${enrollmentId}/eligibility`, {
+    eligibility: data.eligible !== undefined ? data.eligible : data.eligibility,
+    reason: data.reason || ""
+  });
   return response.data;
 };
 

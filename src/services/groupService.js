@@ -9,8 +9,12 @@ export const getGroupMembers = async (groupId) =>
 export const createGroupInSubject = async (subjectId, data) =>
   (await api.post(`/subjects/${subjectId}/groups`, data)).data;
 
-export const getOpenGroupsBySubject = async (subjectId, params) =>
-  (await api.get(`/subjects/${subjectId}/open-groups`, { params })).data;
+// Sửa lại hàm lấy danh sách nhóm mở của môn học:
+export const getOpenGroupsBySubject = async (subjectId) => {
+  // Trỏ đúng endpoint GET /subjects/{subjectId}/open-groups theo tài liệu Swagger
+  const response = await api.get(`/subjects/${subjectId}/open-groups`);
+  return response.data;
+};
 
 export const getSubjectCandidates = async (subjectId, params) =>
   (await api.get(`/subjects/${subjectId}/candidates`, { params })).data;
@@ -61,14 +65,23 @@ export const getMyApplications = async (subjectId) => {
   if (!subjectId) return [];
   const res = await getSubjectMyRequests(subjectId).catch(() => []);
   const list = Array.isArray(res) ? res : res?.content || [];
-  return list.filter((item) => item.type === "APPLICATION");
+  // Chấp nhận cả "APPLICATION" và "APPLY"
+  return list.filter(
+    (item) => item.type === "APPLICATION" || item.type === "APPLY",
+  );
 };
 
 export const getMyInvites = async (subjectId) => {
-  if (!subjectId) return [];
-  const res = await getSubjectMyRequests(subjectId).catch(() => []);
+  const res = await getSubjectMyRequests(subjectId);
   const list = Array.isArray(res) ? res : res?.content || [];
-  return list.filter((item) => item.type === "INVITATION");
+  // Chấp nhận cả type "INVITE" hoặc "INVITATION" và ưu tiên các đơn đang ở trạng thái PENDING (hoặc chưa hết hạn)
+  return list.filter((item) => {
+    const typeMatch = item.type === "INVITE" || item.type === "INVITATION";
+    // Nếu bạn muốn hiển thị cả các đơn lịch sử hoặc chỉ đơn PENDING, ta có thể điều kiện ở đây:
+    const isPending =
+      !item.status || item.status === "PENDING" || item.status === "EXPIRED"; // tạm thời cho phép hiện EXPIRED hoặc PENDING để test
+    return typeMatch;
+  });
 };
 
 export const getGroupInvites = async (groupId) => {
@@ -136,22 +149,35 @@ export const getSubjectComplaints = async (subjectId, params) =>
   (await api.get(`/subjects/${subjectId}/complaints`, { params })).data;
 
 // ==================== LEADER TRANSFERS ====================
-export const offerLeaderTransfer = async (groupId, data) =>
-  (await api.post(`/groups/${groupId}/leader-transfers`, data)).data;
 
-export const getMyLeaderTransfers = async () =>
-  (await api.get(`/me/leader-transfers`))
-    .catch(() => ({ data: [] }))
-    .then((res) => res.data);
+export const offerLeaderTransfer = async (groupId, targetUserId) => {
+  const response = await api.post(`/groups/${groupId}/leader-transfers`, {
+    toUserId: targetUserId,
+    leaveAfter: false,
+  });
+  return response.data;
+};
 
-export const acceptLeaderTransfer = async (transferId) =>
-  (await api.post(`/leader-transfers/${transferId}/accept`)).data;
+export const getMyLeaderTransfers = async () => {
+  const res = await api.get("/me/leader-transfers").catch(() => ({ data: [] }));
+  return res.data?.content || res.data || [];
+};
 
-export const declineLeaderTransfer = async (transferId) =>
-  (await api.post(`/leader-transfers/${transferId}/decline`)).data;
+// 🟢 Đảm bảo có nhận tham số (transferId) ở đây:
+export const acceptLeaderTransfer = async (transferId) => {
+  const response = await api.post(`/leader-transfers/${transferId}/accept`);
+  return response.data;
+};
 
-export const cancelLeaderTransfer = async (transferId) =>
-  (await api.post(`/leader-transfers/${transferId}/cancel`)).data;
+export const declineLeaderTransfer = async (transferId) => {
+  const response = await api.post(`/leader-transfers/${transferId}/decline`);
+  return response.data;
+};
+
+export const cancelLeaderTransfer = async (transferId) => {
+  const response = await api.post(`/leader-transfers/${transferId}/cancel`);
+  return response.data;
+};
 
 // ==================== SUBJECTS & UTILS ====================
 export const getSubjectsBySemester = async (semester) => {

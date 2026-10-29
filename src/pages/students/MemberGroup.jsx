@@ -3,20 +3,26 @@ import {
   getGroupById,
   inviteToGroup,
   removeGroupMember,
+  offerLeaderTransfer,
+  getMyLeaderTransfers,
+  acceptLeaderTransfer,
+  declineLeaderTransfer,
+  cancelLeaderTransfer,
 } from "../../services/groupService";
 
 export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
   const [groupData, setGroupData] = useState(null);
   const [memberInput, setMemberInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [leaderTransfers, setLeaderTransfers] = useState([]); // 👈 Thêm state quản lý transfer
 
   const [dialog, setDialog] = useState(null);
   const [processing, setProcessing] = useState(false);
 
-  // Hàm kiểm tra linh hoạt xem một thành viên có phải leader không
   const checkIfLeader = (member) => {
     return Boolean(
       member?.isLeader ||
+      member?.leader ||
       member?.role === "LEADER" ||
       member?.userId === groupData?.leaderId ||
       member?.id === groupData?.leaderId,
@@ -53,10 +59,20 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
     if (!groupId) return;
 
     try {
-      const groupRes = await getGroupById(groupId);
+      const [groupRes, transfersRes] = await Promise.all([
+        getGroupById(groupId),
+        getMyLeaderTransfers().catch(() => []),
+      ]);
+
       setGroupData(groupRes);
+
+      const transferList = Array.isArray(transfersRes) ? transfersRes : transfersRes?.content || [];
+      // Lọc các yêu cầu liên quan đến nhóm này và đang PENDING
+      setLeaderTransfers(
+        transferList.filter((item) => item.status === "PENDING" && String(item.groupId) === String(groupId))
+      );
     } catch (err) {
-      console.error("Lỗi lấy thông tin nhóm:", err);
+      console.error("Lỗi lấy thông tin nhóm hoặc transfer:", err);
     }
   }, [groupId]);
 
@@ -64,7 +80,6 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
     fetchGroupDetails();
   }, [fetchGroupDetails]);
 
-  // Danh sách thành viên lấy trực tiếp từ nhóm
   const membersList = groupData?.members || [];
 
   const handleInviteMember = async (e) => {
@@ -93,13 +108,13 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
       });
 
       setMemberInput("");
-
       showNotice(
         "Đã gửi lời mời. Sinh viên cần chấp nhận lời mời để vào nhóm.",
       );
+      await fetchGroupDetails();
+      if (onGroupUpdated) await onGroupUpdated();
     } catch (err) {
       console.error("Lỗi gửi lời mời:", err);
-
       showNotice(
         err.response?.data?.message ||
           "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV.",
@@ -134,11 +149,122 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
     });
   };
 
+  const handleOfferLeaderTransfer = (member) => {
+    if (!isLeader) {
+      showNotice("Chỉ có Trưởng nhóm mới có quyền bàn giao vai trò!", "error");
+      return;
+    }
+
+    const targetUserId = member.userId || member.profile?.userId || member.id;
+    const memberName = member.userFullName || member.fullName || member.profile?.fullName || "thành viên này";
+
+    if (!targetUserId) {
+      showNotice("Không tìm thấy ID của thành viên này.", "error");
+      return;
+    }
+
+    showConfirm({
+      title: "Xác nhận bàn giao quyền Trưởng nhóm",
+      message: `Bạn có chắc chắn muốn gửi đề xuất chuyển giao quyền Trưởng nhóm cho ${memberName} không?`,
+      confirmText: "Xác nhận bàn giao",
+      danger: false,
+      action: async () => {
+        await offerLeaderTransfer(groupId, targetUserId);
+        await fetchGroupDetails();
+
+        if (onGroupUpdated) {
+          await onGroupUpdated();
+        }
+
+        showNotice(`Đã gửi yêu cầu bàn giao quyền Leader cho ${memberName} thành công! Đang chờ thành viên xác nhận.`);
+      },
+    });
+  };
+
+  // 🚀 Xử lý Chấp nhận nhận quyền Leader
+  const handleAcceptTransfer = async (transferId) => {
+    try {
+      await acceptLeaderTransfer(transferId);
+      showNotice("Đã nhận quyền Trưởng nhóm thành công!");
+      await fetchGroupDetails();
+      if (onGroupUpdated) await onGroupUpdated();
+      window.location.reload(); // Tải lại trang để đồng bộ giao diện quyền Leader
+    } catch (err) {
+      showNotice(err.response?.data?.message || "Không thể chấp nhận bàn giao.", "error");
+    }
+  };
+
+  // 🚀 Xử lý Từ chối
+  const handleDeclineTransfer = async (transferId) => {
+    try {
+      await declineLeaderTransfer(transferId);
+      showNotice("Đã từ chối nhận quyền Trưởng nhóm.");
+      await fetchGroupDetails();
+    } catch (err) {
+      showNotice(err.response?.data?.message || "Thực hiện thất bại.", "error");
+    }
+  };
+
+  // 🚀 Xử lý Hủy đề xuất (cho Leader cũ)[cite: 30]
+  const handleCancelTransfer = async (transferId) => {
+    try {
+      await cancelLeaderTransfer(transferId);
+      showNotice("Đã hủy đề xuất bàn giao quyền Leader.");
+      await fetchGroupDetails();
+    } catch (err) {
+      showNotice(err.response?.data?.message || "Không thể hủy đề xuất.", "error");
+    }
+  };
+
   const memberCount = membersList.length;
   const isValidSize = memberCount >= 3 && memberCount <= 5;
 
   return (
     <div className="space-y-6 animate-fadeIn text-[#2C2825]">
+      {/* 👑 KHU VỰC HIỂN THỊ YÊU CẦU BÀN GIAO LEADER (Nằm ngay trong tab Thành viên nhóm) */}
+      {leaderTransfers.length > 0 && (
+        <div className="bg-orange-50/80 p-6 rounded-3xl border border-orange-200 shadow-sm space-y-3">
+          <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
+            <span>👑</span>
+            <span>Yêu cầu chuyển giao quyền Trưởng nhóm đang chờ xử lý</span>
+          </div>
+
+          <div className="space-y-2">
+            {leaderTransfers.map((item) => (
+              <div key={item.id} className="bg-white p-4 rounded-2xl border border-orange-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                <div>
+                  <p className="font-black text-[#2C2825]">
+                    {item.fromName ? `Trưởng nhóm ${item.fromName} muốn bàn giao quyền Leader cho bạn.` : "Có yêu cầu bàn giao quyền Leader trong nhóm."}
+                  </p>
+                  <p className="text-[11px] text-[#6B635B] mt-0.5">Mã nhóm: {groupData?.groupCode || groupData?.code}</p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAcceptTransfer(item.id)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Chấp nhận làm Leader
+                  </button>
+                  <button
+                    onClick={() => handleDeclineTransfer(item.id)}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Từ chối
+                  </button>
+                  <button
+                    onClick={() => handleCancelTransfer(item.id)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Hủy đề xuất
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
         <div>
@@ -248,22 +374,29 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
           {membersList.length > 0 ? (
             membersList.map((m) => {
               const isMemberLeader = checkIfLeader(m);
+              const memberId = m.id || m.userId || m.profile?.userId;
+
               return (
                 <div
-                  key={m.id || m.userId}
+                  key={memberId}
                   className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] flex justify-between items-center text-xs"
                 >
                   <div>
                     <h4 className="font-black text-[#2C2825]">
-                      {m.userFullName || m.fullName || "Thành viên"}
+                      {m.userFullName ||
+                        m.fullName ||
+                        m.profile?.fullName ||
+                        "Thành viên"}
                     </h4>
                     <p className="text-[11px] text-[#6B635B] mt-1.5">
                       MSSV:{" "}
                       {m.studentCode ||
                         m.userStudentCode ||
+                        m.profile?.studentCode ||
                         m.email ||
                         m.userEmail ||
-                        m.userId}
+                        m.profile?.email ||
+                        memberId}
                     </p>
                   </div>
 
@@ -278,14 +411,24 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
                       {isMemberLeader ? "👑 Trưởng nhóm" : "👤 Thành viên"}
                     </span>
 
+                    {/* Nút thao tác dành cho Leader */}
                     {isLeader && !isMemberLeader && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMember(m.id || m.userId)}
-                        className="text-red-600 font-bold text-xs hover:underline bg-red-50 px-3 py-1.5 rounded-xl cursor-pointer"
-                      >
-                        Xóa
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOfferLeaderTransfer(m)}
+                          className="text-[#E65100] font-bold text-xs hover:underline bg-orange-50 px-3 py-1.5 rounded-xl cursor-pointer"
+                        >
+                          Bổ nhiệm Leader
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(memberId)}
+                          className="text-red-600 font-bold text-xs hover:underline bg-red-50 px-3 py-1.5 rounded-xl cursor-pointer"
+                        >
+                          Xóa
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
