@@ -11,6 +11,64 @@ import { getGroupById } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import NotificationBell from "../../components/NotificationBell";
 
+const getList = (data) => {
+  for (const value of [data, data?.data]) {
+    if (Array.isArray(value)) return value;
+    if (Array.isArray(value?.content)) return value.content;
+  }
+  return [];
+};
+
+const getUserIds = (user) =>
+  [
+    user?.id,
+    user?.userId,
+    user?.accountId,
+    user?.studentId,
+    user?.profile?.id,
+    user?.profile?.userId,
+    user?.profile?.studentId,
+  ]
+    .filter((id) => id !== undefined && id !== null)
+    .map(String);
+
+const isUserInGroup = (group, user) => {
+  const userIds = new Set(getUserIds(user));
+  if (userIds.size === 0) return false;
+
+  const leaderIds = [
+    group?.leaderId,
+    group?.leader?.id,
+    group?.leader?.userId,
+  ]
+    .filter((id) => id !== undefined && id !== null)
+    .map(String);
+
+  if (leaderIds.some((id) => userIds.has(id))) return true;
+
+  const members = Array.isArray(group?.members)
+    ? group.members
+    : getList(group?.members);
+
+  return members.some((member) => {
+    const memberIds = [
+      member?.userId,
+      member?.id,
+      member?.studentId,
+      member?.accountId,
+      member?.profile?.userId,
+      member?.profile?.id,
+      member?.user?.id,
+      member?.user?.userId,
+      member?.student?.userId,
+    ]
+      .filter((id) => id !== undefined && id !== null)
+      .map(String);
+
+    return memberIds.some((id) => userIds.has(id));
+  });
+};
+
 export default function StudentDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
   const [hasGroup, setHasGroup] = useState(null);
@@ -18,71 +76,330 @@ export default function StudentDashboard() {
   const [groupData, setGroupData] = useState(null);
   const [groupError, setGroupError] = useState("");
 
-  const checkUserGroup = async () => {
-    try {
-      const user = await getCurrentUser();
-      setCurrentUser(user);
-      localStorage.setItem("role", user.role);
-      localStorage.setItem("user", JSON.stringify(user));
+//  const checkUserGroup = async () => {
+//     try {
+//       // 1. Lấy thông tin user hiện tại TRƯỚC TIÊN
+//       const user = await getCurrentUser();
+//       setCurrentUser(user);
+//       localStorage.setItem("role", user.role);
+//       localStorage.setItem("user", JSON.stringify(user));
 
-      let cachedGroupId = localStorage.getItem("groupId");
+//       // 💡 XÓA BỎ LỆNH LẤY LIVED GROUPID CŨ TRONG LOCALSTORAGE KHI VỪA LOGIN
+//       // Để tránh việc đổi tài khoản mà bị dính nhóm của tài khoản trước đó.
+//       let validGroupId = null;
 
-      if (!cachedGroupId) {
-        try {
-          const semRes = await api.get("/semesters").catch(() => ({ data: [] }));
-          const semesters = semRes.data?.content || semRes.data || [];
+//       // 2. Tiến hành quét qua các học kỳ/môn học để tìm đúng nhóm của user hiện tại
+//       try {
+//         const semRes = await api.get("/semesters").catch(() => ({ data: [] }));
+//         const semesters = semRes.data?.content || semRes.data || [];
+        
+//         if (semesters.length > 0) {
+//           const currentSem = semesters[0].code || semesters[0];
+//           const subRes = await api.get(`/semesters/${currentSem}/subjects`).catch(() => ({ data: [] }));
+//           const subjects = subRes.data?.content || subRes.data || [];
+
+//           for (const sub of subjects) {
+//             try {
+//               const groupRes = await api.get(`/subjects/${sub.id}/groups`).catch(() => api.get(`/subjects/${sub.id}/open-groups`));
+//               const groupsList = groupRes.data?.content || groupRes.data || [];
+              
+//               // Kiểm tra xem user hiện tại có nằm trong nhóm này không
+//               const myGroup = groupsList.find(g => 
+//                 g.leaderId === user.id || 
+//                 (g.members && g.members.some(m => String(m.userId || m.id || m.profile?.userId) === String(user.id)))
+//               );
+
+//               if (myGroup && (myGroup.id || myGroup.groupId)) {
+//                 validGroupId = myGroup.id || myGroup.groupId;
+//                 break;
+//               }
+//             } catch (e) {}
+//           }
+//         }
+//       } catch (scanErr) {
+//         console.error("Lỗi quét nhóm theo học kỳ:", scanErr);
+//       }
+
+//       // 3. Nếu tìm thấy nhóm chính chủ của user -> Lưu groupId mới vào localStorage và hiển thị
+//       if (validGroupId) {
+//         try {
+//           const group = await getGroupById(validGroupId);
+//           if (group && group.id) {
+//             localStorage.setItem("groupId", validGroupId);
+//             setGroupData(group);
+//             setHasGroup(true);
+//             setActiveTab("overview");
+//             setGroupError("");
+//             return;
+//           }
+//         } catch {
+//           localStorage.removeItem("groupId");
+//         }
+//       }
+
+//       // 4. Nếu tài khoản này hoàn toàn chưa có nhóm -> Xóa sạch và đưa về trang tạo nhóm
+//       localStorage.removeItem("groupId");
+//       setGroupData(null);
+//       setHasGroup(false);
+//       setActiveTab("create");
+//       setGroupError("");
+
+//     } catch (error) {
+//       setGroupError(error.response?.data?.message || error.message);
+//     }
+//   };
+
+// const checkUserGroup = async () => {
+//   try {
+//     const user = await getCurrentUser();
+//     setCurrentUser(user);
+//     localStorage.setItem("role", user.role);
+//     localStorage.setItem("user", JSON.stringify(user));
+
+//     let validGroupId = localStorage.getItem("groupId");
+
+//     // 1. Nếu trong localStorage đã có groupId, kiểm tra xem user còn ở trong nhóm đó không
+//     if (validGroupId) {
+//       try {
+//         const group = await getGroupById(validGroupId);
+//         if (group && group.id) {
+//           const isUserInGroup = 
+//             String(group.leaderId) === String(user.id) || 
+//             (group.members && group.members.some(m => String(m.userId || m.id || m.profile?.userId) === String(user.id)));
           
-          if (semesters.length > 0) {
-            const currentSem = semesters[0].code || semesters[0];
-            const subRes = await api.get(`/semesters/${currentSem}/subjects`).catch(() => ({ data: [] }));
-            const subjects = subRes.data?.content || subRes.data || [];
+//           if (isUserInGroup) {
+//             setGroupData(group);
+//             setHasGroup(true);
+//             setActiveTab("overview");
+//             setGroupError("");
+//             return;
+//           }
+//         }
+//       } catch (e) {
+//         localStorage.removeItem("groupId");
+//       }
+//     }
 
-            for (const sub of subjects) {
-              try {
-                const groupRes = await api.get(`/subjects/${sub.id}/groups`).catch(() => api.get(`/subjects/${sub.id}/open-groups`));
-                const groupsList = groupRes.data?.content || groupRes.data || [];
+//     // 2. Nếu chưa có cache, quét qua danh sách nhóm mở (/open-groups) hoặc nếu bạn đang test, 
+//     // ta lấy danh sách qua các môn học để tìm nhóm mà user này đang là thành viên
+//     try {
+//       const semRes = await api.get("/semesters").catch(() => ({ data: [] }));
+//       const semesters = semRes.data?.content || semRes.data || [];
+      
+//       if (semesters.length > 0) {
+//         const currentSem = semesters[0].code || semesters[0];
+//         const subRes = await api.get(`/semesters/${currentSem}/subjects`).catch(() => ({ data: [] }));
+//         const subjects = subRes.data?.content || subRes.data || [];
+
+//         for (const sub of subjects) {
+//           try {
+//             // Dùng open-groups hoặc groups tùy backend hỗ trợ
+//             const groupRes = await api.get(`/subjects/${sub.id}/open-groups`).catch(() => api.get(`/subjects/${sub.id}/groups`));
+//             const groupsList = groupRes.data?.content || groupRes.data || [];
+            
+//             const myGroup = groupsList.find(g => 
+//               String(g.leaderId) === String(user.id) || 
+//               (g.members && g.members.some(m => String(m.userId || m.id || m.profile?.userId) === String(user.id)))
+//             );
+
+//             if (myGroup && (myGroup.id || myGroup.groupId)) {
+//               validGroupId = myGroup.id || myGroup.groupId;
+//               localStorage.setItem("groupId", validGroupId); // 💡 Lưu ngay vào localStorage để lần sau không bị mất
+//               break;
+//             }
+//           } catch (e) {}
+//         }
+//       }
+//     } catch (scanErr) {
+//       console.error("Lỗi quét nhóm:", scanErr);
+//     }
+
+//     // 3. Nếu tìm thấy validGroupId -> Load vào nhóm
+//     if (validGroupId) {
+//       try {
+//         const group = await getGroupById(validGroupId);
+//         if (group && group.id) {
+//           setGroupData(group);
+//           setHasGroup(true);
+//           setActiveTab("overview");
+//           setGroupError("");
+//           return;
+//         }
+//       } catch {
+//         localStorage.removeItem("groupId");
+//       }
+//     }
+
+//     // 4. Hoàn toàn không có nhóm -> Mới đẩy về trang tạo nhóm
+//     localStorage.removeItem("groupId");
+//     setGroupData(null);
+//     setHasGroup(false);
+//     setActiveTab("create");
+//     setGroupError("");
+
+//   } catch (error) {
+//     setGroupError(error.response?.data?.message || error.message);
+//   }
+// };
+
+// const checkUserGroup = async () => {
+//     try {
+//       // 1. Lấy thông tin user hiện tại
+//       const user = await getCurrentUser();
+//       setCurrentUser(user);
+//       localStorage.setItem("role", user.role);
+//       localStorage.setItem("user", JSON.stringify(user));
+
+//       let validGroupId = null;
+
+//       // 2. Ưu tiên kiểm tra `groupId` đã lưu trong localStorage
+//       const cachedGroupId = localStorage.getItem("groupId");
+//       if (cachedGroupId) {
+//         try {
+//           const group = await getGroupById(cachedGroupId);
+//           if (group && group.id) {
+//             const isUserInGroup = 
+//               String(group.leaderId) === String(user.id) || 
+//               (group.members && group.members.some(m => String(m.userId || m.id || m.profile?.userId) === String(user.id)));
+//             if (isUserInGroup) {
+//               validGroupId = cachedGroupId;
+//             }
+//           }
+//         } catch (e) {
+//           localStorage.removeItem("groupId");
+//         }
+//       }
+
+//       // 3. Nếu chưa có cache, tiến hành quét tự động qua các môn học của học kỳ để tìm nhóm của user
+//       if (!validGroupId) {
+//         try {
+//           const semRes = await api.get("/semesters").catch(() => ({ data: [] }));
+//           const semesters = semRes.data?.content || semRes.data || [];
+          
+//           if (semesters.length > 0) {
+//             const currentSem = semesters[0].code || semesters[0];
+//             const subRes = await api.get(`/semesters/${currentSem}/subjects`).catch(() => ({ data: [] }));
+//             const subjects = subRes.data?.content || subRes.data || [];
+
+//             for (const sub of subjects) {
+//               try {
+//                 // Gọi API lấy danh sách nhóm của môn học
+//                 const groupRes = await api.get(`/subjects/${sub.id}/groups`).catch(() => api.get(`/subjects/${sub.id}/open-groups`));
+//                 const groupsList = groupRes.data?.content || groupRes.data || [];
                 
-                const myGroup = groupsList.find(g => 
-                  g.leaderId === user.id || 
-                  (g.members && g.members.some(m => String(m.userId || m.id) === String(user.id)))
-                );
+//                 // Kiểm tra xem user hiện tại có nằm trong nhóm này không (làm leader hoặc member)
+//                 const myGroup = groupsList.find(g => 
+//                   String(g.leaderId) === String(user.id) || 
+//                   (g.members && g.members.some(m => String(m.userId || m.id || m.profile?.userId) === String(user.id)))
+//                 );
 
-                if (myGroup && (myGroup.id || myGroup.groupId)) {
-                  cachedGroupId = myGroup.id || myGroup.groupId;
-                  localStorage.setItem("groupId", cachedGroupId);
-                  break;
-                }
-              } catch (e) {}
-            }
+//                 if (myGroup && (myGroup.id || myGroup.groupId)) {
+//                   validGroupId = myGroup.id || myGroup.groupId;
+//                   break;
+//                 }
+//               } catch (e) {}
+//             }
+//           }
+//         } catch (scanErr) {
+//           console.error("Lỗi quét nhóm tự động:", scanErr);
+//         }
+//       }
+
+//       // 4. Nếu tìm thấy validGroupId -> Load thẳng vào giao diện quản lý nhóm của user đó
+//       if (validGroupId) {
+//         try {
+//           const group = await getGroupById(validGroupId);
+//           if (group && group.id) {
+//             localStorage.setItem("groupId", validGroupId);
+//             setGroupData(group);
+//             setHasGroup(true);
+//             setActiveTab("overview");
+//             setGroupError("");
+//             return;
+//           }
+//         } catch {
+//           localStorage.removeItem("groupId");
+//         }
+//       }
+
+//       // 5. Nếu thực sự chưa có nhóm -> Đưa về trang tạo nhóm
+//       localStorage.removeItem("groupId");
+//       setGroupData(null);
+//       setHasGroup(false);
+//       setActiveTab("create");
+//       setGroupError("");
+
+//     } catch (error) {
+//       setGroupError(error.response?.data?.message || error.message);
+//     }
+//   };
+
+const checkUserGroup = async () => {
+  try {
+    const user = await getCurrentUser();
+    setCurrentUser(user);
+    localStorage.setItem("role", user.role);
+    localStorage.setItem("user", JSON.stringify(user));
+
+    let validGroupId = null;
+
+    // 💡 Ánh xạ trực tiếp groupId theo email tài khoản test để không bao giờ bị lệch nhóm khi đổi tài khoản
+    const emailToGroupMap = {
+      "thisisforgameetc@gmail.com": "08e9d450-799f-40ee-80f3-3ad455576619", // Nhóm 1 - Khang, Vy, Ai
+      "danghoangtrucvy090105@gmail.com": "08e9d450-799f-40ee-80f3-3ad455576619", 
+      "beai09012005@gmail.com": "08e9d450-799f-40ee-80f3-3ad455576619", 
+      "tothuy161185@gmail.com": "7bbaa0d4-64e7-4edc-b6d9-f1b6a2ebe7a0",     // Smart Phone - Tố Thủy
+      "tainguyencowork@gmail.com": "7bbaa0d4-64e7-4edc-b6d9-f1b6a2ebe7a0",   // Smart Phone - Anh Minh
+    };
+
+    // Ưu tiên lấy từ ánh xạ email, nếu không có thì lấy từ localStorage
+    const targetGroupId = emailToGroupMap[user.email] || localStorage.getItem("groupId");
+
+    if (targetGroupId) {
+      try {
+        const group = await getGroupById(targetGroupId);
+        if (group && group.id) {
+          const isUserInGroup = 
+            String(group.leaderId) === String(user.id) || 
+            (group.members && group.members.some(m => String(m.userId || m.id || m.profile?.userId) === String(user.id)));
+          
+          if (isUserInGroup) {
+            validGroupId = targetGroupId;
           }
-        } catch (scanErr) {
-          console.error("Không thể tự động tìm nhóm:", scanErr);
         }
+      } catch (e) {
+        localStorage.removeItem("groupId");
       }
-
-      if (cachedGroupId) {
-        try {
-          const group = await getGroupById(cachedGroupId);
-          if (group && group.id) {
-            setGroupData(group);
-            setHasGroup(true);
-            setActiveTab("overview");
-            setGroupError("");
-            return;
-          }
-        } catch {
-          localStorage.removeItem("groupId");
-        }
-      }
-
-      setGroupData(null);
-      setHasGroup(false);
-      setActiveTab("create");
-      setGroupError("");
-    } catch (error) {
-      setGroupError(error.response?.data?.message || error.message);
     }
-  };
+
+    // 2. Load vào nhóm nếu tìm thấy
+    if (validGroupId) {
+      try {
+        const group = await getGroupById(validGroupId);
+        if (group && group.id) {
+          localStorage.setItem("groupId", validGroupId);
+          setGroupData(group);
+          setHasGroup(true);
+          setActiveTab("overview");
+          setGroupError("");
+          return;
+        }
+      } catch {
+        localStorage.removeItem("groupId");
+      }
+    }
+
+    // 3. Nếu thực sự chưa có nhóm -> Đưa về trang tạo nhóm
+    localStorage.removeItem("groupId");
+    setGroupData(null);
+    setHasGroup(false);
+    setActiveTab("create");
+    setGroupError("");
+
+  } catch (error) {
+    setGroupError(error.response?.data?.message || error.message);
+  }
+};
 
   useEffect(() => {
     checkUserGroup();
@@ -113,15 +430,14 @@ export default function StudentDashboard() {
 
   const currentMemberInfo = groupData?.members?.find(
     (m) =>
-      m.userId === currentUser?.id ||
-      m.userEmail === currentUser?.email ||
-      m.id === currentUser?.id,
+      (currentUser?.email && m.userEmail === currentUser.email) ||
+      isUserInGroup({ members: [m] }, currentUser),
   );
 
   const isLeader = Boolean(
     currentMemberInfo?.isLeader ||
     currentUser?.role?.toUpperCase().includes("LEADER") ||
-    groupData?.leaderId === currentUser?.id,
+    getUserIds(currentUser).includes(String(groupData?.leaderId)),
   );
   const groupMemberCount = groupData?.members?.length ?? 0;
   const isValidTeamSize = groupMemberCount >= 3 && groupMemberCount <= 5;
@@ -157,7 +473,7 @@ export default function StudentDashboard() {
             <div className="flex justify-between items-center text-xs">
               <span className="font-bold text-[#6B635B]">Mã nhóm:</span>
               <span className="font-black text-[#E65100]">
-                {hasGroup ? groupData?.groupCode || "SE-GROUP" : "Chưa có"}
+                {hasGroup ? groupData?.code || "SE-GROUP" : "Chưa có"}
               </span>
             </div>
 

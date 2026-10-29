@@ -138,8 +138,29 @@ export default function AdminDashboard() {
 
   const openLeaderModal = async (group) => {
     try {
-      const detail = await getGroupById(group.id);
-      setSelectedGroup(detail || group);
+      const groupId = group.id || group.groupId;
+      // 1. Lấy chi tiết nhóm
+      const detail = await getGroupById(groupId).catch(() => null);
+
+      // 2. Dự phòng gọi thêm API lấy danh sách thành viên riêng nếu object detail chưa có mảng members
+      let membersList = detail?.members || group.members || [];
+      if (membersList.length === 0 && groupId) {
+        try {
+          const membersRes = await api
+            .get(`/groups/${groupId}/members`)
+            .catch(() => null);
+          membersList = Array.isArray(membersRes?.data)
+            ? membersRes.data
+            : membersRes?.data?.content || [];
+        } catch (e) {
+          console.error("Không thể tải danh sách thành viên:", e);
+        }
+      }
+
+      setSelectedGroup({
+        ...(detail || group),
+        members: membersList,
+      });
       setNewLeaderId("");
       setLeaderModalOpen(true);
     } catch (error) {
@@ -150,7 +171,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleReplaceLeader = async (event) => {
+  const handleReplaceGroupLeader = async (event) => {
     event.preventDefault();
     if (!selectedGroup || !newLeaderId) {
       showToast("Vui lòng chọn Leader mới.", "error");
@@ -158,11 +179,12 @@ export default function AdminDashboard() {
     }
 
     const members = selectedGroup.members || [];
+
+    // Tìm thành viên dựa vào ID (hỗ trợ cả cấu trúc member.userId hoặc member.profile?.userId)
     const nextLeader = members.find(
       (member) =>
-        String(member.userId) === String(newLeaderId) &&
-        member.status === "ACTIVE" &&
-        !member.isLeader,
+        String(member.userId || member.profile?.userId) ===
+          String(newLeaderId) && !member.leader, // Kiểm tra không phải là leader hiện tại
     );
 
     if (!nextLeader) {
@@ -170,15 +192,19 @@ export default function AdminDashboard() {
       return;
     }
 
+    const memberName =
+      nextLeader.fullName || nextLeader.profile?.fullName || "Thành viên";
     const confirmed = window.confirm(
-      `Đổi Leader nhóm ${selectedGroup.groupCode} sang ${nextLeader.userFullName}?`,
+      `Đổi Leader nhóm ${selectedGroup.groupCode} sang ${memberName}?`,
     );
     if (!confirmed) return;
 
     setChangingLeader(true);
     try {
+      // Gửi đúng ID của thành viên được chọn lên backend
+      const targetUserId = nextLeader.userId || nextLeader.profile?.userId;
       await replaceGroupLeader(selectedGroup.id, {
-        userId: nextLeader.userId,
+        userId: targetUserId,
       });
       setLeaderModalOpen(false);
       setSelectedGroup(null);
@@ -242,13 +268,29 @@ export default function AdminDashboard() {
       const finalSemList = Array.isArray(semList)
         ? semList
         : [semList].filter(Boolean);
-
       setSemesters(finalSemList);
-      if (finalSemList.length > 0 && !accountSemester) {
-        const firstCode =
-          finalSemList[0].code || finalSemList[0].name || finalSemList[0];
-        setAccountSemester(firstCode);
+
+      let allGroupsList = [];
+      for (const sem of finalSemList) {
+        const semCode = sem.code || sem;
+        try {
+          const groupRes = await api
+            .get(`/semesters/${semCode}/groups`)
+            .catch(() => ({ data: [] }));
+          const list = Array.isArray(groupRes.data)
+            ? groupRes.data
+            : groupRes.data?.content || groupRes.data?.items || [];
+          // Gắn thêm thuộc tính semester vào từng nhóm nếu chưa có để dễ phân loại
+          const mappedList = list.map((g) => ({
+            ...g,
+            semester: g.semester || semCode,
+          }));
+          allGroupsList = [...allGroupsList, ...mappedList];
+        } catch (e) {
+          console.error(`Không thể tải nhóm của kỳ ${semCode}:`, e);
+        }
       }
+      setGroups(allGroupsList);
     } catch (error) {
       console.error("Lỗi tải dữ liệu quản trị:", error);
     } finally {
@@ -1194,40 +1236,62 @@ export default function AdminDashboard() {
 
           {activeMenu === "groups" && (
             <div className="p-8 space-y-6">
-              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl">
-                <h2 className="text-xl font-black text-[#2C2825]">
-                  Quản lý danh sách nhóm đồ án
-                </h2>
-                <p className="text-xs text-[#6B635B]">
-                  Theo dõi toàn bộ các nhóm Capstone Project.
-                </p>
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs flex-wrap gap-4">
+                <div>
+                  <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
+                    QUẢN TRỊ HỆ THỐNG NHÓM
+                  </span>
+                  <h2 className="text-xl font-black text-[#2C2825] mt-1">
+                    Quản lý danh sách nhóm đồ án Capstone
+                  </h2>
+                  <p className="text-xs text-[#6B635B]">
+                    Theo dõi mã nhóm, học kỳ và sĩ số thành viên toàn hệ thống.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#6B635B]">
+                    Tổng số nhóm:
+                  </span>
+                  <span className="px-3 py-1 bg-orange-100 text-[#E65100] font-black text-xs rounded-xl">
+                    {filteredGroups.length} nhóm
+                  </span>
+                </div>
               </div>
 
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="🔍 Tìm kiếm theo mã nhóm, học kỳ..."
-                className="w-full px-4 py-3 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-              />
+              {/* Thanh tìm kiếm nhanh */}
+              <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl shadow-xs">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="🔍 Tìm kiếm nhanh theo mã nhóm (VD: SE-G01), tên đề tài hoặc học kỳ..."
+                  className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100] font-medium"
+                />
+              </div>
 
-              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-sm">
+              {/* Bảng danh sách nhóm đồ án */}
+              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase">Mã nhóm</th>
+                      <th className="p-4 font-black uppercase w-16 text-center">
+                        STT
+                      </th>
+                      <th className="p-4 font-black uppercase">
+                        Mã nhóm / Tên dự án
+                      </th>
                       <th className="p-4 font-black uppercase">Học kỳ</th>
                       <th className="p-4 font-black uppercase">
                         Sĩ số thành viên
                       </th>
                       <th className="p-4 font-black uppercase text-right">
-                        Thao tác
+                        Trạng thái nhóm
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E8E2D9]">
                     {filteredGroups.length > 0 ? (
-                      filteredGroups.map((g) => {
+                      filteredGroups.map((g, index) => {
                         const count =
                           g.memberCount ??
                           g.numberOfMembers ??
@@ -1235,31 +1299,41 @@ export default function AdminDashboard() {
                         const isValidSize = count >= 3 && count <= 5;
                         return (
                           <tr
-                            key={g.id}
-                            className="hover:bg-[#FBF9F5]/60 transition"
+                            key={g.id || g.groupId}
+                            className="hover:bg-[#FBF9F5]/70 transition"
                           >
-                            <td className="p-4 font-bold text-[#2C2825]">
-                              {g.groupCode}
+                            <td className="p-4 text-center font-bold text-[#6B635B]">
+                              {index + 1}
                             </td>
-                            <td className="p-4 font-semibold text-[#6B635B]">
-                              {g.semester || "Fall2026"}
+                            <td className="p-4">
+                              <p className="font-bold text-[#2C2825] text-sm">
+                                {g.groupCode || g.name || "Chưa có mã"}
+                              </p>
+                              {g.name && g.groupCode && (
+                                <p className="text-[11px] text-[#6B635B] mt-0.5">
+                                  {g.name}
+                                </p>
+                              )}
+                            </td>
+                            <td className="p-4 font-bold font-mono text-[#E65100]">
+                              {g.semester || "SU27"}
                             </td>
                             <td className="p-4">
                               <span
-                                className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${isValidSize ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+                                className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${
+                                  isValidSize
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
                               >
-                                {count}/5 người (
-                                {isValidSize ? "Hợp lệ" : "Chưa đạt chuẩn"})
+                                {count}/5 thành viên (
+                                {isValidSize ? "Đạt chuẩn" : "Chưa đạt"})
                               </span>
                             </td>
                             <td className="p-4 text-right">
-                              <button
-                                type="button"
-                                onClick={() => openLeaderModal(g)}
-                                className="px-3.5 py-1.5 bg-white border border-[#E8E2D9] hover:bg-gray-100 font-bold rounded-xl text-xs cursor-pointer"
-                              >
-                                ⚙️ Sửa / Đổi Leader
-                              </button>
+                              <span className="px-3 py-1 bg-gray-100 text-[#6B635B] font-bold rounded-xl text-[11px]">
+                                {g.locked ? " Đã khóa nhóm" : " Đang mở nhóm"}
+                              </span>
                             </td>
                           </tr>
                         );
@@ -1267,10 +1341,10 @@ export default function AdminDashboard() {
                     ) : (
                       <tr>
                         <td
-                          colSpan="4"
-                          className="p-8 text-center text-[#6B635B] italic"
+                          colSpan="5"
+                          className="p-12 text-center text-[#6B635B] italic"
                         >
-                          Chưa có nhóm nào trong hệ thống.
+                          Không tìm thấy nhóm đồ án nào phù hợp trong hệ thống.
                         </td>
                       </tr>
                     )}
@@ -1584,7 +1658,7 @@ export default function AdminDashboard() {
       {leaderModalOpen && selectedGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form
-            onSubmit={handleReplaceLeader}
+            onSubmit={handleReplaceGroupLeader}
             className="w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-xl"
           >
             <div className="flex items-center justify-between border-b pb-3">
@@ -1605,21 +1679,34 @@ export default function AdminDashboard() {
                 value={newLeaderId}
                 onChange={(event) => setNewLeaderId(event.target.value)}
                 required
-                className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal"
+                className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal text-xs"
               >
-                <option value="">-- Chọn thành viên --</option>
-                {(selectedGroup.members || [])
+                <option value="">-- Chọn thành viên mới --</option>
+                {(selectedGroup?.members || [])
                   .filter(
                     (member) =>
-                      member.status === "ACTIVE" &&
-                      !member.isLeader &&
-                      member.userId,
+                      // Kiểm tra điều kiện: không phải là leader hiện tại và có ID
+                      !member.leader &&
+                      (member.userId || member.profile?.userId),
                   )
-                  .map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.userFullName} ({member.userEmail})
-                    </option>
-                  ))}
+                  .map((member) => {
+                    // Lấy đúng các trường dữ liệu từ JSON response thực tế
+                    const mId = member.userId || member.profile?.userId;
+                    const mName =
+                      member.fullName ||
+                      member.profile?.fullName ||
+                      "Thành viên";
+                    const mEmail = member.profile?.email || member.email || "";
+                    const mCode =
+                      member.studentCode || member.profile?.studentCode || "";
+
+                    return (
+                      <option key={mId} value={mId}>
+                        {mName} {mCode ? `(${mCode})` : ""}{" "}
+                        {mEmail ? `- ${mEmail}` : ""}
+                      </option>
+                    );
+                  })}
               </select>
             </label>
             <div className="flex justify-end gap-3 border-t pt-4">

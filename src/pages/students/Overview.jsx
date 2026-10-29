@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function Overview({ groupData, isLeader }) {
-  const semesterName = groupData?.semesterCode || groupData?.semester || "SU27";
+ const semesterName = groupData?.semesterCode || groupData?.semester || groupData?.semesterName || "Spring 2027";
   const groupCode = groupData?.groupCode || groupData?.code || "N/A";
   const majorName =
     groupData?.majorName ||
