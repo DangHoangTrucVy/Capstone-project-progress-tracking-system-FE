@@ -187,3 +187,6 @@ export const getSubjectsBySemester = async (semester) => {
 
 // Trả về mảng rỗng cho các component cũ gọi getAllGroups nhằm tránh lỗi 404
 export const getAllGroups = async () => [];
+
+// ==================== ME & SEMESTERS ====================
+export const getMySemesters = async () => (await api.get("/me/semesters")).data;
