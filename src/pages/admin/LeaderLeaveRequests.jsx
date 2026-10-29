@@ -22,21 +22,32 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
   const [newLeaderUserId, setNewLeaderUserId] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // 1. Lấy danh sách môn học để lấy đúng UUID của subjectId
+  // 1. Lấy danh sách môn học (UUID subjectId) của mọi học kỳ đang có, không gắn cứng mã học kỳ
   useEffect(() => {
-    api.get("/semesters/Fall2026/subjects") // hoặc endpoint lấy danh sách môn học tương ứng
-      .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : res.data.content || [];
+    let cancelled = false;
+    (async () => {
+      try {
+        const semRes = await api.get("/semesters", { params: { size: 1000 } });
+        const semList = Array.isArray(semRes.data) ? semRes.data : semRes.data.content || [];
+        const perSemester = await Promise.all(
+          semList.map((sem) =>
+            api
+              .get(`/semesters/${sem.code}/subjects`)
+              .then((res) => (Array.isArray(res.data) ? res.data : res.data.content || []))
+              .catch(() => []),
+          ),
+        );
+        if (cancelled) return;
+        const list = perSemester.flat();
         setSubjects(list);
-        if (list.length > 0) {
-          const firstUuid = list[0].id || list[0].subjectId;
-          setSubjectId(firstUuid);
-        }
-      })
-      .catch(() => {
-        // Nếu không lấy được danh sách, cho phép admin nhập thủ công hoặc để trống
-        setSubjectId("");
-      });
+        setSubjectId(list.length > 0 ? list[0].id || list[0].subjectId : "");
+      } catch {
+        if (!cancelled) setSubjectId("");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // 2. Lấy danh sách khiếu nại/yêu cầu theo subjectId dạng UUID

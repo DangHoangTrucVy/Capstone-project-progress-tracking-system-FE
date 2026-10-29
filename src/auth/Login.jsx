@@ -266,7 +266,13 @@ const navigateBasedOnRole = (userRole) => {
                   />
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <p className="text-center text-xs text-neutral-400">
+                {googleConfig
+                  ? "Đăng nhập Google chưa được bật: máy chủ chưa cấu hình GOOGLE_CLIENT_IDS."
+                  : "Đang kiểm tra đăng nhập Google..."}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-between items-center text-[11px] text-neutral-400 pt-3 border-t border-neutral-100">
