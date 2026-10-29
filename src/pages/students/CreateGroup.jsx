@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   createGroupInSubject,
   getSubjectsBySemester,
+  getMySemesters,
 } from "../../services/groupService";
 import { getCurrentUser } from "../../services/authService";
 import api from "../../services/api";
@@ -201,35 +202,33 @@ export default function CreateGroup({ onGroupCreated }) {
         errRes?.errorCode === "ALREADY_IN_GROUP"
       ) {
         try {
-          const res = await api
-            .get(`/subjects/${selectedSubjectId}/groups`)
-            .catch(() => api.get(`/subjects/${selectedSubjectId}/open-groups`));
-          const groupsList = Array.isArray(res.data)
-            ? res.data
-            : res.data?.content || [];
+          const semList = await getMySemesters().catch(() => []);
+          let foundGroupId = null;
+          if (Array.isArray(semList)) {
+            for (const sem of semList) {
+              for (const sub of sem.subjects || []) {
+                if (sub.group && (sub.group.id || sub.group.groupId)) {
+                  foundGroupId = sub.group.id || sub.group.groupId;
+                  break;
+                }
+              }
+              if (foundGroupId) break;
+            }
+          }
 
-          const myExistingGroup = groupsList.find(
-            (g) =>
-              g.leaderId === currentUser?.id ||
-              (g.members &&
-                g.members.some(
-                  (m) => String(m.userId || m.id) === String(currentUser?.id),
-                )),
-          );
-
-          if (myExistingGroup && myExistingGroup.id) {
-            localStorage.setItem("groupId", myExistingGroup.id);
+          if (foundGroupId) {
+            localStorage.setItem("groupId", foundGroupId);
 
             setNotice({
               type: "success",
-              title: "Khôi phục phiên Leader thành công",
+              title: "Đã nhận diện nhóm của bạn",
               message:
-                "Hệ thống đã nhận diện nhóm của bạn. Đang vào trang quản lý...",
+                "Hệ thống đã nhận diện nhóm đồ án của bạn. Đang vào trang quản lý...",
             });
 
             setTimeout(async () => {
               if (onGroupCreated) {
-                await onGroupCreated(myExistingGroup.id);
+                await onGroupCreated(foundGroupId);
               } else {
                 window.location.reload();
               }

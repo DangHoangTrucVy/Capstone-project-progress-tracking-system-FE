@@ -36,7 +36,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://usd-plugins-mesa-geneva.trycloudflare.com",
+        target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
       },
