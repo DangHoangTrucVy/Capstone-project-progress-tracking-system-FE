@@ -75,7 +75,7 @@ export default function JoinGroup({ onJoined }) {
     };
 
     const handleLogout = () => {
-        localStorage.clear();
+        ["accessToken", "user", "role", "groupId"].forEach((key) => localStorage.removeItem(key));
         window.location.href = "/login";
     };
 
