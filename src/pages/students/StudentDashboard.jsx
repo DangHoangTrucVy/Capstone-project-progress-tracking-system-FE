@@ -108,14 +108,7 @@ export default function StudentDashboard() {
 
       // 2. Fallback dự phòng (nếu /me/semesters không kết nối được hoặc dữ liệu cache)
       if (!targetGroupId) {
-        const emailToGroupMap = {
-          "thisisforgameetc@gmail.com": "08e9d450-799f-40ee-80f3-3ad455576619",
-          "danghoangtrucvy090105@gmail.com": "08e9d450-799f-40ee-80f3-3ad455576619",
-          "beai09012005@gmail.com": "08e9d450-799f-40ee-80f3-3ad455576619",
-          "tothuy161185@gmail.com": "7bbaa0d4-64e7-4edc-b6d9-f1b6a2ebe7a0",
-          "tainguyencowork@gmail.com": "7bbaa0d4-64e7-4edc-b6d9-f1b6a2ebe7a0",
-        };
-        targetGroupId = emailToGroupMap[user.email] || localStorage.getItem("groupId");
+        targetGroupId = localStorage.getItem("groupId");
       }
 
       // 3. Tải dữ liệu nhóm và xác thực user thực sự có trong nhóm

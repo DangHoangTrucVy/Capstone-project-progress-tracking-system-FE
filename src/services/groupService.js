@@ -127,10 +127,14 @@ export const requestLeaveGroup = async (groupId, data) =>
 export const getGroupLeaveRequests = async (groupId) =>
   (await api.get(`/groups/${groupId}/leave-requests`)).data;
 
-export const getMyLeaveRequests = async () =>
-  (await api.get(`/me/leave-requests`))
-    .catch(() => ({ data: [] }))
-    .then((res) => res.data);
+export const getMyLeaveRequests = async () => {
+  try {
+    const res = await api.get(`/me/leave-requests`);
+    return res.data;
+  } catch {
+    return [];
+  }
+};
 
 export const withdrawLeaveRequest = async (requestId) =>
   (await api.post(`/leave-requests/${requestId}/withdraw`)).data;
