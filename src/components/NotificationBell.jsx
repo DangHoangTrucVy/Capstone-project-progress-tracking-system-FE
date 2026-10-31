@@ -1,6 +1,3 @@
-const isRead = (item) =>
-  item.readAt != null || item.read === true || item.isRead === true;
-
 import { useCallback, useEffect, useState } from "react";
 import {
   getNotifications,
@@ -8,6 +5,9 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from "../services/notificationService";
+
+const isRead = (item) =>
+  item.readAt != null || item.read === true || item.isRead === true;
 
 export default function NotificationBell({ onOpenLeaderRequest }) {
   const [notifications, setNotifications] = useState([]);
@@ -59,8 +59,6 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
 
   useEffect(() => {
     const initial = setTimeout(loadNotifications, 0);
-
-    // Cập nhật định kỳ nếu chưa kết nối SSE.
     const timer = setInterval(loadNotifications, 30000);
     return () => {
       clearTimeout(initial);
@@ -137,17 +135,16 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
       case "LEAVE_DECIDED":
         return "Kết quả yêu cầu";
       case "ELIGIBILITY_CHANGED":
-        // Kiểm tra linh hoạt nội dung tin nhắn để hiển thị đúng nhãn
-        if (message.includes("không đủ") || message.includes("chưa đủ")) {
+        if (message.includes("không đủ") || message.includes("chưa đủ") || message.includes("ineligible")) {
           return "Không đủ điều kiện";
         }
         return "Đủ điều kiện";
       case "LEADER_CHANGE_REQUESTED":
-        return "Đơn xin rời chức vụ Leader";
+        return "Yêu cầu chuyển giao quyền Trưởng nhóm";
       case "LEADER_LEAVE_REQUESTED":
-        return "Leader xin rời nhóm";
+        return "Trưởng nhóm xin rời nhóm";
       case "LEADER_CHANGED":
-        return "Thay đổi Leader";
+        return "Thay đổi Trưởng nhóm";
       default:
         return "Thông báo";
     }
@@ -155,6 +152,7 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
 
   return (
     <div className="relative">
+      {/* Nút quả chuông */}
       <button
         type="button"
         onClick={() => {
@@ -164,18 +162,18 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
         }}
         aria-label="Thông báo"
         aria-expanded={isOpen}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full
+        className="relative flex h-10 w-10 items-center justify-center rounded-2xl
                    border border-[#E8E2D9] bg-white text-[#2C2825]
-                   transition hover:bg-orange-50"
+                   shadow-2xs transition-all duration-200 hover:bg-orange-50 hover:border-orange-200 cursor-pointer"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="21"
-          height="21"
+          width="19"
+          height="19"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.8"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
@@ -188,7 +186,7 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
           <span
             className="absolute -right-1 -top-1 flex min-h-5 min-w-5
                        items-center justify-center rounded-full bg-red-600
-                       px-1 text-[10px] font-bold text-white"
+                       px-1 text-[10px] font-black text-white shadow-xs animate-pulse"
           >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
@@ -204,19 +202,23 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
             onClick={() => setIsOpen(false)}
           />
 
+          {/* Popup danh sách thông báo */}
           <div
-            className="absolute right-0 z-50 mt-3 w-[min(320px,calc(100vw-24px))]
-                       overflow-hidden rounded-2xl border border-[#E8E2D9]
-                       bg-white shadow-xl"
+            className="absolute right-0 z-50 mt-3 w-[min(380px,calc(100vw-24px))]
+                       overflow-hidden rounded-3xl border border-[#E8E2D9]
+                       bg-white shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200"
           >
+            {/* Header popup */}
             <div
               className="flex items-center justify-between border-b
-                            border-[#F0EBE1] px-4 py-3"
+                            border-[#E8E2D9] bg-[#FBF9F5] px-5 py-4"
             >
               <div>
-                <h3 className="font-bold text-[#2C2825]">Thông báo</h3>
-                <p className="text-xs text-[#6B635B]">
-                  {unreadCount} thông báo chưa đọc
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#2C2825]">
+                  Trung tâm Thông báo
+                </h3>
+                <p className="text-[11px] font-medium text-[#6B635B] mt-0.5">
+                  Bạn có <strong className="text-[#E65100]">{unreadCount}</strong> thông báo chưa đọc
                 </p>
               </div>
 
@@ -224,85 +226,95 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
                 type="button"
                 onClick={handleMarkAllRead}
                 disabled={unreadCount === 0}
-                className="text-xs font-semibold text-[#E65100]
-                           hover:underline disabled:opacity-40"
+                className="px-3 py-1.5 bg-white hover:bg-orange-50 text-[#E65100] border border-[#E8E2D9] text-[11px] font-extrabold rounded-xl transition cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Đọc tất cả
               </button>
             </div>
 
-            {error && <p className="px-4 py-3 text-sm text-red-600">{error}</p>}
+            {error && <p className="px-5 py-3 text-xs font-medium text-red-600 bg-red-50">{error}</p>}
 
-            <div className="max-h-80 overflow-y-auto  overscroll-contain">
+            {/* Danh sách items */}
+            <div className="max-h-88 overflow-y-auto overscroll-contain divide-y divide-[#E8E2D9]/60">
               {loading ? (
-                <p className="p-5 text-center text-sm text-gray-500">
-                  Đang tải thông báo...
-                </p>
+                <div className="py-12 text-center">
+                  <div className="inline-block w-6 h-6 border-2 border-[#E65100] border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-2 text-xs font-bold text-[#6B635B]">Đang tải thông báo...</p>
+                </div>
               ) : notifications.length === 0 ? (
-                <div className="px-4 py-10 text-center">
-                  <div className="mb-2 text-3xl">🔔</div>
-                  <p className="text-sm font-semibold text-[#2C2825]">
-                    Chưa có thông báo
+                <div className="px-6 py-12 text-center space-y-2">
+                  <div className="text-3xl">🔔</div>
+                  <p className="text-xs font-black text-[#2C2825]">
+                    Chưa có thông báo nào
                   </p>
-                  <p className="mt-1 text-xs text-[#6B635B]">
-                    Các cập nhật mới sẽ hiển thị tại đây.
+                  <p className="text-[11px] text-[#6B635B]">
+                    Các cập nhật mới từ hệ thống sẽ hiển thị tại đây.
                   </p>
                 </div>
               ) : (
                 notifications.map((item, index) => (
                   <div
                     key={item.id ?? index}
-                    className={`border-b border-[#F5F1EA] px-4 py-3
-                      ${isRead(item) ? "bg-white" : "bg-orange-50/70"}`}
+                    className={`px-5 py-3.5 transition-all hover:bg-[#FBF9F5]
+                      ${isRead(item) ? "bg-white opacity-80" : "bg-orange-50/50"}`}
                   >
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl" aria-hidden="true">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-2xl bg-white border border-[#E8E2D9] flex items-center justify-center text-base shrink-0 shadow-2xs">
                         {getNotificationIcon(item.type)}
-                      </span>
+                      </div>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-[#E65100]">
-                          {getNotificationLabel(item.type)}
-                        </p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-[#E65100]">
+                            {getNotificationLabel(item.type)}
+                          </p>
+                          {!isRead(item) && (
+                            <span className="w-2 h-2 rounded-full bg-[#E65100] shrink-0"></span>
+                          )}
+                        </div>
 
-                        <p className="mt-1 warp-break-words text-sm text-[#2C2825]">
+                        <p className="text-xs font-bold text-[#2C2825] leading-relaxed wrap-break-words">
                           {getMessage(item)}
                         </p>
+                        
                         {item.details && (
-                          <p className="mt-1 text-sm text-[#6B635B]">
-                            Lý do: {item.details}
+                          <p className="text-[11px] text-[#6B635B] bg-white p-2 rounded-xl border border-[#E8E2D9]">
+                            Chi tiết: {item.details}
                           </p>
                         )}
+
                         {item.type === "LEADER_LEAVE_REQUESTED" &&
                           onOpenLeaderRequest && (
                             <button
                               type="button"
-                              className="mt-2 text-sm text-[#E65100] underline"
+                              className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[#E65100] hover:underline cursor-pointer"
                               onClick={() => {
                                 onOpenLeaderRequest(item.entityId);
                                 setIsOpen(false);
                                 if (!isRead(item)) handleMarkRead(item);
                               }}
                             >
-                              Xem yêu cầu rời nhóm
+                              Xem yêu cầu rời nhóm →
                             </button>
                           )}
 
-                        {item.createdAt && (
-                          <p className="mt-1 text-xs text-[#8A8178]">
-                            {new Date(item.createdAt).toLocaleString("vi-VN")}
-                          </p>
-                        )}
+                        <div className="flex items-center justify-between pt-1">
+                          {item.createdAt && (
+                            <span className="text-[10px] font-medium text-[#8A8178]">
+                              {new Date(item.createdAt).toLocaleString("vi-VN")}
+                            </span>
+                          )}
 
-                        {!isRead(item) && (
-                          <button
-                            type="button"
-                            onClick={() => handleMarkRead(item)}
-                            className="mt-2 text-xs font-semibold text-[#E65100] hover:underline"
-                          >
-                            Đánh dấu đã đọc
-                          </button>
-                        )}
+                          {!isRead(item) && (
+                            <button
+                              type="button"
+                              onClick={() => handleMarkRead(item)}
+                              className="text-[10px] font-extrabold text-[#E65100] hover:underline cursor-pointer ml-auto"
+                            >
+                              Đánh dấu đã đọc
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -310,13 +322,14 @@ export default function NotificationBell({ onOpenLeaderRequest }) {
               )}
             </div>
 
-            <div className="border-t border-[#F0EBE1] px-4 py-3">
+            {/* Footer popup */}
+            <div className="border-t border-[#E8E2D9] bg-[#FBF9F5] p-3">
               <button
                 type="button"
                 onClick={loadNotifications}
-                className="w-full rounded-lg bg-[#FBF9F5] py-2
-                           text-xs font-semibold text-[#6B635B]
-                           hover:bg-orange-50"
+                className="w-full rounded-xl bg-white border border-[#E8E2D9] py-2
+                           text-xs font-extrabold text-[#6B635B]
+                           hover:bg-orange-50 hover:text-[#E65100] transition cursor-pointer shadow-2xs"
               >
                 Làm mới thông báo
               </button>

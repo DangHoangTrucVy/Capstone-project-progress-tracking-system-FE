@@ -27,7 +27,6 @@ export default function JoinGroup({ onJoined }) {
 
                 const detailedGroups = await Promise.all(detailedGroupsPromises);
 
-                // Lọc nhóm: Còn chỗ trống (< 5 người) và cùng chuyên ngành (nếu có thông tin)
                 const validGroups = detailedGroups.filter(g => {
                     const memberCount = g.members ? g.members.length : 0;
                     const isNotFull = memberCount < 5;
@@ -60,13 +59,13 @@ export default function JoinGroup({ onJoined }) {
             window.location.reload();
         } catch (err) {
             if (err.response?.status === 409) {
-                alert("Bạn đã là thành viên của nhóm này rồi hoặc đã thuộc nhóm khác!");
+                alert("Bạn đã là thành viên của nhóm này hoặc đã thuộc một nhóm khác!");
                 localStorage.setItem("groupId", groupId);
                 if (onJoined) onJoined();
                 window.location.reload();
             } else {
                 console.error("Lỗi tham gia nhóm:", err);
-                const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại điều kiện cùng ngành.";
+                const errorMsg = err.response?.data?.message || "Không thể tham gia nhóm. Vui lòng kiểm tra lại điều kiện chuyên ngành.";
                 alert(errorMsg);
             }
         } finally {
@@ -80,13 +79,13 @@ export default function JoinGroup({ onJoined }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#FBF9F5] flex flex-col justify-between p-6">
+        <div className="min-h-screen bg-[#FBF9F5] flex flex-col justify-between p-6 font-sans">
             <div className="max-w-3xl mx-auto w-full space-y-6 pt-10">
                 <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
                     <div>
                         <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold rounded-full">⚠️ Chưa tham gia nhóm</span>
-                        <h1 className="text-xl font-black text-[#2C2825] mt-1">Chọn nhóm đồ án cùng ngành</h1>
-                        <p className="text-xs text-[#6B635B]">Hệ thống chỉ hiển thị các nhóm hợp lệ trong cùng chuyên ngành (Sĩ số từ 3 đến 5 người).</p>
+                        <h1 className="text-xl font-black text-[#2C2825] mt-1">Lựa chọn nhóm đồ án cùng chuyên ngành</h1>
+                        <p className="text-xs text-[#6B635B]">Hệ thống chỉ hiển thị các nhóm hợp lệ trong cùng chuyên ngành (Sĩ số từ 3 đến 5 thành viên).</p>
                     </div>
                     <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-red-500 font-bold text-xs rounded-xl transition cursor-pointer">
                         Đăng xuất
@@ -94,7 +93,7 @@ export default function JoinGroup({ onJoined }) {
                 </div>
 
                 <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
-                    <h2 className="text-xs font-black uppercase text-[#6B635B]">Danh sách nhóm hợp lệ trong ngành</h2>
+                    <h2 className="text-xs font-black uppercase text-[#6B635B]">Danh sách nhóm hợp lệ trong chuyên ngành</h2>
                     
                     {loading ? (
                         <p className="text-xs text-center py-8 text-[#6B635B]">Đang tải danh sách nhóm...</p>
@@ -126,12 +125,12 @@ export default function JoinGroup({ onJoined }) {
                         </div>
                     ) : (
                         <div className="text-center py-10 space-y-3">
-                            <p className="text-xs text-[#6B635B]">Hiện không có nhóm nào phù hợp hoặc còn chỗ trống trong ngành của bạn.</p>
+                            <p className="text-xs text-[#6B635B]">Hiện không có nhóm nào phù hợp hoặc còn chỗ trống trong chuyên ngành của bạn.</p>
                         </div>
                     )}
                 </div>
             </div>
-            <footer className="text-center text-[10px] text-[#6B635B] pb-4">MatchPoint FPT</footer>
+            <footer className="text-center text-[10px] text-[#6B635B] pb-4">MatchPoint FPT University</footer>
         </div>
     );
 }

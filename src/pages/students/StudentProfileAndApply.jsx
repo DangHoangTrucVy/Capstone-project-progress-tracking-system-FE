@@ -27,7 +27,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   const [groups, setGroups] = useState([]);
   const [myApps, setMyApps] = useState([]);
   const [myInvites, setMyInvites] = useState([]);
-  const [leaderTransfers, setLeaderTransfers] = useState([]); // 👈 State lưu danh sách chuyển giao Leader
+  const [leaderTransfers, setLeaderTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -52,7 +52,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
       const transferList = Array.isArray(transfersRes) ? transfersRes : transfersRes?.content || [];
       setLeaderTransfers(transferList.filter((item) => item.status === "PENDING"));
     } catch (err) {
-      console.error("Lỗi tải leader transfers:", err);
+      console.error("Lỗi tải thông tin chuyển giao Trưởng nhóm:", err);
     }
   };
 
@@ -90,7 +90,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
         await fetchTransferData();
 
       } catch (err) {
-        console.error("Lỗi khởi tạo dữ liệu profile:", err);
+        console.error("Lỗi khởi tạo dữ liệu hồ sơ:", err);
       } finally {
         setLoading(false);
       }
@@ -136,9 +136,9 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     setSavingProfile(true);
     try {
       await updateMyProfile(profile);
-      showToast("Cập nhật profile cá nhân thành công!", "success");
+      showToast("Cập nhật hồ sơ cá nhân thành công!", "success");
     } catch (err) {
-      alert(err.response?.data?.message || "Cập nhật profile thất bại.");
+      alert(err.response?.data?.message || "Cập nhật hồ sơ thất bại.");
     } finally {
       setSavingProfile(false);
     }
@@ -146,31 +146,31 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
 
   const handleApply = async (groupId) => {
     if (!profile.skills || profile.skills.trim() === "") {
-      showToast("Bạn phải điền đầy đủ thông tin 'Thế mạnh kỹ năng, ưu điểm & nhược điểm' ở phía trên trước khi gửi đơn Apply!", "error");
+      showToast("Bạn cần điền đầy đủ thông tin 'Thế mạnh kỹ năng, ưu điểm & nhược điểm' ở phía trên trước khi gửi đơn ứng tuyển!", "error");
       return;
     }
 
     if (myApps.filter((app) => app.status === "PENDING").length >= 3) {
       showToast(
-        "Bạn chỉ được phép gửi tối đa 3 đơn Apply cùng một lúc!",
+        "Bạn chỉ được phép gửi tối đa 3 đơn ứng tuyển cùng một lúc!",
         "error",
       );
       return;
     }
 
     askConfirm({
-      title: "Xác nhận gửi đơn Apply",
-      message: "Bạn có chắc muốn gửi đơn ứng tuyển vào nhóm này không?",
+      title: "Xác nhận gửi đơn ứng tuyển",
+      message: "Bạn có chắc chắn muốn gửi đơn ứng tuyển vào nhóm này không?",
       onConfirm: async () => {
         try {
           await applyToGroup(groupId, { message: profile.skills.trim() });
-          showToast("Gửi đơn Apply thành công!", "success");
+          showToast("Gửi đơn ứng tuyển thành công!", "success");
           
           const appsRes = await getMyApplications(selectedSubjectId).catch(() => []);
           setMyApps(Array.isArray(appsRes) ? appsRes : appsRes?.content || []);
         } catch (err) {
           showToast(
-            err.response?.data?.message || "Không thể gửi đơn Apply.",
+            err.response?.data?.message || "Không thể gửi đơn ứng tuyển.",
             "error",
           );
         }
@@ -181,7 +181,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   const handleWithdraw = async (appId) => {
     askConfirm({
       title: "Xác nhận rút đơn",
-      message: "Bạn có chắc muốn rút lại đơn Apply này không?",
+      message: "Bạn có chắc muốn rút lại đơn ứng tuyển này không?",
       onConfirm: async () => {
         try {
           await withdrawRequest(appId);
@@ -189,7 +189,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
           const appsRes = await getMyApplications(selectedSubjectId).catch(() => []);
           setMyApps(Array.isArray(appsRes) ? appsRes : appsRes?.content || []);
         } catch (err) {
-          showToast(err.response?.data?.message || "Không thể rút đơn.", "error");
+          showToast(err.response?.data?.message || "Không thể rút đơn ứng tuyển.", "error");
         }
       },
     });
@@ -210,7 +210,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   const handleDeclineInvite = async (inviteId) => {
     try {
       await rejectRequest(inviteId, { reason: "Từ chối lời mời" });
-      showToast("Đã từ chối lời mời.", "success");
+      showToast("Đã từ chối lời mời thành công.", "success");
       const invitesRes = await getMyInvites(selectedSubjectId).catch(() => []);
       setMyInvites(Array.isArray(invitesRes) ? invitesRes : invitesRes?.content || []);
     } catch (err) {
@@ -218,11 +218,10 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     }
   };
 
-  // 🚀 Xử lý Chấp nhận bàn giao Leader
   const handleAcceptTransfer = async (transferId, groupId) => {
     askConfirm({
       title: "Xác nhận nhận quyền Trưởng nhóm",
-      message: "Bạn có chắc chắn muốn nhận vai trò Trưởng nhóm này không?",
+      message: "Bạn có chắc chắn muốn đảm nhận vai trò Trưởng nhóm này không?",
       onConfirm: async () => {
         try {
           await acceptLeaderTransfer(transferId);
@@ -234,17 +233,16 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
             window.location.reload();
           }
         } catch (err) {
-          showToast(err.response?.data?.message || "Không thể chấp nhận bàn giao.", "error");
+          showToast(err.response?.data?.message || "Không thể chấp nhận bàn giao quyền.", "error");
         }
       },
     });
   };
 
-  // 🚀 Xử lý Từ chối bàn giao Leader[cite: 31]
   const handleDeclineTransfer = async (transferId) => {
     askConfirm({
       title: "Xác nhận từ chối",
-      message: "Bạn có chắc muốn từ chối nhận quyền Trưởng nhóm này không?",
+      message: "Bạn có chắc chắn muốn từ chối quyền Trưởng nhóm này không?",
       onConfirm: async () => {
         try {
           await declineLeaderTransfer(transferId);
@@ -257,11 +255,10 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
     });
   };
 
-  // 🚀 Xử lý Hủy đề xuất bàn giao (dành cho Leader cũ)[cite: 30]
   const handleCancelTransfer = async (transferId) => {
     askConfirm({
       title: "Xác nhận hủy đề xuất",
-      message: "Bạn có chắc muốn thu hồi lại đề xuất bàn giao Leader này không?",
+      message: "Bạn có chắc chắn muốn thu hồi lại đề xuất bàn giao quyền Trưởng nhóm này không?",
       onConfirm: async () => {
         try {
           await cancelLeaderTransfer(transferId);
@@ -276,7 +273,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
 
   if (loading) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center text-xs font-bold text-[#6B635B]">
+      <div className="min-h-[50vh] flex items-center justify-center text-xs font-bold text-[#6B635B] font-sans">
         Đang tải thông tin...
       </div>
     );
@@ -296,17 +293,17 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
   });
 
   return (
-    <div className="space-y-8 animate-fadeIn text-[#2C2825] max-w-7xl mx-auto py-4 px-3 font-sans">
+    <div className="space-y-8 font-sans text-[#2C2825] max-w-7xl mx-auto py-4 px-3">
       {/* 1. HỒ SƠ NĂNG LỰC */}
       <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-[#E8E2D9]/60">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100/80 text-[#E65100] text-[10px] font-black uppercase rounded-lg mb-2">
-              <span>📄</span> HỒ SƠ NĂNG LỰC
+              <span>📄</span> HỒ SƠ NĂNG LỰC CÁ NHÂN
             </div>
-            <h2 className="text-lg font-black text-[#2C2825]">Giới thiệu bản thân & Kỹ năng</h2>
+            <h2 className="text-lg font-black text-[#2C2825]">Giới thiệu bản thân & Kỹ năng chuyên môn</h2>
             <p className="text-xs text-[#6B635B] mt-0.5">
-              Ghi rõ thế mạnh kỹ năng, ưu điểm và nhược điểm để các Trưởng nhóm xem xét khi bạn gửi đơn ứng tuyển.
+              Cung cấp rõ các thế mạnh kỹ năng, ưu điểm và nhược điểm để các Trưởng nhóm xem xét khi bạn nộp đơn ứng tuyển.
             </p>
           </div>
         </div>
@@ -328,7 +325,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                     weaknesses: e.target.value,
                   })
                 }
-                placeholder="VD: Thế mạnh: Thành thạo ReactJS, Tailwind CSS, REST API..."
+                placeholder="Ví dụ: Thế mạnh: Thành thạo ReactJS, Tailwind CSS, RESTful API..."
                 className="w-full p-4 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-2xl outline-none focus:border-[#E65100] transition font-medium leading-relaxed resize-y"
               />
               <span className="absolute bottom-3 right-4 text-[10px] text-[#6B635B] bg-white px-2 py-0.5 rounded-md border border-[#E8E2D9]">
@@ -342,13 +339,13 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
               disabled={savingProfile}
               className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
-              <span>💾</span> {savingProfile ? "Đang lưu..." : "LƯU PROFILE CÁ NHÂN"}
+              <span>💾</span> {savingProfile ? "Đang lưu..." : "LƯU HỒ SƠ CÁ NHÂN"}
             </button>
           </div>
         </form>
       </div>
 
-      {/* 👑 KHU VỰC YÊU CẦU CHUYỂN GIAO QUYỀN LEADER */}
+      {/* 👑 KHU VỰC YÊU CẦU CHUYỂN GIAO QUYỀN TRƯỞNG NHÓM */}
       {leaderTransfers.length > 0 && (
         <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
           <div className="flex items-center space-x-2 text-[#E65100]">
@@ -375,7 +372,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                     onClick={() => handleAcceptTransfer(item.id, item.groupId)}
                     className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition cursor-pointer"
                   >
-                    Chấp nhận làm Leader
+                    Chấp nhận làm Trưởng nhóm
                   </button>
                   <button
                     onClick={() => handleDeclineTransfer(item.id)}
@@ -414,7 +411,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                     Mã nhóm: {inv.groupCode || inv.groupName || inv.groupId}
                   </p>
                   <p className="text-[11px] text-[#6B635B]">
-                    Tên nhóm: <strong className="text-[#2C2825]">{inv.groupName || "Nhóm Capstone"}</strong>
+                    Tên nhóm: <strong className="text-[#2C2825]">{inv.groupName || "Nhóm Đồ án"}</strong>
                   </p>
                   <p className="text-[11px] text-[#6B635B]">
                     Trạng thái: <span className={`font-bold ${inv.status === "PENDING" ? "text-amber-600" : "text-red-500"}`}>{inv.status}</span>
@@ -436,32 +433,32 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                     </button>
                   </div>
                 ) : (
-                  <span className="font-bold px-3 py-1 bg-gray-100 rounded-lg border text-gray-500">Đã hết hạn / Đã xử lý</span>
+                  <span className="font-bold px-3 py-1 bg-gray-100 rounded-lg border text-gray-500">Đã hết hạn hoặc đã xử lý</span>
                 )}
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[#6B635B] italic">Hiện tại bạn không có lời mời tham gia nhóm nào từ Trưởng nhóm.</p>
+          <p className="text-xs text-[#6B635B] italic">Hiện tại bạn chưa nhận được lời mời tham gia nhóm nào từ Trưởng nhóm.</p>
         )}
       </div>
 
-      {/* 2. ĐƠN APPLY CỦA TÔI */}
+      {/* 2. ĐƠN ỨNG TUYỂN CỦA TÔI */}
       <div className="bg-white p-8 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2">
           <div className="flex items-center space-x-2.5">
             <span className="text-lg">⚡</span>
             <div>
               <h3 className="text-sm font-black uppercase tracking-wider text-[#2C2825]">
-                ĐƠN APPLY CỦA TÔI ({pendingApps.length}/3 ĐƠN ĐANG CHỜ)
+                ĐƠN ỨNG TUYỂN CỦA TÔI ({pendingApps.length}/3 ĐƠN ĐANG CHỜ)
               </h3>
               <p className="text-[11px] text-[#6B635B] mt-0.5">
-                Giới hạn tối đa 3 đơn gửi song song để đảm bảo tỷ lệ phản hồi tốt nhất.
+                Giới hạn tối đa 3 đơn gửi đồng thời nhằm đảm bảo tỷ lệ phản hồi hiệu quả nhất.
               </p>
             </div>
           </div>
           <span className="text-xs font-black px-3.5 py-1.5 bg-[#FBF9F5] text-[#E65100] border border-[#E8E2D9] rounded-xl">
-            Còn {remainingSlots} lượt apply
+            Còn {remainingSlots} lượt nộp đơn
           </span>
         </div>
 
@@ -472,12 +469,12 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
               <div key={app.id || idx} className="p-5 rounded-2xl border-2 border-amber-300 bg-amber-50/30 flex flex-col justify-between space-y-4 shadow-xs">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-[10px]">
-                    <span className="px-2.5 py-1 bg-amber-200/80 text-amber-900 font-black rounded-lg uppercase">⏳ Chờ duyệt</span>
+                    <span className="px-2.5 py-1 bg-amber-200/80 text-amber-900 font-black rounded-lg uppercase">⏳ Đang chờ duyệt</span>
                     <span className="text-[#6B635B] font-medium">Đã gửi</span>
                   </div>
                   <div>
                     <h4 className="font-black text-sm text-[#2C2825] line-clamp-1">{app.groupCode || app.groupName || app.groupId}</h4>
-                    <p className="text-[11px] text-[#6B635B] mt-0.5">Trạng thái: Đang chờ Leader duyệt</p>
+                    <p className="text-[11px] text-[#6B635B] mt-0.5">Trạng thái: Chờ Trưởng nhóm xét duyệt</p>
                   </div>
                 </div>
                 <div className="pt-3 border-t border-amber-200/60 flex justify-between items-center text-xs">
@@ -489,7 +486,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
               <div key={idx} className="p-6 rounded-2xl border border-dashed border-[#E8E2D9] bg-[#FBF9F5] flex flex-col items-center justify-center text-center space-y-2">
                 <div className="w-10 h-10 rounded-full bg-white border border-[#E8E2D9] flex items-center justify-center text-gray-400 font-bold text-lg">+</div>
                 <p className="text-xs font-black text-[#2C2825]">Vị trí đơn trống {idx + 1}</p>
-                <p className="text-[11px] text-[#6B635B] leading-relaxed">Chọn 1 nhóm từ Sàn ghép đôi bên dưới để gửi nguyện vọng.</p>
+                <p className="text-[11px] text-[#6B635B] leading-relaxed">Chọn một nhóm từ sàn ghép đôi bên dưới để gửi nguyện vọng.</p>
               </div>
             );
           })}
@@ -501,10 +498,10 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-4 border-b border-[#E8E2D9]/60">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100/80 text-[#E65100] text-[10px] font-black uppercase rounded-lg mb-2">
-              <span>👥</span> Chọn nhóm
+              <span>👥</span> Sàn ghép đôi
             </div>
-            <h3 className="text-base font-black text-[#2C2825]">Danh sách nhóm đang tuyển theo môn học</h3>
-            <p className="text-xs text-[#6B635B] mt-0.5">Khám phá các nhóm sinh viên đang thiếu thành viên và nộp đơn apply trực tiếp.</p>
+            <h3 className="text-base font-black text-[#2C2825]">Danh sách nhóm đang tuyển thành viên theo môn học</h3>
+            <p className="text-xs text-[#6B635B] mt-0.5">Khám phá các nhóm đang thiếu thành viên và tiến hành nộp đơn ứng tuyển trực tiếp.</p>
           </div>
 
           <select
@@ -547,7 +544,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center text-[10px]">
                       <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-black rounded-lg">
-                        Còn {slotsLeft} vị trí
+                        Còn {slotsLeft} vị trí trống
                       </span>
                       <span className="font-bold text-[#6B635B]">Sĩ số: {memberCount}/5</span>
                     </div>
@@ -555,7 +552,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                     <div>
                       <h4 className="font-black text-sm text-[#2C2825] line-clamp-1">{g.groupCode || g.name}</h4>
                       <p className="text-[11px] text-[#6B635B] mt-1 line-clamp-2 leading-relaxed">
-                        {g.wantedSkills ? `Cần tuyển: ${g.wantedSkills}` : "Nhóm đang hoàn thiện đội ngũ và chào đón thành viên mới."}
+                        {g.wantedSkills ? `Cần tuyển: ${g.wantedSkills}` : "Nhóm đang hoàn thiện đội ngũ và chào đón các thành viên mới."}
                       </p>
                     </div>
                   </div>
@@ -565,7 +562,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
                       onClick={() => handleApply(g.id)}
                       className="flex-1 py-3 bg-[#E65100] hover:bg-[#D84315] text-white font-black uppercase text-[11px] tracking-wider rounded-xl shadow-md transition cursor-pointer text-center"
                     >
-                      🚀 Nộp đơn Apply
+                      🚀 Nộp đơn ứng tuyển
                     </button>
                   </div>
                 </div>
@@ -574,7 +571,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
           ) : (
             <div className="col-span-3 p-12 text-center bg-[#FBF9F5] rounded-3xl border border-[#E8E2D9]/60 space-y-2">
               <p className="text-sm font-bold text-[#2C2825]">Không tìm thấy nhóm phù hợp</p>
-              <p className="text-xs text-[#6B635B] italic">Không có nhóm nào đang mở tuyển trong môn học này hoặc khớp với từ khóa tìm kiếm.</p>
+              <p className="text-xs text-[#6B635B] italic">Không có nhóm nào đang mở tuyển trong môn học này hoặc khớp với từ khóa tìm kiếm của bạn.</p>
             </div>
           )}
         </div>
@@ -597,7 +594,7 @@ export default function StudentProfileAndApply({ onJoinedGroup }) {
             <h3 className="text-base font-black text-[#2C2825]">{confirmDialog.title}</h3>
             <p className="text-xs text-[#6B635B] leading-relaxed">{confirmDialog.message}</p>
             <div className="pt-2 flex justify-end gap-3">
-              <button type="button" onClick={() => setConfirmDialog(null)} className="rounded-xl border border-[#E8E2D9] px-5 py-2.5 text-xs font-bold text-[#6B635B] cursor-pointer">Hủy</button>
+              <button type="button" onClick={() => setConfirmDialog(null)} className="rounded-xl border border-[#E8E2D9] px-5 py-2.5 text-xs font-bold text-[#6B635B] cursor-pointer">Hủy bỏ</button>
               <button type="button" onClick={async () => { const action = confirmDialog.onConfirm; setConfirmDialog(null); await action(); }} className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white cursor-pointer">Xác nhận</button>
             </div>
           </div>

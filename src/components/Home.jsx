@@ -7,44 +7,44 @@ const Home = () => {
 
   const rolesData = [
     {
-      title: "Student & Leader",
+      title: "Sinh viên & Trưởng nhóm",
       heading: "Đăng nhập Google & Quản lý nhóm đồ án",
       features: [
-        "Đăng nhập trực tiếp bằng tài khoản Google (danh sách import từ phòng đào tạo)",
-        "Kiểm tra trạng thái đủ điều kiện (tín chỉ tích lũy >= 80%)",
-        "Tạo nhóm mới (quy mô 3–5 người) hoặc gửi tối đa 3 đơn Apply đang chờ",
-        "Quản lý thành viên, nhận Invite và xin rời nhóm an toàn",
+        "Đăng nhập trực tiếp bằng tài khoản Google (danh sách được nhập từ phòng đào tạo)",
+        "Kiểm tra trạng thái đủ điều kiện (tín chỉ tích lũy lớn hơn hoặc bằng 80 phần trăm)",
+        "Tạo nhóm mới (quy mô từ 3 đến 5 người) hoặc gửi tối đa 3 đơn đăng ký đang chờ",
+        "Quản lý thành viên, nhận lời mời và xin rời nhóm an toàn",
       ],
-      btnText: "Đăng nhập với vai trò Student / Leader",
+      btnText: "Đăng nhập với vai trò Sinh viên / Trưởng nhóm",
       link: "/login",
     },
     {
-      title: "Admin",
+      title: "Quản trị viên",
       heading: "Quản trị hệ thống và cấu hình đầu kỳ",
       features: [
-        "Import danh sách sinh viên & điều kiện bằng file Excel/CSV",
-        "Cấu hình mốc thời gian, học kỳ và phân công Moderator",
-        "Can thiệp chỉnh sửa danh sách nhóm, thay đổi Leader sau khi khóa",
+        "Nhập danh sách sinh viên và điều kiện bằng tệp Excel hoặc CSV",
+        "Cấu hình mốc thời gian, học kỳ và phân công giảng viên điều phối",
+        "Can thiệp chỉnh sửa danh sách nhóm, thay đổi Trưởng nhóm sau khi khóa",
       ],
-      btnText: "Đăng nhập với vai trò Admin",
+      btnText: "Đăng nhập với vai trò Quản trị viên",
       link: "/login",
     },
     {
-      title: "Moderator & Sub moderator",
+      title: "Giảng viên điều phối & Trợ lý điều phối",
       heading: "Kiểm duyệt và Hướng dẫn đồ án",
       features: [
         "Quản lý toàn bộ hệ thống kiểm duyệt và hoạt động nhóm",
-        "Theo dõi tiến độ, đặt lịch hẹn tư vấn 1:1 và Pre-meeting",
-        "Xử lý các khiếu nại, tranh chấp và xét duyệt danh sách finalized",
+        "Theo dõi tiến độ, đặt lịch hẹn tư vấn một đối một và họp chuẩn bị trước",
+        "Xử lý các khiếu nại, tranh chấp và xét duyệt danh sách đã chốt",
       ],
-      btnText: "Đăng nhập với vai trò Moderator",
+      btnText: "Đăng nhập với vai trò Giảng viên điều phối",
       link: "/login",
     },
   ];
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] text-[#2C2825] font-sans antialiased selection:bg-[#E65100] selection:text-white overflow-x-hidden">
-      {/* 1. Header / Navigation */}
+      {/* 1. Thanh điều hướng */}
       <header className="bg-[#FBF9F5]/90 backdrop-blur-md border-b border-[#E8E2D9] sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3 group cursor-pointer">
@@ -76,13 +76,13 @@ const Home = () => {
         </div>
       </header>
 
-      {/* 2. Hero Section */}
+      {/* 2. Phần mở đầu */}
       <section className="pt-16 pb-20 max-w-7xl mx-auto px-6 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F5EBE1] text-[#E65100] text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#E65100] animate-pulse"></span>
-              Hệ thống quản lý ghép nhóm Capstone Project v2.9
+              Hệ thống quản lý ghép nhóm Đồ án tốt nghiệp 
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-black text-[#2C2825] leading-[1.15] tracking-tight">
@@ -90,7 +90,7 @@ const Home = () => {
             </h1>
 
             <p className="text-[#6B635B] text-base leading-relaxed max-w-lg">
-              Điểm kết nối chính thức, hỗ trợ sinh viên CNTT Đại học FPT tìm kiếm mảnh ghép hoàn hảo và quản lý đồ án tốt nghiệp minh bạch.
+              Điểm kết nối chính thức, hỗ trợ sinh viên công nghệ thông tin Đại học FPT tìm kiếm mảnh ghép hoàn hảo và quản lý đồ án tốt nghiệp minh bạch.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -112,7 +112,7 @@ const Home = () => {
                   ✓
                 </div>
                 <span className="text-xs font-bold text-[#2C2825]">
-                  Trạng thái Finalized (Cấp nhóm)
+                  Trạng thái đã chốt (Cấp nhóm)
                 </span>
               </div>
 
@@ -155,7 +155,7 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Counter Statistics */}
+        {/* Thống kê số liệu */}
         <ScrollReveal delay={100}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-20 border-t border-[#E8E2D9] mt-16 text-center">
             <div className="group cursor-default">
@@ -171,15 +171,15 @@ const Home = () => {
                 3
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Giới hạn đơn Apply chờ
+                Giới hạn đơn đăng ký chờ xử lý
               </div>
             </div>
             <div className="group cursor-default">
               <div className="text-3xl sm:text-4xl font-black text-[#E65100]">
-                48h
+                48 giờ
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                Thời hạn phản hồi đơn / lời mời
+                Thời hạn phản hồi đơn hoặc lời mời
               </div>
             </div>
             <div className="group cursor-default">
@@ -187,14 +187,14 @@ const Home = () => {
                 Google
               </div>
               <div className="text-xs font-medium text-[#6B635B] mt-1">
-                OAuth cho sinh viên
+                Xác thực tài khoản cho sinh viên
               </div>
             </div>
           </div>
         </ScrollReveal>
       </section>
 
-      {/* 3. Features Section */}
+      {/* 3. Phần tính năng */}
       <ScrollReveal delay={100}>
         <section id="tinh-nang" className="py-20 bg-white border-y border-[#E8E2D9]">
           <div className="max-w-7xl mx-auto px-6">
@@ -213,10 +213,10 @@ const Home = () => {
                   🚩
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Kiểm tra điều kiện & Cờ
+                  Kiểm tra điều kiện 
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Tự động đánh giá tiêu chí tích lũy tín chỉ và gắn cờ ineligible từ phòng đào tạo.
+                  Tự động đánh giá tiêu chí tích lũy tín chỉ và gắn cờ không đủ điều kiện từ phòng đào tạo.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
@@ -224,10 +224,10 @@ const Home = () => {
                   👥
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Tạo nhóm & Sĩ số 3–5
+                  Tạo nhóm với sĩ số 3–5 
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Sinh viên tạo nhóm làm Leader, tuyển thành viên đảm bảo quy mô từ 3 đến 5 người chính thức.
+                  Sinh viên tạo nhóm làm Trưởng nhóm, tuyển thành viên đảm bảo quy mô từ 3 đến 5 người chính thức.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
@@ -235,10 +235,10 @@ const Home = () => {
                   📨
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Đơn Apply & Vote
+                  Đơn đăng ký
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Quản lý tối đa 3 đơn Apply đang chờ, biểu quyết ý kiến thành viên và gửi lời mời qua MSSV.
+                  Quản lý tối đa 3 đơn đăng ký đang chờ, biểu quyết ý kiến thành viên và gửi lời mời qua mã số sinh viên.
                 </p>
               </div>
               <div className="bg-[#FBF9F5] p-6 rounded-2xl border border-[#E8E2D9] space-y-4">
@@ -246,10 +246,10 @@ const Home = () => {
                   ⚙️
                 </div>
                 <h3 className="font-bold text-lg text-[#2C2825]">
-                  Quản trị viên & Moderator
+                  Giảng viên điều phối
                 </h3>
                 <p className="text-[#6B635B] text-xs leading-relaxed">
-                  Cấu hình học kỳ, xuất báo cáo Excel bàn giao với mức cô lập giao dịch và quản lý trạng thái Finalized nhóm.
+                  Cấu hình học kỳ, xuất báo cáo tệp Excel bàn giao với mức cô lập giao dịch và quản lý trạng thái đã chốt nhóm.
                 </p>
               </div>
             </div>
@@ -257,7 +257,7 @@ const Home = () => {
         </section>
       </ScrollReveal>
 
-      {/* 4. Target Roles Section */}
+      {/* 4. Phần phân quyền */}
       <ScrollReveal delay={100}>
         <section id="danh-cho-ai" className="py-20 bg-white border-t border-[#E8E2D9]">
           <div className="max-w-7xl mx-auto px-6">
@@ -314,7 +314,7 @@ const Home = () => {
         </section>
       </ScrollReveal>
 
-      {/* 5. Footer */}
+      {/* 5. Chân trang */}
       <footer className="py-10 border-t border-[#E8E2D9] bg-[#FDFBF7] text-[#6B635B] text-xs">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-center md:text-left">
@@ -328,7 +328,7 @@ const Home = () => {
               Hỗ trợ
             </Link>
             <Link to="/privacy" className="hover:text-[#E65100] transition-colors">
-              Chính sách
+              Chính sách bảo mật
             </Link>
             <Link to="/contact" className="hover:text-[#E65100] transition-colors">
               Liên hệ

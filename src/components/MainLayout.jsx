@@ -7,7 +7,7 @@ const MainLayout = ({ children, user, onLogout }) => {
             <div className="absolute top-0 left-1/4 w-125 h-125 bg-orange-300/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
             <div className="absolute bottom-10 right-10 w-112.5 h-112.5 bg-amber-200/25 rounded-full blur-[140px] pointer-events-none -z-10"></div>
 
-            {/* HEADER */}
+            {/* PHẦN ĐẦU TRANG */}
             <header className="bg-white/80 backdrop-blur-md border-b border-[#E8E2D9] sticky top-0 z-40 shadow-sm">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center space-x-8">
@@ -16,7 +16,7 @@ const MainLayout = ({ children, user, onLogout }) => {
                                 F
                             </div>
                             <span className="font-black text-base tracking-tight text-[#2C2825]">
-                                Lịch <span className="text-[#E65100]">Đồ Án</span>
+                                Lịch <span className="text-[#E65100]">Đồ án</span>
                             </span>
                         </div>
                         <nav className="hidden md:flex items-center space-x-1">
@@ -33,13 +33,13 @@ const MainLayout = ({ children, user, onLogout }) => {
                                 </span>
                             </div>
                             <div className="absolute right-0 top-12 hidden group-hover:block bg-white text-xs px-3 py-1.5 rounded-xl shadow-lg border border-orange-100 whitespace-nowrap text-[#E65100] font-semibold z-50">
-                                Chúc bạn một ngày code vui vẻ! ✨
+                                Chúc bạn một ngày làm việc hiệu quả! ✨
                             </div>
                         </div>
 
                         <div className="text-right hidden sm:block">
                             <p className="text-xs font-bold text-[#2C2825]">{user?.fullName || "Đặng Hoàng Trúc Vy"}</p>
-                            <p className="text-[10px] text-[#E65100] font-bold uppercase">Trưởng nhóm • FPT University</p>
+                            <p className="text-[10px] text-[#E65100] font-bold uppercase">Trưởng nhóm • Đại học FPT</p>
                         </div>
                         <button 
                             onClick={onLogout}
@@ -51,15 +51,15 @@ const MainLayout = ({ children, user, onLogout }) => {
                 </div>
             </header>
 
-            {/* MAIN CONTENT */}
+            {/* NỘI DUNG CHÍNH */}
             <main className="grow max-w-7xl w-full mx-auto px-6 py-8 z-10">
                 {children}
             </main>
 
-            {/* FOOTER */}
+            {/* CHÂN TRANG */}
             <footer className="bg-white/80 backdrop-blur-md border-t border-[#E8E2D9] py-6 mt-auto z-10">
                 <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-[#6B635B] gap-4">
-                    <p>© 2026 Đại học FPT - MatchPoint FPT University. </p>
+                    <p>© 2026 Đại học FPT - MatchPoint FPT University.</p>
                     <div className="flex space-x-6">
                         <a href="#" className="hover:text-[#E65100] transition">Quy chế đồ án</a>
                         <a href="#" className="hover:text-[#E65100] transition">Tài liệu hướng dẫn</a>

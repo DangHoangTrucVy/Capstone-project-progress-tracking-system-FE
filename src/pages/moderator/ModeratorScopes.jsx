@@ -8,7 +8,7 @@ export default function ModeratorScopes() {
   const [scopes, setScopes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal gia hạn deadline
+  // Modal gia hạn thời hạn (Deadline)
   const [modalOpen, setModalOpen] = useState(false);
   const [activeScope, setActiveScope] = useState(null);
   const [newDeadline, setNewDeadline] = useState("");
@@ -63,7 +63,7 @@ export default function ModeratorScopes() {
     setModalOpen(true);
   };
 
- const handleSaveDeadline = async (e) => {
+  const handleSaveDeadline = async (e) => {
     e.preventDefault();
     if (!activeScope || !newDeadline) return;
 
@@ -71,40 +71,20 @@ export default function ModeratorScopes() {
       const formattedDeadline = new Date(newDeadline).toISOString();
       const scopeId = activeScope.id || activeScope.scopeId;
 
-      // Luôn gọi API extend hoặc cập nhật deadline kèm trigger mở khoá từ backend
       await api.post(`/scopes/${scopeId}/extend`, {
         deadline: formattedDeadline,
       });
 
-      showToast("Đã mở và gia hạn deadline thành công!");
+      showToast("Đã mở và gia hạn thời hạn hoàn thành thành công!");
       setModalOpen(false);
       loadScopes(selectedSemester);
     } catch (error) {
       showToast(
-        error.response?.data?.message || "Không thể cập nhật deadline.",
+        error.response?.data?.message || "Không thể cập nhật thời hạn hoàn thành.",
         "error",
       );
     }
   };
-
-  // const handleSaveDeadline = async (e) => {
-  //     e.preventDefault();
-  //     if (!activeScope || !newDeadline) return;
-
-  //     try {
-  //       const formattedDeadline = new Date(newDeadline).toISOString();
-  //       const scopeId = activeScope.id || activeScope.scopeId;
-
-  //       // Luôn gọi API gia hạn/cập nhật hoặc kiểm tra lại endpoint backend hỗ trợ chuyển trạng thái
-  //       await api.post(`/scopes/${scopeId}/extend`, { deadline: formattedDeadline });
-
-  //       showToast("Cập nhật deadline thành công!");
-  //       setModalOpen(false);
-  //       loadScopes(selectedSemester);
-  //     } catch (error) {
-  //       showToast(error.response?.data?.message || "Không thể cập nhật deadline.", "error");
-  //     }
-  //   };
 
   return (
     <div className="p-8 space-y-6">
@@ -119,10 +99,10 @@ export default function ModeratorScopes() {
       <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs">
         <div>
           <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-            MODERATOR · PHẠM VI NGÀNH & DEADLINE
+            ĐIỀU PHỐI VIÊN · PHẠM VI NGÀNH & THỜI HẠN HOÀN THÀNH
           </span>
           <h1 className="text-xl font-black text-[#2C2825] mt-1">
-            Cấu hình thời gian & Deadline theo từng ngành
+            Cấu hình thời gian & Thời hạn hoàn thành theo từng ngành
           </h1>
         </div>
         <select
@@ -146,10 +126,10 @@ export default function ModeratorScopes() {
           <thead>
             <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
               <th className="p-4 font-black uppercase">
-                Ngành học (Major Scope)
+                Ngành học
               </th>
               <th className="p-4 font-black uppercase">Giai đoạn hiện tại</th>
-              <th className="p-4 font-black uppercase">Deadline</th>
+              <th className="p-4 font-black uppercase">Thời hạn hoàn thành</th>
               <th className="p-4 font-black uppercase text-right">Thao tác</th>
             </tr>
           </thead>
@@ -175,14 +155,14 @@ export default function ModeratorScopes() {
                   <td className="p-4 text-[#6B635B]">
                     {scope.deadline
                       ? new Date(scope.deadline).toLocaleString()
-                      : "Deadline chung học kỳ"}
+                      : "Thời hạn chung học kỳ"}
                   </td>
                   <td className="p-4 text-right">
                     <button
                       onClick={() => handleOpenExtendModal(scope)}
                       className="px-3 py-1.5 bg-orange-50 text-[#E65100] hover:bg-orange-100 font-bold rounded-xl border border-orange-200 cursor-pointer"
                     >
-                      ⏱ Gia hạn / Đổi Deadline
+                      ⏱ Gia hạn thời giao tạo nhóm
                     </button>
                   </td>
                 </tr>
@@ -201,7 +181,7 @@ export default function ModeratorScopes() {
         </table>
       </div>
 
-      {/* MODAL GIA HẠN DEADLINE */}
+      {/* MODAL GIA HẠN THỜI HẠN */}
       {modalOpen && activeScope && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form
@@ -210,7 +190,7 @@ export default function ModeratorScopes() {
           >
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="text-sm font-black text-[#2C2825]">
-                Gia hạn deadline ngành:{" "}
+                Gia hạn thời hạn ngành:{" "}
                 {activeScope.majorName || activeScope.major}
               </h3>
               <button
@@ -222,7 +202,7 @@ export default function ModeratorScopes() {
               </button>
             </div>
             <label className="block space-y-1 font-bold">
-              Chọn mốc thời điểm deadline mới (Ít nhất sau 48h):
+              Chọn mốc thời điểm thời hạn mới (Ít nhất sau 48h):
               <input
                 type="datetime-local"
                 value={newDeadline}

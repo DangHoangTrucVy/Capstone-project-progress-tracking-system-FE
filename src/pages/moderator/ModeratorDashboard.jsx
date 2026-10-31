@@ -11,6 +11,7 @@ import Profile from "../../auth/Profile";
 import ModeratorLeaveRequests from "./ModeratorLeaveRequests";
 import ModeratorScopes from "./ModeratorScopes";
 import ModeratorGroupControl from "./ModeratorGroupControl";
+import NotificationBell from "../../components/NotificationBell";
 
 export default function ModeratorDashboard() {
   const [user, setUser] = useState(null);
@@ -22,7 +23,6 @@ export default function ModeratorDashboard() {
   const [loading, setLoading] = useState(true);
   const [filterUnder3, setFilterUnder3] = useState(false);
 
-  // Toast thông báo
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -49,7 +49,7 @@ export default function ModeratorDashboard() {
         setSelectedSemester(firstCode);
       }
     } catch (error) {
-      console.error("Lỗi tải dữ liệu Moderator:", error);
+      console.error("Lỗi tải dữ liệu Điều phối viên:", error);
     } finally {
       setLoading(false);
     }
@@ -59,11 +59,12 @@ export default function ModeratorDashboard() {
     fetchModeratorData();
   }, []);
 
+  // Tự động tải lại dữ liệu khi đổi học kỳ hoặc khi chuyển về tab quản lý nhóm
   useEffect(() => {
     if (selectedSemester) {
       loadSemesterData(selectedSemester);
     }
-  }, [selectedSemester]);
+  }, [selectedSemester, activeMenu]);
 
   const loadSemesterData = async (semester) => {
     try {
@@ -130,9 +131,9 @@ export default function ModeratorDashboard() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      showToast("Tải xuống file Excel bàn giao thành công!");
+      showToast("Tải xuống tệp Excel bàn giao thành công!");
     } catch (error) {
-      showToast("Không thể xuất file lúc này.", "error");
+      showToast("Không thể xuất tệp lúc này.", "error");
     }
   };
 
@@ -142,7 +143,7 @@ export default function ModeratorDashboard() {
   };
 
   const getInitials = (name) => {
-    if (!name) return "MO";
+    if (!name) return "ĐP";
     const words = name.trim().split(" ");
     return words.length > 1
       ? words[words.length - 2][0] + words[words.length - 1][0]
@@ -161,7 +162,7 @@ export default function ModeratorDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FBF9F5] flex items-center justify-center text-xs font-bold text-[#6B635B]">
-        Đang tải phân vùng Moderator...
+        Đang tải phân vùng Điều phối viên...
       </div>
     );
   }
@@ -179,11 +180,11 @@ export default function ModeratorDashboard() {
         </div>
       )}
 
-      {/* SIDEBAR CHUẨN Y HỆT ADMIN */}
-      <aside className="w-79 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 select-none shrink-0 h-screen min-h-0 overflow-hidden">
+      {/* SIDEBAR ĐIỀU PHỐI VIÊN */}
+      <aside className="w-79 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 select-none shrink-0 h-screen min-h-0 overflow-hidden shadow-2xs">
         <div className="flex-1 min-h-0 overflow-y-auto space-y-8 pr-1">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-full bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-200">
+          <div className="flex items-center space-x-3.5 px-2 pt-2">
+            <div className="w-9 h-9 rounded-2xl bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-500/20 font-black">
               ✓
             </div>
             <div>
@@ -191,7 +192,7 @@ export default function ModeratorDashboard() {
                 Điều Phối Viên
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                MatchPoint FPT Capstone v2.9
+                Hệ thống Quản lý Đồ án FPT
               </p>
             </div>
           </div>
@@ -202,9 +203,9 @@ export default function ModeratorDashboard() {
             </p>
             <button
               onClick={() => setActiveMenu("groups")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeMenu === "groups"
-                  ? "bg-[#E65100] text-white shadow-md"
+                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
@@ -213,9 +214,9 @@ export default function ModeratorDashboard() {
             </button>
             <button
               onClick={() => setActiveMenu("leave-requests")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeMenu === "leave-requests"
-                  ? "bg-[#E65100] text-white shadow-md"
+                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
@@ -224,26 +225,26 @@ export default function ModeratorDashboard() {
             </button>
             <button
               onClick={() => setActiveMenu("scopes")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeMenu === "scopes"
-                  ? "bg-[#E65100] text-white shadow-md"
+                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
               <span>⏱️</span>
-              <span>Phạm vi & Deadline ngành</span>
+              <span>Phạm vi & Thời hạn ngành</span>
             </button>
 
             <button
               onClick={() => setActiveMenu("group-control")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeMenu === "group-control"
-                  ? "bg-[#E65100] text-white shadow-md"
+                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
               <span>⚙️</span>
-              <span>Điều phối chi tiết nhóm (7.1)</span>
+              <span>Điều phối chi tiết nhóm</span>
             </button>
 
             <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
@@ -252,14 +253,14 @@ export default function ModeratorDashboard() {
 
             <button
               onClick={() => setActiveMenu("profile")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
                 activeMenu === "profile"
-                  ? "bg-[#E65100] text-white shadow-md"
+                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
               <span>⚙️</span>
-              <span>Hồ sơ Moderator</span>
+              <span>Hồ sơ cá nhân</span>
             </button>
           </div>
         </div>
@@ -270,16 +271,16 @@ export default function ModeratorDashboard() {
               <img
                 src={user.avatarUrl || user.avatar}
                 alt="Avatar"
-                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-[#E8E2D9]"
+                className="w-10 h-10 rounded-xl object-cover shadow-xs border border-[#E8E2D9]"
               />
             ) : (
-              <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs shadow-sm">
+              <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs shadow-xs">
                 {getInitials(user?.fullName)}
               </div>
             )}
             <div className="overflow-hidden">
               <h4 className="text-xs font-black truncate">
-                {user?.fullName || "Moderator"}
+                {user?.fullName || "Điều phối viên"}
               </h4>
               <p className="text-[10px] text-[#6B635B] truncate">
                 {user?.email}
@@ -297,13 +298,18 @@ export default function ModeratorDashboard() {
 
       {/* CONTENT CHÍNH */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
-        <header className="h-16 bg-white border-b border-[#E8E2D9] px-6 flex justify-between items-center text-xs font-semibold text-[#6B635B] shrink-0">
-          <span>Điều Phối Viên — {activeMenu.toUpperCase()}</span>
-          <div className="flex items-center gap-4">
+        <header className="h-18 bg-white border-b border-[#E8E2D9] px-8 flex justify-between items-center text-xs shrink-0 shadow-2xs">
+          <div className="flex items-center space-x-3">
+            <span className="font-extrabold text-[#E65100] bg-orange-50/80 px-3 py-1.5 rounded-xl border border-orange-100/80 shadow-2xs">
+              Điều Phối Viên — {activeMenu === "groups" ? "QUẢN LÝ NHÓM" : activeMenu === "leave-requests" ? "KHIẾU NẠI RỜI NHÓM" : activeMenu === "scopes" ? "PHẠM VI & THỜI HẠN" : activeMenu === "group-control" ? "ĐIỀU PHỐI CHI TIẾT" : "HỒ SƠ CÁ NHÂN"}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-4">
             <select
               value={selectedSemester}
               onChange={(e) => setSelectedSemester(e.target.value)}
-              className="p-2 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
+              className="px-4 py-2 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
             >
               {semesters.map((sem, idx) => {
                 const code = sem.code || sem;
@@ -314,19 +320,25 @@ export default function ModeratorDashboard() {
                 );
               })}
             </select>
-            <span className="text-[#E65100] font-bold">
-              Xin chào, {user?.fullName || "Moderator"}
-            </span>
+
+            <NotificationBell />
+
+            <div className="text-right hidden sm:block pl-3 border-l border-[#E8E2D9]">
+              <p className="font-extrabold text-[#2C2825] text-xs">
+                {user?.fullName || "Điều phối viên"}
+              </p>
+              <p className="text-[10px] text-[#6B635B]">{user?.email}</p>
+            </div>
           </div>
         </header>
 
         <div className="w-full flex-1 flex flex-col">
           {activeMenu === "groups" && (
             <div className="p-8 space-y-6">
-              <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs flex justify-between items-center flex-wrap gap-4">
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-3xl shadow-sm flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-                    MODERATOR · ĐIỀU PHỐI HỌC KỲ
+                  <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-lg">
+                    ĐIỀU PHỐI VIÊN · QUẢN LÝ HỌC KỲ
                   </span>
                   <h1 className="text-xl font-black text-[#2C2825] mt-1">
                     Quản lý nhóm đồ án & Xuất báo cáo bàn giao
@@ -335,7 +347,7 @@ export default function ModeratorDashboard() {
                 <div>
                   <button
                     onClick={handleExport}
-                    className="px-4 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs"
+                    className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl cursor-pointer shadow-md transition"
                   >
                     ↓ Xuất Excel bàn giao (.xlsx)
                   </button>
@@ -344,7 +356,7 @@ export default function ModeratorDashboard() {
 
               {stats && (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] shadow-xs">
+                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
                     <p className="text-xs font-bold text-[#6B635B]">
                       Tổng sinh viên
                     </p>
@@ -352,7 +364,7 @@ export default function ModeratorDashboard() {
                       {stats.total?.totalStudents || stats.totalStudents || 0}
                     </p>
                   </div>
-                  <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] shadow-xs">
+                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
                     <p className="text-xs font-bold text-[#6B635B]">
                       Tổng số nhóm
                     </p>
@@ -362,7 +374,7 @@ export default function ModeratorDashboard() {
                         groups.length}
                     </p>
                   </div>
-                  <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] shadow-xs">
+                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
                     <p className="text-xs font-bold text-[#6B635B]">
                       Nhóm dưới 3 người
                     </p>
@@ -374,7 +386,7 @@ export default function ModeratorDashboard() {
                         ).length}
                     </p>
                   </div>
-                  <div className="bg-white p-5 rounded-2xl border border-[#E8E2D9] shadow-xs">
+                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
                     <p className="text-xs font-bold text-[#6B635B]">
                       Sinh viên chưa có nhóm
                     </p>
@@ -387,16 +399,16 @@ export default function ModeratorDashboard() {
                 </div>
               )}
 
-              <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex items-center justify-between shadow-xs flex-wrap gap-4">
+              <div className="bg-white p-5 border border-[#E8E2D9] rounded-3xl flex items-center justify-between shadow-sm flex-wrap gap-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-[#6B635B]">
                     Bộ lọc:
                   </span>
                   <button
                     onClick={() => setFilterUnder3(false)}
-                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                       !filterUnder3
-                        ? "bg-[#E65100] text-white"
+                        ? "bg-[#E65100] text-white shadow-xs"
                         : "bg-[#FBF9F5] text-[#6B635B] border border-[#E8E2D9]"
                     }`}
                   >
@@ -404,9 +416,9 @@ export default function ModeratorDashboard() {
                   </button>
                   <button
                     onClick={() => setFilterUnder3(true)}
-                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                       filterUnder3
-                        ? "bg-red-600 text-white"
+                        ? "bg-red-600 text-white shadow-xs"
                         : "bg-red-50 text-red-700 border border-red-200"
                     }`}
                   >
@@ -416,21 +428,21 @@ export default function ModeratorDashboard() {
 
                 <button
                   onClick={handleDissolveUnder3}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition"
                 >
                   💥 Giải tán tất cả nhóm dưới 3 người
                 </button>
               </div>
 
-              <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
+              <div className="bg-white border border-[#E8E2D9] rounded-3xl overflow-hidden shadow-sm">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase">Mã nhóm</th>
+                      <th className="p-4 font-black uppercase">Tên Nhóm</th>
                       <th className="p-4 font-black uppercase">Sĩ số</th>
                       <th className="p-4 font-black uppercase">Trạng thái</th>
                       <th className="p-4 font-black uppercase text-right">
-                        Quyền điều phối (7.1)
+                        Quyền điều phối
                       </th>
                     </tr>
                   </thead>
@@ -452,18 +464,27 @@ export default function ModeratorDashboard() {
                             </td>
                             <td className="p-4">
                               <span
-                                className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${isValid ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600 border border-red-200"}`}
+                                className={`px-3 py-1 font-bold rounded-xl text-[10px] ${isValid ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}
                               >
                                 {count}/5 người (
                                 {isValid ? "Hợp lệ" : "Chưa đạt chuẩn"})
                               </span>
                             </td>
-                            <td className="p-4 text-[#6B635B]">
-                              {g.status || "Mở / Khóa"}
+                            <td className="p-4 font-bold">
+                              {g.locked || g.isLocked ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 border border-red-200 rounded-xl text-[10px]">
+                                  Nhóm đã khóa
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-[10px]">
+                                  Nhóm đang mở
+                                </span>
+                              )}
                             </td>
                             <td className="p-4 text-right">
                               <span className="text-xs text-[#6B635B] italic bg-[#FBF9F5] px-3 py-1.5 rounded-xl border border-[#E8E2D9]">
-                                Moderator có toàn quyền thêm/bớt/gộp nhóm
+                                Giảng viên điều phối có toàn quyền thêm/bớt/gộp
+                                nhóm
                               </span>
                             </td>
                           </tr>
@@ -494,7 +515,7 @@ export default function ModeratorDashboard() {
           )}
 
           {activeMenu === "group-control" && (
-            <ModeratorGroupControl semester={selectedSemester} />
+            <ModeratorGroupControl semester={selectedSemester} onGroupUpdated={() => loadSemesterData(selectedSemester)} />
           )}
 
           {activeMenu === "profile" && (

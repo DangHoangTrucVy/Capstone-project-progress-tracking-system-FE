@@ -6,13 +6,12 @@ import {
   rejectRequest,
   inviteToGroup,
   withdrawRequest,
-  getApplicationVotes,
 } from "../../services/groupService";
 
 export default function GroupApplications({
   groupId,
   isLeader = false,
-  currentUserId,
+  onGroupUpdated,
 }) {
   const [applications, setApplications] = useState([]);
   const [invites, setInvites] = useState([]);
@@ -47,30 +46,38 @@ export default function GroupApplications({
   }, []);
 
   const fetchData = async () => {
-    if (!groupId || groupId.startsWith("temp-") || groupId.startsWith("leader-")) {
+    if (
+      !groupId ||
+      groupId.startsWith("temp-") ||
+      groupId.startsWith("leader-")
+    ) {
       setLoading(false);
       return;
     }
     try {
       const res = await getGroupRequests(groupId);
       const reqList = Array.isArray(res) ? res : res?.content || [];
-      
+
       const pendingApps = reqList.filter(
-        (item) => 
-          (!item.status || item.status === "PENDING") && 
-          (item.type === "APPLICATION" || item.type === "APPLY" || item.type === "APPLIED" || !item.type)
+        (item) =>
+          (!item.status || item.status === "PENDING") &&
+          (item.type === "APPLICATION" ||
+            item.type === "APPLY" ||
+            item.type === "APPLIED" ||
+            !item.type),
       );
       setApplications(pendingApps);
 
-      // SỬA LẠI ĐOẠN NÀY ĐỂ BẮT ĐÚNG CÁC KIỂU TYPE CỦA LỜI MỜI
       const pendingInvites = reqList.filter(
-        (item) => 
-          (!item.status || item.status === "PENDING") && 
-          (item.type === "INVITATION" || item.type === "INVITE" || item.type === "OFFER")
+        (item) =>
+          (!item.status || item.status === "PENDING") &&
+          (item.type === "INVITATION" ||
+            item.type === "INVITE" ||
+            item.type === "OFFER"),
       );
       setInvites(pendingInvites);
     } catch (err) {
-      console.error("Lỗi tải danh sách request:", err);
+      console.error("Lỗi tải danh sách yêu cầu:", err);
     } finally {
       setLoading(false);
     }
@@ -83,13 +90,16 @@ export default function GroupApplications({
   const handleApprove = (reqId) => {
     if (!isLeader) return;
     setDialog({
-      title: "Xác nhận duyệt đơn",
+      title: "Xác nhận duyệt đơn ứng tuyển",
       message:
-        "Bạn có chắc chắn muốn duyệt đơn ứng tuyển của sinh viên này không?",
+        "Bạn có chắc chắn muốn duyệt đơn ứng tuyển của sinh viên này vào nhóm không?",
       confirmText: "Duyệt đơn",
       action: async () => {
         await acceptRequest(reqId);
         await fetchData();
+        if (onGroupUpdated) {
+          await onGroupUpdated();
+        }
         showToast(
           "Đã duyệt đơn và thêm sinh viên vào nhóm thành công!",
           "success",
@@ -121,7 +131,7 @@ export default function GroupApplications({
 
     setDialog({
       title: "Xác nhận gửi lời mời",
-      message: `Gửi lời mời đến sinh viên MSSV ${inviteStudentId.trim().toUpperCase()}?`,
+      message: `Gửi lời mời tham gia nhóm đến sinh viên có mã số ${inviteStudentId.trim().toUpperCase()}?`,
       confirmText: "Gửi lời mời",
       action: async () => {
         setInviting(true);
@@ -151,7 +161,7 @@ export default function GroupApplications({
       action: async () => {
         await withdrawRequest(requestId);
         await fetchData();
-        showToast("Đã thu hồi lời mời.", "success");
+        showToast("Đã thu hồi lời mời thành công.", "success");
       },
     });
   };
@@ -159,22 +169,22 @@ export default function GroupApplications({
   if (loading) {
     return (
       <div className="p-6 text-xs text-[#6B635B]">
-        Đang tải danh sách ứng tuyển...
+        Đang tải danh sách đơn ứng tuyển...
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn text-[#2C2825]">
-      {/* 1. MỜI THÀNH VIÊN VÀO NHÓM (CÓ PHÂN QUYỀN LEADER / MEMBER) */}
+    <div className="space-y-6 font-sans text-[#2C2825]">
+      {/* 1. MỜI THÀNH VIÊN VÀO NHÓM */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-xs font-black uppercase text-[#6B635B]">
-            Mời thành viên vào nhóm bằng MSSV
+            Mời thành viên mới vào nhóm bằng Mã số sinh viên
           </h3>
           {!isLeader && (
             <span className="text-[10px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg">
-              Chỉ Nhóm Trưởng mới có quyền mời
+              Chỉ Trưởng nhóm mới có quyền mời thành viên
             </span>
           )}
         </div>
@@ -187,7 +197,7 @@ export default function GroupApplications({
             onChange={(e) => setInviteStudentId(e.target.value)}
             placeholder={
               isLeader
-                ? "Vui lòng nhập MSSV"
+                ? "Nhập mã số sinh viên (VD: HE123456)"
                 : "Chỉ Trưởng nhóm mới được phép mời thành viên"
             }
             className="flex-1 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl outline-none focus:border-[#E65100] disabled:opacity-60 disabled:cursor-not-allowed"
@@ -202,24 +212,46 @@ export default function GroupApplications({
           </button>
         </form>
         <p className="text-[11px] text-[#6B635B] italic">
-          * Lưu ý: Chức năng này chỉ thực hiện do quyền của Nhóm Trưởng.
+          * Lưu ý: Tính năng này chỉ dành riêng cho quyền hạn của Trưởng nhóm.
         </p>
 
-       {invites.length > 0 && (
+        {invites.length > 0 && (
           <div className="pt-2 space-y-2">
-            <p className="text-[11px] font-bold text-[#6B635B]">Các lời mời đang chờ:</p>
+            <p className="text-[11px] font-bold text-[#6B635B]">
+              Các lời mời đang chờ phản hồi:
+            </p>
             {invites.map((inv) => {
-              // Bóc tách dữ liệu chuẩn từ object student hoặc cấp ngoài cùng
               const student = inv.student || {};
-              const name = student.fullName || inv.fullName || inv.userFullName || "Không rõ tên";
-              const code = student.studentCode || inv.studentCode || inv.userCode || inv.userEmail || "N/A";
+              const name =
+                student.fullName ||
+                inv.fullName ||
+                inv.userFullName ||
+                "Không rõ tên";
+              const code =
+                student.studentCode ||
+                inv.studentCode ||
+                inv.userCode ||
+                inv.userEmail ||
+                "N/A";
 
               return (
-                <div key={inv.id} className="flex justify-between items-center bg-[#FBF9F5] p-3 rounded-xl border border-[#E8E2D9] text-xs">
-                  <span>Thành viên: <strong>{name}</strong></span>
-                  <span>MSSV: <strong>{code}</strong></span>
+                <div
+                  key={inv.id}
+                  className="flex justify-between items-center bg-[#FBF9F5] p-3 rounded-xl border border-[#E8E2D9] text-xs"
+                >
+                  <span>
+                    Thành viên: <strong>{name}</strong>
+                  </span>
+                  <span>
+                    Mã số sinh viên: <strong>{code}</strong>
+                  </span>
                   {isLeader && (
-                    <button onClick={() => handleRevokeInvite(inv.id)} className="text-red-600 font-bold hover:underline cursor-pointer">Thu hồi</button>
+                    <button
+                      onClick={() => handleRevokeInvite(inv.id)}
+                      className="text-red-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Thu hồi
+                    </button>
                   )}
                 </div>
               );
@@ -232,11 +264,11 @@ export default function GroupApplications({
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-xs font-black uppercase text-[#6B635B]">
-            Danh sách đơn Apply chờ xét duyệt ({applications.length})
+            Danh sách đơn ứng tuyển chờ xét duyệt ({applications.length})
           </h3>
           <span className="text-[11px] text-[#6B635B] font-medium">
             {isLeader
-              ? "Bạn có quyền duyệt hoặc từ chối đơn"
+              ? "Bạn có quyền xét duyệt hoặc từ chối đơn"
               : "Bạn đang xem ở chế độ Thành viên"}
           </span>
         </div>
@@ -244,7 +276,6 @@ export default function GroupApplications({
         {applications.length > 0 ? (
           <div className="space-y-3">
             {applications.map((app) => {
-              // Lấy đúng dữ liệu từ object student và format ngày giờ tạo
               const student = app.student || {};
               const studentName =
                 student.fullName ||
@@ -256,7 +287,6 @@ export default function GroupApplications({
               const studentEmail =
                 student.email || app.email || app.userEmail || "N/A";
 
-              // Format ngày giờ tạo createdAt từ chuẩn ISO sang định dạng dễ đọc VN
               let formattedDate = "N/A";
               if (app.createdAt) {
                 const dateObj = new Date(app.createdAt);
@@ -280,9 +310,9 @@ export default function GroupApplications({
                       {studentName}
                     </p>
                     <p className="text-[11px] text-[#6B635B]">
-                      MSSV:{" "}
+                      Mã số sinh viên:{" "}
                       <strong className="text-[#2C2825]">{studentCode}</strong>{" "}
-                      | Gmail:{" "}
+                      | Thư điện tử:{" "}
                       <strong className="text-[#2C2825]">{studentEmail}</strong>
                     </p>
                     <p className="text-[11px] text-[#6B635B]">
@@ -292,7 +322,7 @@ export default function GroupApplications({
                       </strong>
                     </p>
                     <p className="text-[11px] text-[#6B635B] bg-white p-2.5 rounded-xl border border-[#E8E2D9] mt-1">
-                      <strong>Hồ sơ năng lực / Lời nhắn:</strong>{" "}
+                      <strong>Hồ sơ năng lực & Lời nhắn:</strong>{" "}
                       {app.message ||
                         student.skills ||
                         student.strengths ||
@@ -300,7 +330,6 @@ export default function GroupApplications({
                     </p>
                   </div>
 
-                  {/* Chỉ Leader mới có nút Duyệt / Từ chối */}
                   {isLeader ? (
                     <div className="flex gap-2 shrink-0">
                       <button
@@ -318,7 +347,7 @@ export default function GroupApplications({
                     </div>
                   ) : (
                     <span className="px-3 py-1.5 bg-gray-100 text-gray-600 font-bold rounded-xl text-[11px] shrink-0">
-                      Chờ Nhóm Trưởng xử lý
+                      Chờ Trưởng nhóm xử lý
                     </span>
                   )}
                 </div>
@@ -327,12 +356,12 @@ export default function GroupApplications({
           </div>
         ) : (
           <p className="text-xs text-[#6B635B] italic">
-            Chưa có sinh viên nào nộp đơn apply vào nhóm.
+            Chưa có sinh viên nào nộp đơn ứng tuyển vào nhóm.
           </p>
         )}
       </div>
 
-      {/* Modal từ chối đơn dành cho Leader */}
+      {/* Modal từ chối đơn */}
       {rejectingApp && isLeader && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <form
@@ -347,7 +376,7 @@ export default function GroupApplications({
               onChange={(e) => setRejectReason(e.target.value)}
               rows={3}
               required
-              placeholder="Nhập lý do từ chối..."
+              placeholder="Nhập lý do từ chối rõ ràng..."
               className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] p-3 text-xs outline-none focus:border-red-500"
             />
             <div className="flex justify-end gap-2">
@@ -392,7 +421,7 @@ export default function GroupApplications({
                 onClick={() => setDialog(null)}
                 className="rounded-xl border border-[#E8E2D9] px-5 py-2.5 text-xs font-bold text-[#6B635B] cursor-pointer"
               >
-                Hủy
+                Hủy bỏ
               </button>
               <button
                 type="button"
