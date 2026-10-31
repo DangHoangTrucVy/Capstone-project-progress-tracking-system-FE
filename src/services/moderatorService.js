@@ -33,20 +33,21 @@ export const dissolveGroupsBatch = async (groupIds) => {
 };
 
 // 6. Đưa sinh viên lẻ vào nhóm (kể cả nhóm đang khóa, tối đa 5 người) (7.1)
-export const addStudentToGroup = async (groupId, studentId) => {
-  const response = await api.post(`/groups/${groupId}/moderation/add`, { studentId });
+// Backend (ModerationController.StudentBody) đọc trường "userId", không phải "studentId".
+export const addStudentToGroup = async (groupId, userId) => {
+  const response = await api.post(`/groups/${groupId}/moderation/add`, { userId });
   return response.data;
 };
 
 // 7. Chuyển sinh viên từ nhóm hiện tại sang nhóm khác (7.1)
-export const moveStudentToGroup = async (targetGroupId, studentId) => {
-  const response = await api.post(`/groups/${targetGroupId}/moderation/move`, { studentId });
+export const moveStudentToGroup = async (targetGroupId, userId) => {
+  const response = await api.post(`/groups/${targetGroupId}/moderation/move`, { userId });
   return response.data;
 };
 
 // 8. Đưa sinh viên ra khỏi nhóm kèm lý do (7.1)
-export const removeStudentFromGroup = async (groupId, studentId, reason) => {
-  const response = await api.post(`/groups/${groupId}/moderation/remove`, { studentId, reason });
+export const removeStudentFromGroup = async (groupId, userId, reason) => {
+  const response = await api.post(`/groups/${groupId}/moderation/remove`, { userId, reason });
   return response.data;
 };
 

@@ -90,13 +90,10 @@ export default function ModeratorGroupControl({ semester }) {
     setTargetGroup(group);
     setSelectedStudentId("");
     try {
-      const res = await api
-        .get(`/semesters/${semester}/students?hasGroup=false`)
-        .catch(() => ({ data: [] }));
-      const list = Array.isArray(res.data)
-        ? res.data
-        : res.data.content || res.data.items || [];
-      setUnassignedStudents(list);
+      const res = await api.get(`/semesters/${semester}/students?hasGroup=false&size=100`).catch(() => ({ data: [] }));
+      const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
+      // Nhóm chỉ gồm sinh viên cùng ngành (backend trả OTHER_MAJOR nếu khác ngành) => chỉ hiện SV cùng ngành với nhóm.
+      setUnassignedStudents(list.filter((s) => !group.majorCode || s.majorCode === group.majorCode));
     } catch {
       setUnassignedStudents([]);
     }
@@ -494,7 +491,7 @@ export default function ModeratorGroupControl({ semester }) {
               >
                 <option value="">-- Chọn sinh viên --</option>
                 {unassignedStudents.map((s) => (
-                  <option key={s.id || s.studentCode} value={s.userId || s.id}>
+                  <option key={s.userId || s.enrollmentId} value={s.userId}>
                     {s.fullName} ({s.studentCode || s.email})
                   </option>
                 ))}
