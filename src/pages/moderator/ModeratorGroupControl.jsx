@@ -6,6 +6,7 @@ import {
   removeStudentFromGroup,
   mergeGroups,
   assignGroupLeaderDirectly,
+  createGroupForStudents,
   checkFinalizeScope,
   finalizeScope,
   reopenScope,
@@ -15,7 +16,7 @@ import api from "../../services/api";
 export default function ModeratorGroupControl({ semester }) {
   const [groups, setGroups] = useState([]);
   const [scopes, setScopes] = useState([]);
-  const [unassignedList, setUnassignedList] = useState([]); // Danh sách sinh viên chưa có nhóm
+  const [unassignedList, setUnassignedList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal thêm sinh viên vào nhóm
@@ -34,6 +35,31 @@ export default function ModeratorGroupControl({ semester }) {
   const [mergeModalOpen, setMergeModalOpen] = useState(false);
   const [sourceGroups, setSourceGroups] = useState([]);
   const [selectedSourceGroupId, setSelectedSourceGroupId] = useState("");
+
+  // Modal tạo nhóm mới cho sinh viên lẻ & chỉ định Leader
+  const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
+  const [selectedScopeId, setSelectedScopeId] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupLeaderId, setNewGroupLeaderId] = useState("");
+  const [newGroupMemberIds, setNewGroupMemberIds] = useState([]);
+
+  // Modal nhập lý do khi đưa sinh viên ra khỏi nhóm
+  const [removeModalOpen, setRemoveModalOpen] = useState(false);
+  const [removingTarget, setRemovingTarget] = useState({ groupId: null, studentId: null, studentName: "" });
+  const [removeReason, setRemoveReason] = useState("");
+
+  // Modal nhập lý do khi mở lại danh sách
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [reopeningScopeId, setReopeningScopeId] = useState(null);
+  const [reopenReason, setReopenReason] = useState("");
+
+  // Modal xác nhận chốt danh sách
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [scopeToFinalize, setScopeToFinalize] = useState(null);
+
+  // Modal xác nhận chỉ định trưởng nhóm (Thay thế window.confirm)
+  const [leaderModalOpen, setLeaderModalOpen] = useState(false);
+  const [leaderTarget, setLeaderTarget] = useState({ groupId: null, userId: null, userName: "" });
 
   const [toast, setToast] = useState({
     show: false,
@@ -72,6 +98,9 @@ export default function ModeratorGroupControl({ semester }) {
         ? scopesRes.data
         : scopesRes.data.content || [];
       setScopes(scopeList);
+      if (scopeList.length > 0 && !selectedScopeId) {
+        setSelectedScopeId(scopeList[0].id || scopeList[0].scopeId);
+      }
 
       const unassignedData = Array.isArray(unassignedRes.data)
         ? unassignedRes.data
@@ -85,14 +114,12 @@ export default function ModeratorGroupControl({ semester }) {
     }
   };
 
-  // Mở modal thêm sinh viên lẻ
   const handleOpenAddModal = async (group) => {
     setTargetGroup(group);
     setSelectedStudentId("");
     try {
       const res = await api.get(`/semesters/${semester}/students?hasGroup=false&size=100`).catch(() => ({ data: [] }));
       const list = Array.isArray(res.data) ? res.data : res.data.content || res.data.items || [];
-      // Nhóm chỉ gồm sinh viên cùng ngành (backend trả OTHER_MAJOR nếu khác ngành) => chỉ hiện SV cùng ngành với nhóm.
       setUnassignedStudents(list.filter((s) => !group.majorCode || s.majorCode === group.majorCode));
     } catch {
       setUnassignedStudents([]);
@@ -105,7 +132,6 @@ export default function ModeratorGroupControl({ semester }) {
     if (!targetGroup || !selectedStudentId) return;
 
     try {
-      // selectedStudentId đang được truyền lên API
       await addStudentToGroup(targetGroup.id, selectedStudentId);
       showToast("Đã thêm sinh viên vào nhóm thành công!");
       setAddModalOpen(false);
@@ -118,7 +144,33 @@ export default function ModeratorGroupControl({ semester }) {
     }
   };
 
-  // Chuyển sinh viên sang nhóm khác
+  const handleConfirmCreateGroup = async (e) => {
+    e.preventDefault();
+    if (!selectedScopeId || !newGroupName.trim() || !newGroupLeaderId) {
+      showToast("Vui lòng điền đủ tên nhóm, chọn Trưởng nhóm và ít nhất một thành viên.", "error");
+      return;
+    }
+
+    try {
+      await createGroupForStudents(selectedScopeId, {
+        name: newGroupName.trim(),
+        leaderUserId: newGroupLeaderId,
+        memberUserIds: newGroupMemberIds.length > 0 ? newGroupMemberIds : [newGroupLeaderId],
+      });
+      showToast("Tạo nhóm mới và chỉ định Trưởng nhóm thành công!");
+      setCreateGroupModalOpen(false);
+      setNewGroupName("");
+      setNewGroupLeaderId("");
+      setNewGroupMemberIds([]);
+      loadData(semester);
+    } catch (error) {
+      showToast(
+        error.response?.data?.message || "Không thể tạo nhóm mới.",
+        "error",
+      );
+    }
+  };
+
   const handleOpenMoveModal = (student, currentGrpId) => {
     setMovingStudent(student);
     setSourceGroupId(currentGrpId);
@@ -146,7 +198,6 @@ export default function ModeratorGroupControl({ semester }) {
     }
   };
 
-  // Gộp nhóm
   const handleOpenMergeModal = (group) => {
     setTargetGroup(group);
     setSelectedSourceGroupId("");
@@ -172,16 +223,20 @@ export default function ModeratorGroupControl({ semester }) {
     }
   };
 
-  // Đưa sinh viên ra khỏi nhóm
-  const handleRemoveStudent = async (groupId, studentId, studentName) => {
-    const reason = window.prompt(
-      `Nhập lý do đưa sinh viên ${studentName} ra khỏi nhóm:`,
-    );
-    if (!reason || !reason.trim()) return;
+  const handleOpenRemoveModal = (groupId, studentId, studentName) => {
+    setRemovingTarget({ groupId, studentId, studentName });
+    setRemoveReason("");
+    setRemoveModalOpen(true);
+  };
+
+  const handleConfirmRemoveStudent = async (e) => {
+    e.preventDefault();
+    if (!removeReason.trim()) return;
 
     try {
-      await removeStudentFromGroup(groupId, studentId, reason.trim());
+      await removeStudentFromGroup(removingTarget.groupId, removingTarget.studentId, removeReason.trim());
       showToast("Đã đưa sinh viên ra khỏi nhóm.");
+      setRemoveModalOpen(false);
       loadData(semester);
     } catch (error) {
       showToast(
@@ -191,20 +246,26 @@ export default function ModeratorGroupControl({ semester }) {
     }
   };
 
-  // Chỉ định Leader trực tiếp
-  const handleMakeLeader = async (groupId, userId, userName) => {
-    if (!window.confirm(`Chỉ định ${userName} làm Leader mới của nhóm?`))
-      return;
+  // Mở modal xác nhận chỉ định Trưởng nhóm
+  const handleMakeLeader = (groupId, userId, userName) => {
+    setLeaderTarget({ groupId, userId, userName });
+    setLeaderModalOpen(true);
+  };
 
+  // Thực thi gọi API đổi Trưởng nhóm
+  const executeMakeLeader = async () => {
+    if (!leaderTarget.groupId || !leaderTarget.userId) return;
     try {
-      await assignGroupLeaderDirectly(groupId, userId);
-      showToast(`Đã đổi Leader thành công sang ${userName}!`);
+      await assignGroupLeaderDirectly(leaderTarget.groupId, leaderTarget.userId);
+      showToast(`Đã đổi Trưởng nhóm thành công sang ${leaderTarget.userName}!`);
+      setLeaderModalOpen(false);
       loadData(semester);
     } catch (error) {
       showToast(
-        error.response?.data?.message || "Không thể đổi Leader.",
+        error.response?.data?.message || "Không thể đổi Trưởng nhóm.",
         "error",
       );
+      setLeaderModalOpen(false);
     }
   };
 
@@ -217,23 +278,38 @@ export default function ModeratorGroupControl({ semester }) {
       }
     } catch {}
 
-    if (!window.confirm("Chốt danh sách phạm vi ngành này?")) return;
+    setScopeToFinalize(scopeId);
+    setConfirmModalOpen(true);
+  };
+
+  const executeFinalize = async () => {
+    if (!scopeToFinalize) return;
     try {
-      await finalizeScope(scopeId);
+      await finalizeScope(scopeToFinalize);
       showToast("Chốt danh sách thành công!");
+      setConfirmModalOpen(false);
+      setScopeToFinalize(null);
       loadData(semester);
     } catch (error) {
       showToast(error.response?.data?.message || "Chốt thất bại.", "error");
+      setConfirmModalOpen(false);
     }
   };
 
-  const handleReopen = async (scopeId) => {
-    const reason = window.prompt("Nhập lý do mở lại danh sách đã chốt:");
-    if (!reason || !reason.trim()) return;
+  const handleOpenReopenModal = (scopeId) => {
+    setReopeningScopeId(scopeId);
+    setReopenReason("");
+    setReopenModalOpen(true);
+  };
+
+  const handleConfirmReopen = async (e) => {
+    e.preventDefault();
+    if (!reopenReason.trim()) return;
 
     try {
-      await reopenScope(scopeId, reason.trim());
+      await reopenScope(reopeningScopeId, reopenReason.trim());
       showToast("Đã mở lại danh sách thành công!");
+      setReopenModalOpen(false);
       loadData(semester);
     } catch (error) {
       showToast(error.response?.data?.message || "Mở lại thất bại.", "error");
@@ -253,14 +329,23 @@ export default function ModeratorGroupControl({ semester }) {
       <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs flex-wrap gap-4">
         <div>
           <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-            MODERATOR · ĐIỀU PHỐI CHI TIẾT NHÓM (7.1)
+            ĐIỀU PHỐI VIÊN · ĐIỀU PHỐI CHI TIẾT NHÓM
           </span>
           <h1 className="text-xl font-black text-[#2C2825] mt-1">
-            Quản lý thành viên, thêm/bớt, chuyển nhóm, gộp nhóm & Chỉ định
-            Leader
+            Quản lý thành viên, thêm/bớt, chuyển nhóm, gộp nhóm & Chỉ định Trưởng nhóm
           </h1>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {unassignedList.length > 0 && (
+            <button
+              onClick={() => setCreateGroupModalOpen(true)}
+              className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer transition flex items-center gap-1.5"
+            >
+              <span>✨</span>
+              <span>Tạo nhóm cho SV lẻ</span>
+            </button>
+          )}
+
           {scopes.map((sc) => {
             const scId = sc.id || sc.scopeId;
             const isFinalized = sc.finalized;
@@ -272,7 +357,7 @@ export default function ModeratorGroupControl({ semester }) {
                 <span className="font-bold">{sc.majorName || sc.major}</span>
                 {isFinalized ? (
                   <button
-                    onClick={() => handleReopen(scId)}
+                    onClick={() => handleOpenReopenModal(scId)}
                     className="px-2.5 py-1 bg-amber-50 text-amber-700 font-bold rounded-lg border border-amber-200 cursor-pointer"
                   >
                     🔓 Mở lại
@@ -291,15 +376,14 @@ export default function ModeratorGroupControl({ semester }) {
         </div>
       </div>
 
-      {/* 💡 DANH SÁCH SINH VIÊN CHƯA CÓ NHÓM DẠNG BẢNG (STT, MSSV, HỌ VÀ TÊN) */}
+      {/* DANH SÁCH SINH VIÊN CHƯA CÓ NHÓM */}
       <div className="bg-white border border-[#E8E2D9] rounded-2xl p-6 shadow-xs space-y-4">
         <div>
           <h3 className="text-sm font-black text-[#2C2825]">
             🎓 Danh sách sinh viên chưa có nhóm ({unassignedList.length})
           </h3>
           <p className="text-[11px] text-[#6B635B]">
-            Các sinh viên lẻ chưa thuộc nhóm nào trong học kỳ này để Moderator
-            chủ động phân bổ.
+            Các sinh viên lẻ chưa thuộc nhóm nào trong học kỳ này để điều phối viên chủ động phân bổ.
           </p>
         </div>
 
@@ -307,11 +391,10 @@ export default function ModeratorGroupControl({ semester }) {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                <th className="p-3 font-black uppercase w-16 text-center">
-                  STT
-                </th>
-                <th className="p-3 font-black uppercase">MSSV</th>
+                <th className="p-3 font-black uppercase w-16 text-center">STT</th>
+                <th className="p-3 font-black uppercase">Mã số sinh viên</th>
                 <th className="p-3 font-black uppercase">Họ và tên</th>
+                <th className="p-3 font-black uppercase">Email</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E2D9]">
@@ -324,18 +407,21 @@ export default function ModeratorGroupControl({ semester }) {
                     <td className="p-3 text-center font-bold text-[#6B635B]">
                       {index + 1}
                     </td>
-                    <td className="p-3 font-mono font-bold text-[#E65100]">
+                    <td className="p-3 font-mono font-bold text-[#171311]">
                       {stu.studentCode || stu.code || "—"}
                     </td>
                     <td className="p-3 font-bold text-[#2C2825]">
                       {stu.fullName || stu.name || "—"}
+                    </td>
+                    <td className="p-3 text-[#6B635B]">
+                      {stu.email || stu.userEmail || "—"}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan="3"
+                    colSpan="4"
                     className="p-8 text-center text-[#6B635B] italic"
                   >
                     Tuyệt vời! Tất cả sinh viên trong học kỳ đều đã có nhóm.
@@ -372,7 +458,7 @@ export default function ModeratorGroupControl({ semester }) {
                     </h3>
                     <p className="text-[11px] text-[#6B635B]">
                       Sĩ số: {count}/5 thành viên • Trạng thái:{" "}
-                      {g.status || "Hoạt động"}
+                      {g.locked || g.isLocked ? "Đã khóa" : "Đang mở"}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -394,63 +480,74 @@ export default function ModeratorGroupControl({ semester }) {
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {members.map((m) => (
-                    <div
-                      key={m.userId || m.id}
-                      className="p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl flex justify-between items-center text-xs"
-                    >
-                      <div>
-                        <p className="font-bold text-[#2C2825]">
-                          {m.userFullName || m.fullName}{" "}
-                          {m.isLeader && (
-                            <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">
-                              Leader
-                            </span>
+                  {members.map((m) => {
+                    const isLeader = Boolean(m.isLeader || m.leader || m.role === "LEADER" || m.position === "LEADER");
+                    const studentCode = m.studentCode || m.code || m.userCode || "";
+                    return (
+                      <div
+                        key={m.userId || m.id}
+                        className="p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl flex justify-between items-center text-xs"
+                      >
+                        <div>
+                          <p className="font-bold text-[#462309] flex items-center gap-1.5 flex-wrap">
+                            <span>{m.userFullName || m.fullName}</span>
+                            {isLeader ? (
+                              <span className="text-[9.5px] bg-cyan-400 text-shadow-cyan-400 px-1.5 py-0.5 rounded font-bold">
+                                Trưởng nhóm
+                              </span>
+                            ) : (
+                              <span className="text-[9.5px] bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded font-bold">
+                                Thành viên
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-[#080706] font-stretch-75% font-bold mt-1">
+                           MSSV: {studentCode}
+                          </p>
+                          <p className="text-[10px] text-[#6B635B]">
+                            {m.userEmail || m.email}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenMoveModal(m, g.id)}
+                            title="Chuyển sang nhóm khác"
+                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-bold text-[10px] cursor-pointer"
+                          >
+                            ⇄
+                          </button>
+                          {!isLeader && (
+                            <button
+                              onClick={() =>
+                                handleMakeLeader(
+                                  g.id,
+                                  m.userId || m.id,
+                                  m.userFullName || m.fullName,
+                                )
+                              }
+                              title="Chỉ định làm Trưởng nhóm"
+                              className="p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg font-bold text-[10px] cursor-pointer"
+                            >
+                              ⭐
+                            </button>
                           )}
-                        </p>
-                        <p className="text-[10px] text-[#6B635B]">
-                          {m.userEmail || m.email}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenMoveModal(m, g.id)}
-                          title="Chuyển sang nhóm khác"
-                          className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-bold text-[10px] cursor-pointer"
-                        >
-                          ⇄
-                        </button>
-                        {!m.isLeader && (
                           <button
                             onClick={() =>
-                              handleMakeLeader(
+                              handleOpenRemoveModal(
                                 g.id,
                                 m.userId || m.id,
                                 m.userFullName || m.fullName,
                               )
                             }
-                            title="Chỉ định làm Leader"
-                            className="p-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg font-bold text-[10px] cursor-pointer"
+                            title="Đưa ra khỏi nhóm"
+                            className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] cursor-pointer"
                           >
-                            ⭐
+                            ✕
                           </button>
-                        )}
-                        <button
-                          onClick={() =>
-                            handleRemoveStudent(
-                              g.id,
-                              m.userId || m.id,
-                              m.userFullName || m.fullName,
-                            )
-                          }
-                          title="Đưa ra khỏi nhóm"
-                          className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] cursor-pointer"
-                        >
-                          ✕
-                        </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -462,9 +559,139 @@ export default function ModeratorGroupControl({ semester }) {
         )}
       </div>
 
+      {/* MODAL TẠO NHÓM MỚI CHO SINH VIÊN LẺ & CHỈ ĐỊNH LEADER */}
+      {createGroupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleConfirmCreateGroup}
+            className="w-full max-w-lg space-y-5 rounded-3xl bg-white p-7 shadow-2xl text-xs"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-sm font-black text-[#2C2825]">
+                Tạo nhóm mới cho sinh viên chưa có nhóm
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCreateGroupModalOpen(false)}
+                className="font-bold text-gray-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <label className="block space-y-1 font-bold">
+                Chọn phạm vi ngành (Scope):
+                <select
+                  value={selectedScopeId}
+                  onChange={(e) => setSelectedScopeId(e.target.value)}
+                  required
+                  className="w-full mt-1 p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] outline-none"
+                >
+                  {scopes.map((sc) => {
+                    const scId = sc.id || sc.scopeId;
+                    return (
+                      <option key={scId} value={scId}>
+                        {sc.majorName || sc.major}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+
+              <label className="block space-y-1 font-bold">
+                Tên nhóm mới:
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Ví dụ: Nhóm 01 hoặc SE_Group_01"
+                  required
+                  className="w-full mt-1 p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] outline-none"
+                />
+              </label>
+
+              <label className="block space-y-1 font-bold">
+                Chỉ định Trưởng nhóm:
+                <select
+                  value={newGroupLeaderId}
+                  onChange={(e) => {
+                    const lId = e.target.value;
+                    setNewGroupLeaderId(lId);
+                    if (lId && !newGroupMemberIds.includes(lId)) {
+                      setNewGroupMemberIds([...newGroupMemberIds, lId]);
+                    }
+                  }}
+                  required
+                  className="w-full mt-1 p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] outline-none"
+                >
+                  <option value="">-- Chọn sinh viên làm Trưởng nhóm --</option>
+                  {unassignedList.map((s) => (
+                    <option key={s.userId || s.id} value={s.userId || s.id}>
+                      {s.fullName} ({s.studentCode || s.email})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="space-y-1 font-bold">
+                <p>Chọn các thành viên tham gia nhóm (Tối đa 5 người):</p>
+                <div className="max-h-40 overflow-y-auto border border-[#E8E2D9] rounded-xl p-3 bg-[#FBF9F5] space-y-2">
+                  {unassignedList.map((s) => {
+                    const sId = s.userId || s.id;
+                    const isChecked = newGroupMemberIds.includes(sId);
+                    return (
+                      <label key={sId} className="flex items-center gap-2 cursor-pointer font-normal">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              if (newGroupMemberIds.length >= 5) {
+                                showToast("Mỗi nhóm tối đa 5 thành viên.", "error");
+                                return;
+                              }
+                              setNewGroupMemberIds([...newGroupMemberIds, sId]);
+                            } else {
+                              if (sId === newGroupLeaderId) {
+                                showToast("Không thể bỏ chọn Trưởng nhóm khỏi danh sách thành viên.", "error");
+                                return;
+                              }
+                              setNewGroupMemberIds(newGroupMemberIds.filter((id) => id !== sId));
+                            }
+                          }}
+                          className="rounded border-[#E8E2D9] text-[#E65100] focus:ring-0"
+                        />
+                        <span>{s.fullName} — <strong className="font-mono">{s.studentCode}</strong> ({s.email})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                onClick={() => setCreateGroupModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl cursor-pointer transition"
+              >
+                Xác nhận tạo nhóm
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* MODAL THÊM SINH VIÊN VÀO NHÓM */}
       {addModalOpen && targetGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmAddStudent}
             className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
@@ -476,7 +703,7 @@ export default function ModeratorGroupControl({ semester }) {
               <button
                 type="button"
                 onClick={() => setAddModalOpen(false)}
-                className="font-bold text-gray-400"
+                className="font-bold text-gray-400 cursor-pointer"
               >
                 ✕
               </button>
@@ -501,13 +728,13 @@ export default function ModeratorGroupControl({ semester }) {
               <button
                 type="button"
                 onClick={() => setAddModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 font-bold rounded-xl"
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl"
+                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl cursor-pointer"
               >
                 Xác nhận thêm
               </button>
@@ -518,7 +745,7 @@ export default function ModeratorGroupControl({ semester }) {
 
       {/* MODAL CHUYỂN SINH VIÊN SANG NHÓM KHÁC */}
       {moveModalOpen && movingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmMoveStudent}
             className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
@@ -531,7 +758,7 @@ export default function ModeratorGroupControl({ semester }) {
               <button
                 type="button"
                 onClick={() => setMoveModalOpen(false)}
-                className="font-bold text-gray-400"
+                className="font-bold text-gray-400 cursor-pointer"
               >
                 ✕
               </button>
@@ -558,13 +785,13 @@ export default function ModeratorGroupControl({ semester }) {
               <button
                 type="button"
                 onClick={() => setMoveModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 font-bold rounded-xl"
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl"
+                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl cursor-pointer"
               >
                 Xác nhận chuyển
               </button>
@@ -575,7 +802,7 @@ export default function ModeratorGroupControl({ semester }) {
 
       {/* MODAL GỘP NHÓM */}
       {mergeModalOpen && targetGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmMerge}
             className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
@@ -587,7 +814,7 @@ export default function ModeratorGroupControl({ semester }) {
               <button
                 type="button"
                 onClick={() => setMergeModalOpen(false)}
-                className="font-bold text-gray-400"
+                className="font-bold text-gray-400 cursor-pointer"
               >
                 ✕
               </button>
@@ -616,18 +843,218 @@ export default function ModeratorGroupControl({ semester }) {
               <button
                 type="button"
                 onClick={() => setMergeModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 font-bold rounded-xl"
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl"
+                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl cursor-pointer"
               >
                 Xác nhận gộp nhóm
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* MODAL NHẬP LÝ DO ĐƯA SINH VIÊN RA KHỎI NHÓM */}
+      {removeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleConfirmRemoveStudent}
+            className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-sm font-black text-[#2C2825]">
+                Đưa sinh viên ra khỏi nhóm
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRemoveModalOpen(false)}
+                className="font-bold text-gray-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-[#6B635B]">
+              Bạn đang đưa sinh viên <strong className="text-[#2C2825]">{removingTarget.studentName}</strong> ra khỏi nhóm. Vui lòng nhập lý do bên dưới:
+            </p>
+            <textarea
+              value={removeReason}
+              onChange={(e) => setRemoveReason(e.target.value)}
+              placeholder="Nhập lý do chi tiết..."
+              required
+              rows={3}
+              className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] outline-none"
+            />
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                onClick={() => setRemoveModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl cursor-pointer"
+              >
+                Xác nhận đưa ra
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL NHẬP LÝ DO MỞ LẠI DANH SÁCH */}
+      {reopenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleConfirmReopen}
+            className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
+          >
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-sm font-black text-[#2C2825]">
+                Mở lại danh sách đã chốt
+              </h3>
+              <button
+                type="button"
+                onClick={() => setReopenModalOpen(false)}
+                className="font-bold text-gray-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-[#6B635B]">
+              Vui lòng nhập lý do mở lại danh sách phạm vi ngành này:
+            </p>
+            <textarea
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              placeholder="Nhập lý do mở lại..."
+              required
+              rows={3}
+              className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] outline-none"
+            />
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                onClick={() => setReopenModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-amber-600 text-white font-bold rounded-xl cursor-pointer"
+              >
+                Xác nhận mở lại
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL XÁC NHẬN CHỐT DANH SÁCH */}
+      {confirmModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md space-y-5 rounded-3xl bg-white p-6 shadow-2xl text-xs">
+            <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
+              <h3 className="text-sm font-black text-[#2C2825]">
+                Xác nhận chốt danh sách
+              </h3>
+              <button
+                type="button"
+                onClick={() => setConfirmModalOpen(false)}
+                className="font-bold text-gray-400 hover:text-[#2C2825] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex items-start gap-3.5 py-1">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg shrink-0">
+                🔒
+              </div>
+              <div>
+                <p className="font-bold text-[#2C2825] text-sm">
+                  Bạn có chắc chắn muốn chốt danh sách phạm vi ngành này không?
+                </p>
+                <p className="text-[11px] text-[#6B635B] mt-1">
+                  Sau khi chốt, các thay đổi lớn sẽ bị hạn chế theo quy định của học kỳ.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[#E8E2D9] pt-4">
+              <button
+                type="button"
+                onClick={() => setConfirmModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#6B635B] font-bold rounded-xl cursor-pointer transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={executeFinalize}
+                className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl cursor-pointer shadow-md transition"
+              >
+                Xác nhận chốt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XÁC NHẬN CHỈ ĐỊNH TRƯỞNG NHÓM (THAY THẾ WINDOW.CONFIRM) */}
+      {leaderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md space-y-5 rounded-3xl bg-white p-6 shadow-2xl text-xs">
+            <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
+              <h3 className="text-sm font-black text-[#2C2825]">
+                Xác nhận chỉ định Trưởng nhóm
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLeaderModalOpen(false)}
+                className="font-bold text-gray-400 hover:text-[#2C2825] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex items-start gap-3.5 py-1">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-center text-lg shrink-0">
+                ⭐
+              </div>
+              <div>
+                <p className="font-bold text-[#2C2825] text-sm">
+                  Chỉ định <span className="text-[#E65100]">{leaderTarget.userName}</span> làm Trưởng nhóm mới của nhóm?
+                </p>
+                <p className="text-[11px] text-[#6B635B] mt-1">
+                  Quyền trưởng nhóm cũ sẽ được thay thế bằng thành viên này ngay lập tức.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[#E8E2D9] pt-4">
+              <button
+                type="button"
+                onClick={() => setLeaderModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#6B635B] font-bold rounded-xl cursor-pointer transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={executeMakeLeader}
+                className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl cursor-pointer shadow-md transition"
+              >
+                Xác nhận đổi
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

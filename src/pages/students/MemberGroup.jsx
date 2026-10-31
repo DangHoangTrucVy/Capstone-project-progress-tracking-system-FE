@@ -10,11 +10,16 @@ import {
   cancelLeaderTransfer,
 } from "../../services/groupService";
 
-export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupUpdated }) {
+export default function MemberGroup({
+  groupId,
+  isLeader,
+  currentUserId,
+  onGroupUpdated,
+}) {
   const [groupData, setGroupData] = useState(null);
   const [memberInput, setMemberInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [leaderTransfers, setLeaderTransfers] = useState([]); // 👈 Thêm state quản lý transfer
+  const [leaderTransfers, setLeaderTransfers] = useState([]);
 
   const [dialog, setDialog] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -34,7 +39,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
       title: type === "success" ? "Thành công" : "Có lỗi xảy ra",
       message,
       type,
-      confirmText: "OK",
+      confirmText: "Đã hiểu",
       action: null,
     });
   };
@@ -66,10 +71,15 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
 
       setGroupData(groupRes);
 
-      const transferList = Array.isArray(transfersRes) ? transfersRes : transfersRes?.content || [];
-      // Lọc các yêu cầu liên quan đến nhóm này và đang PENDING
+      const transferList = Array.isArray(transfersRes)
+        ? transfersRes
+        : transfersRes?.content || [];
       setLeaderTransfers(
-        transferList.filter((item) => item.status === "PENDING" && String(item.groupId) === String(groupId))
+        transferList.filter(
+          (item) =>
+            item.status === "PENDING" &&
+            String(item.groupId) === String(groupId),
+        ),
       );
     } catch (err) {
       console.error("Lỗi lấy thông tin nhóm hoặc transfer:", err);
@@ -94,7 +104,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
 
     if (membersList.length >= 5) {
       showNotice(
-        "Nhóm đã đạt số lượng tối đa (5 thành viên). Không thể thêm mới!",
+        "Nhóm đã đạt số lượng thành viên tối đa (5 thành viên). Không thể thêm mới!",
         "error",
       );
       return;
@@ -109,7 +119,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
 
       setMemberInput("");
       showNotice(
-        "Đã gửi lời mời. Sinh viên cần chấp nhận lời mời để vào nhóm.",
+        "Đã gửi lời mời thành công. Sinh viên cần xác nhận để tham gia nhóm.",
       );
       await fetchGroupDetails();
       if (onGroupUpdated) await onGroupUpdated();
@@ -117,7 +127,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
       console.error("Lỗi gửi lời mời:", err);
       showNotice(
         err.response?.data?.message ||
-          "Gửi lời mời thất bại. Vui lòng kiểm tra lại MSSV.",
+          "Gửi lời mời thất bại. Vui lòng kiểm tra lại mã số sinh viên.",
         "error",
       );
     } finally {
@@ -133,7 +143,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
 
     showConfirm({
       title: "Xác nhận xóa thành viên",
-      message: "Bạn có chắc muốn xóa thành viên này khỏi nhóm?",
+      message: "Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm không?",
       confirmText: "Xóa thành viên",
       danger: true,
       action: async () => {
@@ -156,16 +166,20 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
     }
 
     const targetUserId = member.userId || member.profile?.userId || member.id;
-    const memberName = member.userFullName || member.fullName || member.profile?.fullName || "thành viên này";
+    const memberName =
+      member.userFullName ||
+      member.fullName ||
+      member.profile?.fullName ||
+      "thành viên này";
 
     if (!targetUserId) {
-      showNotice("Không tìm thấy ID của thành viên này.", "error");
+      showNotice("Không tìm thấy mã định danh của thành viên này.", "error");
       return;
     }
 
     showConfirm({
       title: "Xác nhận bàn giao quyền Trưởng nhóm",
-      message: `Bạn có chắc chắn muốn gửi đề xuất chuyển giao quyền Trưởng nhóm cho ${memberName} không?`,
+      message: `Bạn có chắc chắn muốn gửi đề xuất chuyển giao vai trò Trưởng nhóm cho ${memberName} không?`,
       confirmText: "Xác nhận bàn giao",
       danger: false,
       action: async () => {
@@ -176,25 +190,28 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
           await onGroupUpdated();
         }
 
-        showNotice(`Đã gửi yêu cầu bàn giao quyền Leader cho ${memberName} thành công! Đang chờ thành viên xác nhận.`);
+        showNotice(
+          `Đã gửi yêu cầu bàn giao quyền Trưởng nhóm cho ${memberName} thành công! Đang chờ thành viên xác nhận.`,
+        );
       },
     });
   };
 
-  // 🚀 Xử lý Chấp nhận nhận quyền Leader
   const handleAcceptTransfer = async (transferId) => {
     try {
       await acceptLeaderTransfer(transferId);
       showNotice("Đã nhận quyền Trưởng nhóm thành công!");
       await fetchGroupDetails();
       if (onGroupUpdated) await onGroupUpdated();
-      window.location.reload(); // Tải lại trang để đồng bộ giao diện quyền Leader
+      window.location.reload();
     } catch (err) {
-      showNotice(err.response?.data?.message || "Không thể chấp nhận bàn giao.", "error");
+      showNotice(
+        err.response?.data?.message || "Không thể chấp nhận bàn giao quyền.",
+        "error",
+      );
     }
   };
 
-  // 🚀 Xử lý Từ chối
   const handleDeclineTransfer = async (transferId) => {
     try {
       await declineLeaderTransfer(transferId);
@@ -205,14 +222,16 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
     }
   };
 
-  // 🚀 Xử lý Hủy đề xuất (cho Leader cũ)[cite: 30]
   const handleCancelTransfer = async (transferId) => {
     try {
       await cancelLeaderTransfer(transferId);
-      showNotice("Đã hủy đề xuất bàn giao quyền Leader.");
+      showNotice("Đã hủy đề xuất bàn giao quyền Trưởng nhóm.");
       await fetchGroupDetails();
     } catch (err) {
-      showNotice(err.response?.data?.message || "Không thể hủy đề xuất.", "error");
+      showNotice(
+        err.response?.data?.message || "Không thể hủy đề xuất.",
+        "error",
+      );
     }
   };
 
@@ -220,8 +239,8 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
   const isValidSize = memberCount >= 3 && memberCount <= 5;
 
   return (
-    <div className="space-y-6 animate-fadeIn text-[#2C2825]">
-      {/* 👑 KHU VỰC HIỂN THỊ YÊU CẦU BÀN GIAO LEADER */}
+    <div className="space-y-6 font-sans text-[#2C2825]">
+      {/* 👑 KHU VỰC HIỂN THỊ YÊU CẦU BÀN GIAO TRƯỞNG NHÓM */}
       {leaderTransfers.length > 0 && (
         <div className="bg-orange-50/80 p-6 rounded-3xl border border-orange-200 shadow-sm space-y-3">
           <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
@@ -231,25 +250,24 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
 
           <div className="space-y-2">
             {leaderTransfers.map((item) => {
-              // Kiểm tra xem user hiện tại có phải là người tạo yêu cầu (Leader cũ) hay không
-              // (Dựa vào item.fromUserId hoặc bạn có thể truyền currentUserId vào component nếu có)
-              const isSender = String(item.fromUserId) === String(currentUserId) || isLeader; 
-              // Hoặc nếu component này nhận props `isLeader`, ta có thể phân biệt:
-              // Nếu đang là Leader gửi đi -> chỉ hiện nút "Hủy đề xuất".
-              // Nếu là người nhận được đề xuất -> hiện "Chấp nhận làm Leader" và "Từ chối".
-
               return (
-                <div key={item.id} className="bg-white p-4 rounded-2xl border border-orange-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                <div
+                  key={item.id}
+                  className="bg-white p-4 rounded-2xl border border-orange-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs"
+                >
                   <div>
                     <p className="font-black text-[#2C2825]">
-                      {item.fromName ? `Trưởng nhóm ${item.fromName} muốn bàn giao quyền Leader cho bạn.` : "Có yêu cầu bàn giao quyền Leader trong nhóm."}
+                      {item.fromName
+                        ? `Trưởng nhóm ${item.fromName} muốn bàn giao quyền Trưởng nhóm cho bạn.`
+                        : "Có yêu cầu bàn giao quyền Trưởng nhóm trong nhóm."}
                     </p>
-                    <p className="text-[11px] text-[#6B635B] mt-0.5">Mã nhóm: {groupData?.groupCode || groupData?.code}</p>
+                    <p className="text-[11px] text-[#6B635B] mt-0.5">
+                      Mã nhóm: {groupData?.groupCode || groupData?.code}
+                    </p>
                   </div>
 
                   <div className="flex gap-2">
                     {isLeader ? (
-                      // 1. Giao diện dành cho LEADER (Người gửi đề xuất): Chỉ có nút Hủy đề xuất
                       <button
                         onClick={() => handleCancelTransfer(item.id)}
                         className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition cursor-pointer"
@@ -257,13 +275,12 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                         Hủy đề xuất
                       </button>
                     ) : (
-                      // 2. Giao diện dành cho THÀNH VIÊN ĐƯỢC CHỈ ĐỊNH: Chấp nhận hoặc Từ chối
                       <>
                         <button
                           onClick={() => handleAcceptTransfer(item.id)}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition cursor-pointer"
                         >
-                          Chấp nhận làm Leader
+                          Chấp nhận làm Trưởng nhóm
                         </button>
                         <button
                           onClick={() => handleDeclineTransfer(item.id)}
@@ -288,7 +305,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
             Thành viên nhóm ({memberCount}/5 người)
           </h2>
           <p className="text-xs text-[#6B635B] mt-1">
-            Yêu cầu quy mô nhóm hợp lệ: từ 3 đến 5 thành viên chính thức.
+            Quy mô nhóm hợp lệ theo quy định: từ 3 đến 5 thành viên chính thức.
           </p>
         </div>
 
@@ -300,12 +317,12 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                 : "bg-amber-50 text-amber-700 border border-amber-200"
             }`}
           >
-            {isValidSize ? "✓ Sĩ số hợp lệ" : "⚠️ Cần từ 3–5 thành viên"}
+            {isValidSize ? "✓ Sĩ số hợp lệ" : "⚠️ Cần đạt từ 3–5 thành viên"}
           </span>
         </div>
       </div>
 
-      {isLeader && (
+      {/* {isLeader && (
         <form
           onSubmit={handleInviteMember}
           className="bg-white p-6 rounded-3xl border border-[#E8E2D9] space-y-3 shadow-sm"
@@ -314,7 +331,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
             htmlFor="member-invite-code"
             className="block text-xs font-bold uppercase text-[#6B635B]"
           >
-            Mời sinh viên bằng MSSV
+            Mời sinh viên tham gia bằng Mã số sinh viên
           </label>
           <div className="flex gap-3 flex-wrap">
             <input
@@ -323,7 +340,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
               onChange={(e) => setMemberInput(e.target.value)}
               required
               disabled={loading}
-              placeholder="Nhập MSSV"
+              placeholder="Nhập mã số sinh viên..."
               className="border border-[#E8E2D9] bg-[#FBF9F5] rounded-xl px-4 py-2.5 text-xs flex-1 outline-none focus:border-[#E65100]"
             />
             <button
@@ -337,15 +354,14 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
             </button>
           </div>
           <p className="text-xs text-[#6B635B]">
-            Sinh viên chỉ được tính vào sĩ số sau khi chấp nhận lời mời. Hệ
-            thống kiểm tra lại sức chứa khi chấp nhận.
+            Sinh viên sẽ chính thức được tính vào sĩ số sau khi chấp nhận lời
+            mời tham gia nhóm.
           </p>
         </form>
-      )}
+      )} */}
 
       {/* DANH SÁCH */}
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E8E2D9] space-y-6 shadow-sm">
-        {/* GROUP CODE */}
         <div className="p-4 bg-orange-50/60 rounded-2xl border border-orange-200 flex justify-between items-center">
           <div>
             <p className="text-[10px] font-black text-orange-600 uppercase tracking-wider">
@@ -364,7 +380,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
 
               try {
                 await navigator.clipboard.writeText(codeToCopy);
-                showNotice("Đã sao chép mã nhóm!");
+                showNotice("Đã sao chép mã nhóm thành công!");
               } catch {
                 showNotice(
                   "Không thể sao chép mã nhóm. Vui lòng thử lại.",
@@ -384,7 +400,9 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
             <h3 className="text-xs font-black uppercase text-[#6B635B]">
               Danh sách thành viên hiện tại
             </h3>
-            <span className="text-[10px] text-[#9E958C]">Tự động cập nhật</span>
+            <span className="text-[10px] text-[#9E958C]">
+              Cập nhật trực tiếp
+            </span>
           </div>
 
           {membersList.length > 0 ? (
@@ -404,8 +422,8 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                         m.profile?.fullName ||
                         "Thành viên"}
                     </h4>
-                    <p className="text-[11px] text-[#6B635B] mt-1.5">
-                      MSSV:{" "}
+                    <p className="text-[11px] text-[#815b35] mt-1.5 font-bold">
+                      Mã số sinh viên:{" "}
                       {m.studentCode ||
                         m.userStudentCode ||
                         m.profile?.studentCode ||
@@ -413,6 +431,16 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                         m.userEmail ||
                         m.profile?.email ||
                         memberId}
+                    </p>
+
+                    <p className="text-[11px] text-[#815b35] mt-1.5 font-bold">
+                      Thư điện tử:{" "}
+                      <em className="text-[#b64f01] font-medium">
+                        {m.email ||
+                          m.userEmail ||
+                          m.profile?.email ||
+                          "Chưa cập nhật"}
+                      </em>
                     </p>
                   </div>
 
@@ -427,7 +455,6 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                       {isMemberLeader ? "👑 Trưởng nhóm" : "👤 Thành viên"}
                     </span>
 
-                    {/* Nút thao tác dành cho Leader */}
                     {isLeader && !isMemberLeader && (
                       <div className="flex items-center gap-2">
                         <button
@@ -435,7 +462,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                           onClick={() => handleOfferLeaderTransfer(m)}
                           className="text-[#E65100] font-bold text-xs hover:underline bg-orange-50 px-3 py-1.5 rounded-xl cursor-pointer"
                         >
-                          Bổ nhiệm Leader
+                          Bổ nhiệm Trưởng nhóm
                         </button>
                         <button
                           type="button"
@@ -452,7 +479,7 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
             })
           ) : (
             <p className="text-xs text-center text-[#6B635B] py-4 italic">
-              Chưa có thành viên nào trong nhóm.
+              Hiện chưa có thành viên nào trong nhóm.
             </p>
           )}
         </div>
@@ -527,7 +554,9 @@ export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupU
                       : "bg-[#E65100] hover:bg-[#D84315]"
                   }`}
                 >
-                  {processing ? "Đang xử lý..." : dialog.confirmText || "OK"}
+                  {processing
+                    ? "Đang xử lý..."
+                    : dialog.confirmText || "Đã hiểu"}
                 </button>
               </div>
             </div>

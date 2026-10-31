@@ -17,7 +17,7 @@ export default function Contact() {
                     <span className="px-3 py-1 bg-[#F5EBE1] text-[#E65100] text-xs font-bold rounded-full inline-block">
                         KẾT NỐI HỆ THỐNG
                     </span>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2825]">Liên hệ Ban Quản Trị & Đào Tạo</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2825]">Liên hệ Ban Quản trị và Phòng Đào tạo</h1>
                     <p className="text-xs sm:text-sm text-[#6B635B]">Hỗ trợ giải quyết các vấn đề về cờ điều kiện, tài khoản Google OAuth và phân quyền nhóm.</p>
                 </div>
 
@@ -28,7 +28,7 @@ export default function Contact() {
                         <div className="space-y-4 text-xs text-[#6B635B]">
                             <div className="flex items-start gap-3">
                                 <span className="text-[#E65100] font-bold text-sm">📍</span>
-                                <p>Phòng Đào Tạo / Ban Quản Trị Hệ Thống Đồ Án Tốt Nghiệp FPT.</p>
+                                <p>Phòng Đào tạo / Ban Quản trị Hệ thống Đồ án tốt nghiệp Đại học FPT.</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[#E65100] font-bold text-sm">✉️</span>
@@ -36,7 +36,7 @@ export default function Contact() {
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="text-[#E65100] font-bold text-sm">📞</span>
-                                <p>Hotline: Giờ hành chính từ Thứ Hai đến Thứ Sáu.</p>
+                                <p>Tổng đài hỗ trợ: Giờ hành chính từ Thứ Hai đến Thứ Sáu.</p>
                             </div>
                         </div>
 
@@ -46,7 +46,7 @@ export default function Contact() {
                     </div>
 
                     <form className="p-8 bg-white border border-[#E8E2D9] rounded-2xl space-y-4 shadow-sm" onSubmit={(e) => { e.preventDefault(); alert("Đã gửi yêu cầu thành công!"); }}>
-                        <h3 className="font-bold text-base text-[#2C2825]">Gửi yêu cầu hỗ trợ (Student / Leader)</h3>
+                        <h3 className="font-bold text-base text-[#2C2825]">Gửi yêu cầu hỗ trợ (Sinh viên / Trưởng nhóm)</h3>
                         
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-[#6B635B]">Họ và tên</label>
@@ -55,7 +55,7 @@ export default function Contact() {
 
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-[#6B635B]">Mã sinh viên / Email trường</label>
-                            <input type="text" placeholder="VD: HE123456 hoặc email@fpt.edu.vn" className="w-full px-4 py-2.5 text-xs rounded-xl border border-[#E8E2D9] focus:outline-none focus:border-[#E65100]" required />
+                            <input type="text" placeholder="Ví dụ: HE123456 hoặc email@fpt.edu.vn" className="w-full px-4 py-2.5 text-xs rounded-xl border border-[#E8E2D9] focus:outline-none focus:border-[#E65100]" required />
                         </div>
 
                         <div className="space-y-1">

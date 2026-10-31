@@ -14,13 +14,12 @@ export default function CreateGroup({ onGroupCreated }) {
   const [wantedSkills, setWantedSkills] = useState("");
   const [semesters, setSemesters] = useState([]);
   const [selectedSemester, setSelectedSemester] = useState("");
-  const [semesterDeadline, setSemesterDeadline] = useState(""); // Thêm state lưu deadline theo học kỳ
+  const [semesterDeadline, setSemesterDeadline] = useState(""); 
   const [subjectScopes, setSubjectScopes] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
 
-  // Danh sách gợi ý kỹ năng nhanh (UI state phụ trợ cho đẹp mắt)
   const [skillTags, setSkillTags] = useState(["ReactJS", "NodeJS / Express", "Spring Boot", "UI/UX (Figma)"]);
   const [customSkillInput, setCustomSkillInput] = useState("");
 
@@ -47,7 +46,6 @@ export default function CreateGroup({ onGroupCreated }) {
     fetchInitData();
   }, []);
 
-  // Lấy thông tin chi tiết học kỳ (bao gồm defaultDeadline) mỗi khi selectedSemester thay đổi
   useEffect(() => {
     if (selectedSemester) {
       const fetchSemesterDetails = async () => {
@@ -55,7 +53,6 @@ export default function CreateGroup({ onGroupCreated }) {
           const res = await api.get(`/semesters/${selectedSemester}`).catch(() => null);
           const semData = res?.data;
           if (semData && semData.defaultDeadline) {
-            // Format ngày tháng hiển thị đẹp hơn nếu cần (VD: DD/MM/YYYY)
             const rawDate = new Date(semData.defaultDeadline);
             const formattedDate = !isNaN(rawDate.getTime()) 
               ? rawDate.toLocaleDateString("vi-VN") 
@@ -126,7 +123,6 @@ export default function CreateGroup({ onGroupCreated }) {
     }
   }, [selectedSemester]);
 
-  // Đồng bộ kỹ năng vào state wantedSkills
   useEffect(() => {
     setWantedSkills(skillTags.join(", "));
   }, [skillTags]);
@@ -149,7 +145,7 @@ export default function CreateGroup({ onGroupCreated }) {
       setNotice({
         type: "error",
         title: "Thiếu thông tin môn học",
-        message: "Vui lòng chọn môn học/ngành phù hợp trước khi tạo nhóm.",
+        message: "Vui lòng chọn môn học và chuyên ngành phù hợp trước khi thành lập nhóm.",
       });
       return;
     }
@@ -175,8 +171,8 @@ export default function CreateGroup({ onGroupCreated }) {
 
       setNotice({
         type: "success",
-        title: "Tạo nhóm thành công",
-        message: "Bạn đã trở thành Trưởng nhóm chính thức trong môn học.",
+        title: "Thành lập nhóm thành công",
+        message: "Bạn đã chính thức trở thành Trưởng nhóm trong môn học.",
       });
 
       if (onGroupCreated && createdGroupId) {
@@ -187,12 +183,12 @@ export default function CreateGroup({ onGroupCreated }) {
       const errRes = error.response?.data;
       const errorMsg = errRes?.message || "";
 
-      let displayMessage = "Tạo nhóm thất bại! Vui lòng kiểm tra lại.";
+      let displayMessage = "Thành lập nhóm thất bại! Vui lòng kiểm tra lại thông tin.";
       if (
         errorMsg.includes("deadline has passed") ||
         errorMsg.includes("Moderator now arranges")
       ) {
-        displayMessage = "Đã quá hạn tạo nhóm ! Giảng viên hướng dẫn sẽ sắp xếp các nhóm cho bạn.";
+        displayMessage = "Đã quá hạn thời gian thành lập nhóm! Giảng viên điều phối sẽ sắp xếp các nhóm cho bạn.";
       } else if (errorMsg) {
         displayMessage = errorMsg;
       }
@@ -223,7 +219,7 @@ export default function CreateGroup({ onGroupCreated }) {
               type: "success",
               title: "Đã nhận diện nhóm của bạn",
               message:
-                "Hệ thống đã nhận diện nhóm đồ án của bạn. Đang vào trang quản lý...",
+                "Hệ thống đã nhận diện nhóm đồ án của bạn. Đang chuyển vào trang quản lý...",
             });
 
             setTimeout(async () => {
@@ -242,7 +238,7 @@ export default function CreateGroup({ onGroupCreated }) {
 
       setNotice({
         type: "error",
-        title: "Không thể tạo nhóm",
+        title: "Không thể thành lập nhóm",
         message: displayMessage,
       });
     } finally {
@@ -255,40 +251,40 @@ export default function CreateGroup({ onGroupCreated }) {
   );
 
   return (
-    <main className="max-w-7xl mx-auto py-2 px-4 space-y-6 animate-fadeIn font-sans text-[#2C2825]">
+    <main className="max-w-7xl mx-auto py-2 px-4 space-y-6 font-sans text-[#2C2825]">
       {isAlreadyLeader ? (
         <div className="max-w-xl mx-auto text-center py-12 space-y-3 bg-white rounded-3xl border border-[#E8E2D9] shadow-sm p-8">
           <p className="text-sm font-bold text-amber-600">
-            Bạn đã là Trưởng nhóm của một nhóm khác!
+            Bạn hiện đang giữ vai trò Trưởng nhóm của một nhóm khác!
           </p>
           <p className="text-xs text-[#6B635B]">
-            Mỗi sinh viên không làm Leader nhiều nhóm trong cùng đợt luận án.
+            Mỗi sinh viên không đảm nhận vai trò Trưởng nhóm ở nhiều nhóm trong cùng một đợt làm đồ án tốt nghiệp.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start max-w-6xl mx-auto">
           {/* CỘT TRÁI: FORM ĐĂNG KÝ THÀNH LẬP NHÓM */}
-          <div className="lg:col-span-2 bg-white p-8 md:p-10 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
+          <div className="lg:col-span-2 bg-white/90 backdrop-blur-md p-8 md:p-10 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-6">
             <div className="space-y-1 pb-4 border-b border-[#E8E2D9]">
               <span className="text-[11px] font-black text-[#E65100] tracking-widest uppercase">
-                Khởi tạo Capstone Project
+                Khởi tạo dự án tốt nghiệp
               </span>
               <h1 className="text-xl font-black text-[#2C2825]">
                 Đăng ký thành lập nhóm mới
               </h1>
               <p className="text-xs text-[#6B635B] leading-relaxed">
-                Điền đầy đủ thông tin bên dưới để khởi tạo nhóm và nhận quyền{" "}
+                Hoàn tất các thông tin bên dưới để khởi tạo nhóm và nhận quyền{" "}
                 <strong className="text-[#2C2825]">Trưởng nhóm chính thức</strong>.
               </p>
             </div>
 
             {/* Lưu ý quan trọng */}
-            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
               <span className="text-base">⚠️</span>
               <div className="space-y-0.5">
                 <p className="font-black">Lưu ý quan trọng:</p>
                 <p className="text-[11px] leading-relaxed opacity-90">
-                  Sinh viên tạo nhóm sẽ tự động trở thành <strong>Trưởng nhóm</strong> và chịu trách nhiệm duyệt thành viên tham gia, chốt đề tài và nộp báo cáo đồ án cho Hội đồng bộ môn.
+                  Sinh viên khởi tạo sẽ tự động trở thành <strong>Trưởng nhóm</strong>, chịu trách nhiệm quản lý thành viên, thống nhất đề tài và nộp các ấn phẩm đồ án cho hội đồng bộ môn.
                 </p>
               </div>
             </div>
@@ -305,11 +301,11 @@ export default function CreateGroup({ onGroupCreated }) {
                     type="text"
                     value={groupCode}
                     onChange={(e) => setGroupCode(e.target.value)}
-                    placeholder="VD: SE-G01"
+                    placeholder="Ví dụ: SE-G01"
                     required
                     className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100] font-bold"
                   />
-                  <p className="text-[10px] text-[#6B635B]">Định dạng chuẩn: [Kỳ]-[Ngành]-[Số nhóm]</p>
+                  <p className="text-[10px] text-[#6B635B]">Định dạng chuẩn theo học kỳ và chuyên ngành</p>
                 </div>
 
                 <div className="space-y-2">
@@ -320,11 +316,11 @@ export default function CreateGroup({ onGroupCreated }) {
                     type="text"
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    placeholder="VD: Nhóm 01 - SmartCampus AI"
+                    placeholder="Ví dụ: Nhóm 01 - SmartCampus AI"
                     required
                     className="w-full px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100] font-bold"
                   />
-                  <p className="text-[10px] text-[#6B635B]">Tên nhóm nhận diện công khai trên sàn ghép đôi</p>
+                  <p className="text-[10px] text-[#6B635B]">Tên nhận diện công khai trên sàn ghép đôi</p>
                 </div>
 
                 <div className="space-y-2">
@@ -350,7 +346,7 @@ export default function CreateGroup({ onGroupCreated }) {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-black text-[#2C2825] uppercase">
-                    Chọn môn học & Ngành học *
+                    Chọn môn học & Chuyên ngành *
                   </label>
                   <select
                     value={selectedSubjectId}
@@ -371,7 +367,7 @@ export default function CreateGroup({ onGroupCreated }) {
               {/* Kỹ năng & Công nghệ cần tuyển */}
               <div className="space-y-2">
                 <label className="block text-xs font-black text-[#2C2825] uppercase">
-                  Kỹ năng & Công nghệ cần tuyển
+                  Kỹ năng & Công nghệ cần tuyển dụng
                 </label>
                 <div className="p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-2xl space-y-3">
                   <div className="flex flex-wrap gap-2">
@@ -403,12 +399,12 @@ export default function CreateGroup({ onGroupCreated }) {
                         setCustomSkillInput("");
                       }
                     }}
-                    placeholder="Nhấn Enter hoặc thêm kỹ năng khác (VD: Docker, AWS, Flutter...)"
+                    placeholder="Nhấn Enter để thêm kỹ năng (Ví dụ: Docker, AWS, Flutter...)"
                     className="w-full px-3 py-2 text-xs bg-white border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
                   />
 
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-[#6B635B] font-bold">Gợi ý thêm nhanh:</span>
+                    <span className="text-[10px] text-[#6B635B] font-bold">Gợi ý nhanh:</span>
                     {["+ Next.js", "+ Python/FastAPI", "+ DevOps", "+ Mobile Flutter"].map((suggestion, idx) => {
                       const cleanName = suggestion.replace("+ ", "");
                       return (
@@ -430,7 +426,7 @@ export default function CreateGroup({ onGroupCreated }) {
               <div className="flex items-start gap-2 pt-1">
                 <input type="checkbox" defaultChecked id="commit" className="mt-0.5 accent-[#E65100] cursor-pointer" />
                 <label htmlFor="commit" className="text-[11px] text-[#6B635B] leading-relaxed cursor-pointer">
-                  Tôi cam kết thông tin khai báo là chính xác, đồng ý chịu trách nhiệm điều hành nhóm theo đúng <strong className="text-[#2C2825]">Quy chế Đồ án tốt nghiệp</strong> của Nhà trường và Khoa CNTT FPT.
+                  Tôi cam kết mọi thông tin khai báo là hoàn toàn chính xác, đồng thời tuân thủ tuyệt đối <strong className="text-[#2C2825]">Quy chế Đồ án tốt nghiệp</strong> của Nhà trường và Khoa CNTT.
                 </label>
               </div>
 
@@ -445,69 +441,69 @@ export default function CreateGroup({ onGroupCreated }) {
                     : "Xác nhận thành lập nhóm trong môn học"}
                 </span>
                 <span className="text-[10px] font-normal normal-case opacity-90">
-                  (Bạn sẽ chính thức trở thành Trưởng nhóm)
+                  (Bạn sẽ chính thức đảm nhận vai trò Trưởng nhóm)
                 </span>
               </button>
             </form>
           </div>
 
-          {/* CỘT PHẢI: CÁC KHỐI THÔNG TIN (QUY CHẾ, ĐẶC QUYỀN, TÌM NHÓM) */}
+          {/* CỘT PHẢI: CÁC KHỐI THÔNG TIN */}
           <div className="space-y-6">
             {/* Quy chế lập nhóm */}
-            <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-3">
+            <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-3">
               <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
                 <span>💡</span>
-                <span>Quy chế lập nhóm Capstone</span>
+                <span>Quy chế lập nhóm đồ án</span>
               </div>
-              <p className="text-[10px] text-[#9E958C]">FPT University Rules</p>
+              <p className="text-[10px] text-[#9E958C]">Quy định chung Đại học FPT</p>
               <ul className="space-y-2.5 text-[11px] text-[#6B635B] list-disc pl-4 leading-relaxed">
                 <li>
-                  <strong>Quy mô nhóm hợp lệ:</strong> Cần tối thiểu 3 đến tối đa 5 thành viên chính thức để được duyệt đề tài.
+                  <strong>Quy mô nhóm hợp lệ:</strong> Cần tối thiểu từ 3 đến tối đa 5 thành viên chính thức để được công nhận đề tài.
                 </li>
                 <li>
-                  <strong>Nguyên tắc độc quyền:</strong> Mỗi sinh viên chỉ thuộc một nhóm chính thức duy nhất tại một thời điểm trong môn học.
+                  <strong>Nguyên tắc độc quyền:</strong> Mỗi sinh viên chỉ được phép thuộc một nhóm chính thức duy nhất trong cùng học kỳ.
                 </li>
                 <li>
-                  <strong>Hạn chót khóa danh sách:</strong> Nhóm cần đủ thành viên trước ngày{" "}
+                  <strong>Hạn chót khóa danh sách:</strong> Nhóm phải hoàn tất số lượng thành viên trước ngày{" "}
                   <strong className="text-[#E65100]">
                     {semesterDeadline || "..."}
                   </strong>{" "}
-                  trước khi bộ môn đóng đợt ghép.
+                  trước khi bộ môn đóng đợt ghép đôi.
                 </li>
               </ul>
             </div>
 
             {/* Đặc quyền trưởng nhóm */}
-            <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-3">
+            <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-3">
               <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
                 <span>👑</span>
-                <span>Đặc quyền trưởng nhóm</span>
+                <span>Đặc quyền của Trưởng nhóm</span>
               </div>
               <div className="space-y-2 text-[11px] text-[#6B635B]">
                 <p className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span> Toàn quyền duyệt hoặc từ chối sinh viên ứng tuyển.
+                  <span className="text-emerald-600 font-bold">✓</span> Toàn quyền xét duyệt hoặc từ chối sinh viên nộp đơn ứng tuyển.
                 </p>
                 <p className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span> Gửi lời mời trực tiếp thành viên theo Mã số MSSV.
+                  <span className="text-emerald-600 font-bold">✓</span> Gửi lời mời trực tiếp đến thành viên thông qua mã số sinh viên.
                 </p>
                 <p className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span> Cộng điểm đóng góp quản trị dự án Capstone (+5%).
+                  <span className="text-emerald-600 font-bold">✓</span> Cộng điểm đóng góp quản trị dự án đồ án (+5%).
                 </p>
               </div>
             </div>
 
             {/* Banner tìm kiếm nhóm */}
             <div className="bg-[#1E1B18] text-white p-6 rounded-3xl shadow-md space-y-3">
-              <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Chưa muốn làm Leader?</p>
-              <h3 className="text-sm font-black">Tìm kiếm nhóm đang tuyển thành viên</h3>
+              <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Chưa muốn làm Trưởng nhóm?</p>
+              <h3 className="text-sm font-black">Khám phá các nhóm đang mở tuyển</h3>
               <p className="text-[11px] text-gray-300 leading-relaxed">
-                Khám phá hơn 14 nhóm Capstone đang mở tuyển Frontend, Backend, AI Engineer để gia nhập ngay.
+                Tìm kiếm các đội ngũ lập trình đang tìm kiếm lập trình viên Frontend, Backend, AI Engineer để gia nhập ngay.
               </p>
               <button 
                 type="button"
                 className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition cursor-pointer border border-white/20"
               >
-                Xem danh sách nhóm đang mở →
+                Xem danh sách nhóm đang mở tuyển →
               </button>
             </div>
           </div>
@@ -542,7 +538,7 @@ export default function CreateGroup({ onGroupCreated }) {
                 onClick={() => setNotice(null)}
                 className="rounded-xl bg-[#E65100] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#D84315] cursor-pointer"
               >
-                OK
+                Đã hiểu
               </button>
             </div>
           </div>

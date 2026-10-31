@@ -3,20 +3,20 @@ import { Link } from "react-router-dom";
 export default function Support() {
     const faqs = [
         {
-            q: "Tại sao tài khoản của tôi bị gắn cờ không đủ điều kiện (Ineligible)?",
-            a: "Cờ không đủ điều kiện được hệ thống đánh giá theo tỷ lệ tín chỉ tích lũy (dưới 80%) hoặc do Phòng Đào tạo import đầu kỳ. Sinh viên bị gắn cờ vẫn có thể đăng nhập Google để theo dõi thông tin, nhưng không được phép tạo nhóm hoặc tham gia nhóm cho đến khi được gỡ cờ."
+            q: "Tại sao tài khoản của tôi bị gắn cờ không đủ điều kiện?",
+            a: "Cờ không đủ điều kiện được hệ thống đánh giá theo tỷ lệ tín chỉ tích lũy (dưới 80 phần trăm) hoặc do phòng đào tạo nhập đầu kỳ. Sinh viên bị gắn cờ vẫn có thể đăng nhập Google để theo dõi thông tin, nhưng không được phép tạo nhóm hoặc tham gia nhóm cho đến khi được gỡ cờ."
         },
         {
             q: "Quy mô một nhóm hợp lệ được quy định như thế nào?",
-            a: "Nhóm chuẩn cần đạt từ 3 đến 5 thành viên chính thức. Nhóm dưới 3 người sau thời điểm chốt sẽ không bị tự động giải tán ngoài deadline, nhưng giảng viên và ban quản trị sẽ theo dõi sát sao."
+            a: "Nhóm chuẩn cần đạt từ 3 đến 5 thành viên chính thức. Nhóm dưới 3 người sau thời điểm chốt sẽ không bị tự động giải tán ngoài hạn chót, nhưng giảng viên và ban quản trị sẽ theo dõi sát sao."
         },
         {
-            q: "Giới hạn gửi đơn Apply và nhận Invite diễn ra như thế nào?",
-            a: "Sinh viên tự do được phép giữ tối đa 3 đơn Apply đang chờ xử lý cùng lúc. Nếu đơn bị từ chối hoặc thu hồi, hệ thống sẽ trả lại lượt để bạn nộp đơn khác. Riêng các lời mời (Invite) nhận từ Leader không bị tính vào giới hạn này."
+            q: "Giới hạn gửi đơn đăng ký và nhận lời mời diễn ra như thế nào?",
+            a: "Sinh viên tự do được phép giữ tối đa 3 đơn đăng ký đang chờ xử lý cùng lúc. Nếu đơn bị từ chối hoặc thu hồi, hệ thống sẽ trả lại lượt để bạn nộp đơn khác. Riêng các lời mời nhận từ Trưởng nhóm không bị tính vào giới hạn này."
         },
         {
-            q: "Trạng thái Chốt danh sách (Finalized) được quản lý như thế nào?",
-            a: "Cờ Finalized được chuyển sang quản lý tập trung ở cấp Nhóm (Group-level). Khi Leader gửi danh sách lên Admin/Moderator duyệt, nhóm sẽ được khóa để đảm bảo tính nhất quán dữ liệu."
+            q: "Trạng thái chốt danh sách được quản lý như thế nào?",
+            a: "Cờ trạng thái đã chốt được chuyển sang quản lý tập trung ở cấp Nhóm. Khi Trưởng nhóm gửi danh sách lên Quản trị viên hoặc Giảng viên điều phối duyệt, nhóm sẽ được khóa để đảm bảo tính nhất quán dữ liệu."
         }
     ];
 
@@ -34,11 +34,11 @@ export default function Support() {
 
                 <div className="text-center space-y-3 bg-white p-8 rounded-2xl border border-[#E8E2D9] shadow-sm">
                     <span className="px-3 py-1 bg-[#F5EBE1] text-[#E65100] text-xs font-bold rounded-full inline-block">
-                        TRỢ GIÚP HỆ THỐNG V2.9
+                        TRỢ GIÚP HỆ THỐNG 
                     </span>
                     <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2825]">Trung tâm Hỗ trợ Lập nhóm Đồ án</h1>
                     <p className="text-xs sm:text-sm text-[#6B635B] max-w-xl mx-auto">
-                        Giải đáp quy chế v2.9, quy trình đăng nhập Google OAuth và phân quyền Student, Leader, Admin, Moderator.
+                        Giải đáp quy chế, quy trình đăng nhập Google OAuth và phân quyền cho Sinh viên, Trưởng nhóm, Quản trị viên và Giảng viên điều phối.
                     </p>
                 </div>
 
@@ -46,7 +46,7 @@ export default function Support() {
                     {faqs.map((item, idx) => (
                         <div key={idx} className="p-6 bg-white border border-[#E8E2D9] rounded-2xl space-y-2 shadow-sm">
                             <h3 className="font-bold text-sm sm:text-base text-[#2C2825] flex items-start gap-2">
-                                <span className="text-[#E65100]">Q{idx + 1}:</span> {item.q}
+                                <span className="text-[#E65100]">H{idx + 1}:</span> {item.q}
                             </h3>
                             <p className="text-xs text-[#6B635B] pl-6 leading-relaxed">
                                 {item.a}
@@ -56,7 +56,7 @@ export default function Support() {
                 </div>
 
                 <div className="p-8 bg-white border border-[#E8E2D9] rounded-2xl text-center space-y-4 shadow-sm">
-                    <h3 className="font-bold text-base text-[#2C2825]">Bạn cần can thiệp xử lý đặc biệt từ Admin?</h3>
+                    <h3 className="font-bold text-base text-[#2C2825]">Bạn cần can thiệp xử lý đặc biệt từ Quản trị viên?</h3>
                     <p className="text-xs text-[#6B635B]">Liên hệ ban quản trị hoặc phòng đào tạo nếu gặp sự cố về cờ điều kiện hoặc phân quyền nhóm.</p>
                     <Link 
                         to="/contact" 

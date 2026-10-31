@@ -15,31 +15,31 @@ export default function Privacy() {
 
                 <div className="text-center space-y-3 bg-white p-8 rounded-2xl border border-[#E8E2D9] shadow-sm">
                     <span className="px-3 py-1 bg-[#F5EBE1] text-[#E65100] text-xs font-bold rounded-full inline-block">
-                        QUY CHẾ & BẢO MẬT V2.9
+                        QUY CHẾ VÀ BẢO MẬT 
                     </span>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2825]">Chính sách Quản lý Đồ án Tốt nghiệp</h1>
-                    <p className="text-xs text-[#9E958C]">Áp dụng cho các vai trò: Student, Leader, Admin, Moderator và Sub moderator</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2825]">Chính sách Quản lý Đồ án tốt nghiệp</h1>
+                    <p className="text-xs text-[#9E958C]">Áp dụng cho các vai trò: Sinh viên, Trưởng nhóm, Quản trị viên, Giảng viên điều phối và Trợ lý điều phối</p>
                 </div>
 
                 <div className="space-y-6 text-xs leading-relaxed bg-white p-8 border border-[#E8E2D9] rounded-2xl shadow-sm">
                     <section className="space-y-2 border-b border-[#F2ECE4] pb-4">
-                        <h2 className="font-bold text-sm text-[#2C2825]">1. Phân quyền và Xác thực (Authentication)</h2>
-                        <p className="text-[#6B635B]">Admin và Moderator đăng nhập bảo mật bằng Email/Password với cơ chế vô hiệu hóa Token (`token_version`) ngay khi thay đổi thông tin. Sinh viên đăng nhập trực tiếp qua <strong>Google OAuth</strong> dựa trên danh sách import từ phòng đào tạo.</p>
+                        <h2 className="font-bold text-sm text-[#2C2825]">1. Phân quyền và Xác thực tài khoản</h2>
+                        <p className="text-[#6B635B]">Quản trị viên và Giảng viên điều phối đăng nhập bảo mật bằng Thư điện tử và Mật khẩu với cơ chế vô hiệu hóa mã thông báo ngay khi thay đổi thông tin. Sinh viên đăng nhập trực tiếp qua <strong>Google OAuth</strong> dựa trên danh sách được nhập từ phòng đào tạo.</p>
                     </section>
 
                     <section className="space-y-2 border-b border-[#F2ECE4] pb-4">
-                        <h2 className="font-bold text-sm text-[#2C2825]">2. Quyền riêng tư hồ sơ khi Apply nhóm</h2>
-                        <p className="text-[#6B635B]">Khi sinh viên gửi đơn <strong>Apply</strong> vào một nhóm, Leader và các thành viên được phép xem hồ sơ cá nhân (thế mạnh, kỹ năng) để tuyển chọn. Quyền xem này tự động chấm dứt khi đơn bị thu hồi hoặc từ chối.</p>
+                        <h2 className="font-bold text-sm text-[#2C2825]">2. Quyền riêng tư hồ sơ khi đăng ký vào nhóm</h2>
+                        <p className="text-[#6B635B]">Khi sinh viên gửi đơn <strong>đăng ký</strong> vào một nhóm, Trưởng nhóm và các thành viên được phép xem hồ sơ cá nhân (thế mạnh, kỹ năng) để tuyển chọn. Quyền xem này tự động chấm dứt khi đơn bị thu hồi hoặc từ chối.</p>
                     </section>
 
                     <section className="space-y-2 border-b border-[#F2ECE4] pb-4">
-                        <h2 className="font-bold text-sm text-[#2C2825]">3. Quy định kiểm tra điều kiện & Cờ Finalized</h2>
-                        <p className="text-[#6B635B]">Hệ thống tự động đánh giá tiêu chí tích lũy tín chỉ. Sinh viên bị gắn cờ ineligible không thể tạo hoặc tham gia nhóm. Trạng thái <strong>Finalized</strong> được quản lý tập trung ở cấp độ Nhóm (Group-level).</p>
+                        <h2 className="font-bold text-sm text-[#2C2825]">3. Quy định kiểm tra điều kiện và cờ trạng thái chốt</h2>
+                        <p className="text-[#6B635B]">Hệ thống tự động đánh giá tiêu chí tích lũy tín chỉ. Sinh viên bị gắn cờ không đủ điều kiện không thể tạo hoặc tham gia nhóm. Trạng thái <strong>đã chốt</strong> được quản lý tập trung ở cấp độ Nhóm.</p>
                     </section>
 
                     <section className="space-y-2">
                         <h2 className="font-bold text-sm text-[#2C2825]">4. Tính duy nhất và Nhất quán dữ liệu báo cáo</h2>
-                        <p className="text-[#6B635B]">Mỗi sinh viên chỉ thuộc tối đa một nhóm chính thức. Dữ liệu xuất báo cáo Excel sử dụng mức cô lập giao dịch `REPEATABLE READ` để đảm bảo tính chính xác tuyệt đối tại thời điểm xuất file.</p>
+                        <p className="text-[#6B635B]">Mỗi sinh viên chỉ thuộc tối đa một nhóm chính thức. Dữ liệu xuất báo cáo tệp Excel sử dụng mức cô lập giao dịch đọc lặp lại để đảm bảo tính chính xác tuyệt đối tại thời điểm xuất tệp.</p>
                     </section>
                 </div>
             </div>

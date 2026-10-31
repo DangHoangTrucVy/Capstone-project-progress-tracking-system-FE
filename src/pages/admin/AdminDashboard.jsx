@@ -22,12 +22,13 @@ import {
   deleteSemester,
   assignModerator,
 } from "../../services/semesterService";
-import { exportSemesterExcel } from "../../services/moderatorService"; // 👈 Thêm service xuất Excel
+import { exportSemesterExcel } from "../../services/moderatorService";
 import Profile from "../../auth/Profile";
 import EligibilityPanel from "./EligibilityPanel";
 import LeaderLeaveRequests from "./LeaderLeaveRequests";
 import SemesterSettings from "./SemesterSettings";
 import api from "../../services/api";
+import MajorPanel from "./MajorPanel";
 import {
   PieChart,
   Pie,
@@ -65,6 +66,9 @@ export default function AdminDashboard() {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [newLeaderId, setNewLeaderId] = useState("");
   const [changingLeader, setChangingLeader] = useState(false);
+
+  // 🌟 State quản lý hiển thị Modal chi tiết nhóm
+  const [selectedGroupDetail, setSelectedGroupDetail] = useState(null);
 
   // States cho quản lý tài khoản & học kỳ
   const [semesters, setSemesters] = useState([]);
@@ -115,7 +119,6 @@ export default function AdminDashboard() {
     }, 3000);
   };
 
-  // 💡 Hàm xử lý xuất Excel theo học kỳ
   const handleExportSemester = async (semesterCode) => {
     if (!semesterCode) {
       showToast("Vui lòng chọn học kỳ để xuất file.", "error");
@@ -139,10 +142,8 @@ export default function AdminDashboard() {
   const openLeaderModal = async (group) => {
     try {
       const groupId = group.id || group.groupId;
-      // 1. Lấy chi tiết nhóm
       const detail = await getGroupById(groupId).catch(() => null);
 
-      // 2. Dự phòng gọi thêm API lấy danh sách thành viên riêng nếu object detail chưa có mảng members
       let membersList = detail?.members || group.members || [];
       if (membersList.length === 0 && groupId) {
         try {
@@ -174,17 +175,15 @@ export default function AdminDashboard() {
   const handleReplaceGroupLeader = async (event) => {
     event.preventDefault();
     if (!selectedGroup || !newLeaderId) {
-      showToast("Vui lòng chọn Leader mới.", "error");
+      showToast("Vui lòng chọn Trưởng nhóm mới.", "error");
       return;
     }
 
     const members = selectedGroup.members || [];
-
-    // Tìm thành viên dựa vào ID (hỗ trợ cả cấu trúc member.userId hoặc member.profile?.userId)
     const nextLeader = members.find(
       (member) =>
         String(member.userId || member.profile?.userId) ===
-          String(newLeaderId) && !member.leader, // Kiểm tra không phải là leader hiện tại
+          String(newLeaderId) && !member.leader,
     );
 
     if (!nextLeader) {
@@ -195,13 +194,12 @@ export default function AdminDashboard() {
     const memberName =
       nextLeader.fullName || nextLeader.profile?.fullName || "Thành viên";
     const confirmed = window.confirm(
-      `Đổi Leader nhóm ${selectedGroup.groupCode} sang ${memberName}?`,
+      `Đổi Trưởng nhóm ${selectedGroup.groupCode} sang ${memberName}?`,
     );
     if (!confirmed) return;
 
     setChangingLeader(true);
     try {
-      // Gửi đúng ID của thành viên được chọn lên backend
       const targetUserId = nextLeader.userId || nextLeader.profile?.userId;
       await replaceGroupLeader(selectedGroup.id, {
         userId: targetUserId,
@@ -210,10 +208,10 @@ export default function AdminDashboard() {
       setSelectedGroup(null);
       setNewLeaderId("");
       await fetchAdminData();
-      showToast(`Đổi Leader nhóm ${selectedGroup.groupCode} thành công.`);
+      showToast(`Đổi Trưởng nhóm ${selectedGroup.groupCode} thành công.`);
     } catch (error) {
       showToast(
-        error.response?.data?.message || "Đổi Leader thất bại.",
+        error.response?.data?.message || "Đổi Trưởng nhóm thất bại.",
         "error",
       );
     } finally {
@@ -239,7 +237,6 @@ export default function AdminDashboard() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch dữ liệu tổng quan cho toàn hệ thống
   const fetchAdminData = async () => {
     try {
       const currentUser = await getCurrentUser().catch(() => null);
@@ -280,10 +277,11 @@ export default function AdminDashboard() {
           const list = Array.isArray(groupRes.data)
             ? groupRes.data
             : groupRes.data?.content || groupRes.data?.items || [];
-          // Gắn thêm thuộc tính semester vào từng nhóm nếu chưa có để dễ phân loại
           const mappedList = list.map((g) => ({
             ...g,
             semester: g.semester || semCode,
+            // Gắn kèm thông tin moderator của học kỳ vào từng nhóm
+            semesterModerator: sem.moderator,
           }));
           allGroupsList = [...allGroupsList, ...mappedList];
         } catch (e) {
@@ -462,7 +460,7 @@ export default function AdminDashboard() {
                 Quản Trị Hệ Thống
               </h2>
               <p className="text-[10px] text-[#6B635B]">
-                MatchPoint FPT Capstone v2.9
+                Hệ thống Quản lý Đồ án FPT
               </p>
             </div>
           </div>
@@ -490,6 +488,17 @@ export default function AdminDashboard() {
               Quản lý học kỳ & sinh viên
             </p>
 
+            <button
+              onClick={() => setActiveMenu("majors")}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition cursor-pointer ${
+                activeMenu === "majors"
+                  ? "bg-[#E65100] text-white shadow-md"
+                  : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>🏛️</span>
+              <span>Chuyên ngành </span>
+            </button>
             <button
               onClick={() => {
                 setActiveMenu("eligibility");
@@ -530,7 +539,7 @@ export default function AdminDashboard() {
               }`}
             >
               <span>👤</span>
-              <span>Tài khoản </span>
+              <span>Tài khoản</span>
             </button>
             <button
               onClick={() => {
@@ -628,7 +637,7 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <div className="w-full flex-1 flex flex-col">
+        <div className="w-full flex-1 flex flex-col ">
           {activeMenu === "monitoring" && (
             <section className="p-8 space-y-6">
               <div className="bg-white p-6 border border-[#E8E2D9] space-y-2 rounded-2xl flex justify-between items-center shadow-xs">
@@ -657,7 +666,7 @@ export default function AdminDashboard() {
                     bg: "bg-blue-50 text-blue-600",
                   },
                   {
-                    label: "Tổng số nhóm đồ án ",
+                    label: "Tổng số nhóm đồ án",
                     value: semesters.reduce(
                       (sum, sem) => sum + (sem.groupCount || 0),
                       0,
@@ -763,29 +772,29 @@ export default function AdminDashboard() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-xs space-y-4">
                   <h3 className="text-sm font-black text-[#2C2825]">
-                    📊 Tỷ lệ phân bổ vai trò tài khoản
+                    📊 Tỷ lệ phân bổ vai trò tài khoản hệ thống
                   </h3>
-                  <div className="h-84 w-full pt-4 flex items-center justify-center">
+                  <div className="h-80 w-full pt-2 flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={[
                             {
-                              name: "Student",
+                              name: "Sinh viên",
                               value: manageableUsers.filter(
                                 (u) => u.role === "STUDENT",
                               ).length,
                               fill: "#3B82F6",
                             },
                             {
-                              name: "Moderator",
+                              name: "Giảng viên",
                               value: manageableUsers.filter(
                                 (u) => u.role === "MODERATOR",
                               ).length,
                               fill: "#8B5CF6",
                             },
                             {
-                              name: "Admin",
+                              name: "Quản trị viên",
                               value: manageableUsers.filter(
                                 (u) => u.role === "ADMIN",
                               ).length,
@@ -793,15 +802,17 @@ export default function AdminDashboard() {
                             },
                           ]}
                           cx="50%"
-                          cy="42%"
-                          innerRadius={55}
-                          outerRadius={75}
-                          paddingAngle={4}
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={95}
+                          paddingAngle={6}
                           dataKey="value"
                           nameKey="name"
-                          label
+                          label={({ name, percent }) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
                         >
-                          {["#3B82F6", "#10B981", "#8B5CF6", "#EF4444"].map(
+                          {["#3B82F6", "#8B5CF6", "#EF4444"].map(
                             (color, index) => (
                               <Cell key={`cell-${index}`} fill={color} />
                             ),
@@ -874,7 +885,7 @@ export default function AdminDashboard() {
               </div>
             </section>
           )}
-
+          {activeMenu === "majors" && <MajorPanel />}
           {activeMenu === "eligibility" && (
             <EligibilityPanel onChanged={fetchAdminData} />
           )}
@@ -886,7 +897,7 @@ export default function AdminDashboard() {
             />
           )}
 
-          {/* TAB QUẢN LÝ HỌC KỲ - CÓ NÚT XUẤT EXCEL TỪNG KỲ Ở TRÊN CÙNG */}
+          {/* TAB QUẢN LÝ HỌC KỲ */}
           {activeMenu === "semesters" && (
             <div className="p-8 space-y-6">
               <div className="flex justify-between items-center bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs flex-wrap gap-4">
@@ -950,7 +961,7 @@ export default function AdminDashboard() {
                       <th className="p-4 font-black uppercase w-12 text-center">
                         STT
                       </th>
-                      <th className="p-4 font-black uppercase">Mã kì</th>
+                      <th className="p-4 font-black uppercase">Mã kỳ</th>
                       <th className="p-4 font-black uppercase">Học Kỳ</th>
                       <th className="p-4 font-black uppercase">
                         Thời gian bắt đầu
@@ -958,7 +969,7 @@ export default function AdminDashboard() {
                       <th className="p-4 font-black uppercase">
                         Thời gian kết thúc
                       </th>
-                      <th className="p-4 font-black uppercase">Mở nhóm </th>
+                      <th className="p-4 font-black uppercase">Mở nhóm</th>
                       <th className="p-4 font-black uppercase">Trạng thái</th>
                       <th className="p-4 font-black uppercase text-right">
                         Thao tác
@@ -1086,8 +1097,8 @@ export default function AdminDashboard() {
                     Quản lý toàn bộ tài khoản hệ thống
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Quản lý tất cả tài khoản Admin, Moderator, Leader và
-                    Student.
+                    Quản lý tất cả tài khoản Quản trị, Giảng viên, Trưởng nhóm
+                    và Sinh viên.
                   </p>
                 </div>
                 <button
@@ -1105,9 +1116,9 @@ export default function AdminDashboard() {
                   </span>
                   {[
                     { label: "Tất cả", value: "" },
-                    { label: "Student", value: "STUDENT" },
-                    { label: "Moderator", value: "MODERATOR" },
-                    { label: "Admin", value: "ADMIN" },
+                    { label: "Sinh viên", value: "STUDENT" },
+                    { label: "Giảng viên", value: "MODERATOR" },
+                    { label: "Quản trị viên", value: "ADMIN" },
                   ].map((roleObj) => (
                     <button
                       key={roleObj.value}
@@ -1205,7 +1216,13 @@ export default function AdminDashboard() {
                                         : "bg-blue-50 text-blue-700 border border-blue-200"
                                 }`}
                               >
-                                {u.role || "STUDENT"}
+                                {u.role === "ADMIN"
+                                  ? "Quản trị viên"
+                                  : u.role === "MODERATOR"
+                                    ? "Giảng viên"
+                                    : u.role === "LEADER"
+                                      ? "Trưởng nhóm"
+                                      : "Sinh viên"}
                               </span>
                             </td>
                             <td className="p-4 text-left">
@@ -1245,7 +1262,8 @@ export default function AdminDashboard() {
                     Quản lý danh sách nhóm đồ án Capstone
                   </h2>
                   <p className="text-xs text-[#6B635B]">
-                    Theo dõi mã nhóm, học kỳ và sĩ số thành viên toàn hệ thống.
+                    Bấm vào mã nhóm để xem chi tiết thành viên, đề tài Capstone
+                    và giảng viên hướng dẫn.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1285,7 +1303,7 @@ export default function AdminDashboard() {
                         Sĩ số thành viên
                       </th>
                       <th className="p-4 font-black uppercase text-right">
-                        Trạng thái nhóm
+                        Thao tác / Trạng thái
                       </th>
                     </tr>
                   </thead>
@@ -1306,9 +1324,28 @@ export default function AdminDashboard() {
                               {index + 1}
                             </td>
                             <td className="p-4">
-                              <p className="font-bold text-[#2C2825] text-sm">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const groupId = g.id || g.groupId;
+                                    const detailRes = await getGroupById(
+                                      groupId,
+                                    ).catch(() => null);
+                                    setSelectedGroupDetail({
+                                      ...g,
+                                      ...(detailRes || {}),
+                                      members:
+                                        detailRes?.members || g.members || [],
+                                    });
+                                  } catch {
+                                    setSelectedGroupDetail(g);
+                                  }
+                                }}
+                                className="font-bold text-[#E65100] hover:underline text-sm text-left cursor-pointer"
+                              >
                                 {g.groupCode || g.name || "Chưa có mã"}
-                              </p>
+                              </button>
                               {g.name && g.groupCode && (
                                 <p className="text-[11px] text-[#6B635B] mt-0.5">
                                   {g.name}
@@ -1330,9 +1367,16 @@ export default function AdminDashboard() {
                                 {isValidSize ? "Đạt chuẩn" : "Chưa đạt"})
                               </span>
                             </td>
-                            <td className="p-4 text-right">
-                              <span className="px-3 py-1 bg-gray-100 text-[#6B635B] font-bold rounded-xl text-[11px]">
-                                {g.locked ? " Đã khóa nhóm" : " Đang mở nhóm"}
+                            <td className="p-4 text-right flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openLeaderModal(g)}
+                                className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-xl text-[11px] border border-purple-200 cursor-pointer"
+                              >
+                                👑 Đổi Trưởng nhóm
+                              </button>
+                              <span className="px-3 py-1.5 bg-gray-100 text-[#6B635B] font-bold rounded-xl text-[11px]">
+                                {g.locked ? "🔒 Đã khóa" : "🔓 Đang mở"}
                               </span>
                             </td>
                           </tr>
@@ -1368,6 +1412,159 @@ export default function AdminDashboard() {
         </div>
       </main>
 
+      {/* 🌟 MODAL HIỂN THỊ CHI TIẾT THÀNH VIÊN VÀ THÔNG TIN NHÓM */}
+      {selectedGroupDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-[#E8E2D9] p-7 space-y-6 text-xs my-8">
+            <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+              <div>
+                <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[10px] font-black rounded-lg uppercase">
+                  Thông tin chi tiết nhóm
+                </span>
+                <h3 className="text-base font-black text-[#2C2825] mt-1">
+                  Nhóm: {selectedGroupDetail.groupCode || "—"} (
+                  {selectedGroupDetail.name || "Chưa đặt tên"})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedGroupDetail(null)}
+                className="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 bg-[#FBF9F5] p-4 rounded-2xl border border-[#E8E2D9]">
+              <div>
+                <p className="text-[10px] font-bold text-[#6B635B] uppercase">
+                  Tên đề tài Capstone:
+                </p>
+                <p className="font-black text-[#2C2825] mt-0.5 text-sm">
+                  {selectedGroupDetail.topicName ||
+                    selectedGroupDetail.capstoneName ||
+                    selectedGroupDetail.name ||
+                    "Chưa đăng ký đề tài"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-[#6B635B] uppercase">
+                  Giảng viên hướng dẫn:
+                </p>
+                <p className="font-black text-[#E65100] mt-0.5 text-sm">
+                  {selectedGroupDetail.semesterModerator?.fullName ||
+                    selectedGroupDetail.moderator?.fullName ||
+                    selectedGroupDetail.moderatorName ||
+                    selectedGroupDetail.instructorName ||
+                    selectedGroupDetail.lecturerName ||
+                    selectedGroupDetail.lecturer?.fullName ||
+                    "Chưa phân công"}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-black text-xs text-[#2C2825] uppercase tracking-wider">
+                Danh sách thành viên ({selectedGroupDetail.members?.length || 0}
+                /5)
+              </h4>
+
+              <div className="border border-[#E8E2D9] rounded-2xl overflow-hidden">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
+                      <th className="p-3 font-black uppercase w-12 text-center">
+                        STT
+                      </th>
+                      <th className="p-3 font-black uppercase">MSSV</th>
+                      <th className="p-3 font-black uppercase">Họ và tên</th>
+                      <th className="p-3 font-black uppercase">Gmail</th>
+                      <th className="p-3 font-black uppercase text-right">
+                        Vai trò
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E8E2D9]">
+                    {selectedGroupDetail.members &&
+                    selectedGroupDetail.members.length > 0 ? (
+                      selectedGroupDetail.members.map((m, idx) => {
+                        const isLeader = Boolean(
+                          m.isLeader ||
+                          m.leader ||
+                          m.role === "LEADER" ||
+                          m.position === "LEADER",
+                        );
+                        const mCode =
+                          m.studentCode ||
+                          m.code ||
+                          m.userCode ||
+                          m.profile?.studentCode ||
+                          "—";
+                        const mName =
+                          m.fullName ||
+                          m.userFullName ||
+                          m.profile?.fullName ||
+                          "—";
+                        const mEmail =
+                          m.email || m.userEmail || m.profile?.email || "—";
+
+                        return (
+                          <tr
+                            key={m.userId || m.id || idx}
+                            className="hover:bg-[#FBF9F5]/70"
+                          >
+                            <td className="p-3 text-center font-bold text-[#6B635B]">
+                              {idx + 1}
+                            </td>
+                            <td className="p-3 font-mono font-bold text-[#E65100]">
+                              {mCode}
+                            </td>
+                            <td className="p-3 font-bold text-[#2C2825]">
+                              {mName}
+                            </td>
+                            <td className="p-3 text-[#6B635B]">{mEmail}</td>
+                            <td className="p-3 text-right">
+                              {isLeader ? (
+                                <span className="px-2.5 py-1 bg-purple-100 text-purple-700 font-bold rounded-lg text-[10px]">
+                                  👑 Trưởng nhóm
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-gray-100 text-gray-700 font-bold rounded-lg text-[10px]">
+                                  Thành viên
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="p-6 text-center text-[#6B635B] italic"
+                        >
+                          Chưa có thành viên nào trong nhóm này.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedGroupDetail(null)}
+                className="px-6 py-2.5 bg-[#2C2825] hover:bg-black text-white font-bold rounded-xl cursor-pointer shadow-md transition"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL TẠO / SỬA HỌC KỲ */}
       {semesterModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn overflow-y-auto">
@@ -1379,7 +1576,7 @@ export default function AdminDashboard() {
               <h3 className="text-sm font-black text-[#2C2825]">
                 {isEditingSemester
                   ? "✏️ Cập nhật thông tin học kỳ"
-                  : "⚙️ Tạo học kỳ mới & Phân công Moderator"}
+                  : "⚙️ Tạo học kỳ mới & Phân công Giảng viên"}
               </h3>
               <button
                 type="button"
@@ -1498,7 +1695,7 @@ export default function AdminDashboard() {
 
             <div className="space-y-1">
               <label className="font-bold text-[#6B635B]">
-                Phân công Moderator phụ trách kỳ
+                Phân công Giảng viên phụ trách kỳ
               </label>
               <select
                 value={semesterForm.moderatorId}
@@ -1510,7 +1707,7 @@ export default function AdminDashboard() {
                 }
                 className="w-full p-3 bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#2C2825] outline-none cursor-pointer focus:border-[#E65100]"
               >
-                <option value="">-- Chọn Moderator (Tuỳ chọn) --</option>
+                <option value="">-- Chọn Giảng viên (Tuỳ chọn) --</option>
                 {moderators.map((mod) => (
                   <option
                     key={mod.id || mod.userId}
@@ -1526,8 +1723,8 @@ export default function AdminDashboard() {
               <p className="font-black">📌 Ghi chú hướng dẫn:</p>
               <p className="text-[11px] leading-relaxed">
                 • Quản lý mốc thời gian và cấu hình ghép nhóm theo chuẩn v2.9.
-                <br />• Bạn có thể thay đổi thông tin hoặc gán lại Moderator phụ
-                trách học kỳ bất cứ lúc nào.
+                <br />• Bạn có thể thay đổi thông tin hoặc gán lại Giảng viên
+                phụ trách học kỳ bất cứ lúc nào.
               </p>
             </div>
 
@@ -1631,7 +1828,7 @@ export default function AdminDashboard() {
                 }
                 className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 font-normal"
               >
-                <option value="MODERATOR">Moderator</option>
+                <option value="MODERATOR">Giảng viên</option>
               </select>
             </label>
             <div className="flex justify-end gap-3 border-t border-[#F0EBE1] pt-4">
@@ -1654,7 +1851,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* MODAL ĐỔI LEADER */}
+      {/* MODAL ĐỔI TRƯỞNG NHÓM */}
       {leaderModalOpen && selectedGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form
@@ -1663,7 +1860,7 @@ export default function AdminDashboard() {
           >
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-lg font-black text-[#2C2825]">
-                Đổi Leader nhóm {selectedGroup.groupCode}
+                Đổi Trưởng nhóm {selectedGroup.groupCode}
               </h3>
               <button
                 type="button"
@@ -1674,7 +1871,7 @@ export default function AdminDashboard() {
               </button>
             </div>
             <label className="block space-y-2 text-sm font-bold">
-              Chọn Leader mới
+              Chọn Trưởng nhóm mới
               <select
                 value={newLeaderId}
                 onChange={(event) => setNewLeaderId(event.target.value)}
@@ -1685,12 +1882,10 @@ export default function AdminDashboard() {
                 {(selectedGroup?.members || [])
                   .filter(
                     (member) =>
-                      // Kiểm tra điều kiện: không phải là leader hiện tại và có ID
                       !member.leader &&
                       (member.userId || member.profile?.userId),
                   )
                   .map((member) => {
-                    // Lấy đúng các trường dữ liệu từ JSON response thực tế
                     const mId = member.userId || member.profile?.userId;
                     const mName =
                       member.fullName ||

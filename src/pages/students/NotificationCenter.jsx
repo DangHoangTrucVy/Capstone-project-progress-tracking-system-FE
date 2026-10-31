@@ -61,15 +61,15 @@ export default function NotificationCenter() {
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsAsRead();
-      alert("Đã đánh dấu tất cả là đã đọc!");
+      alert("Đã đánh dấu tất cả thông báo là đã đọc!");
       fetchNotificationData();
     } catch (err) {
-      alert("Không thể thực hiện thao tác này.");
+      alert("Không thể thực hiện thao tác này lúc này.");
     }
   };
 
   return (
-    <div className="space-y-6 p-8 max-w-4xl mx-auto font-sans animate-fadeIn text-[#2C2825]">
+    <div className="space-y-6 p-8 max-w-4xl mx-auto font-sans text-[#2C2825]">
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm flex justify-between items-center">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export default function NotificationCenter() {
             )}
           </div>
           <p className="text-xs text-[#6B635B]">
-            Cập nhật các tin tức, lịch hẹn và đánh giá mới nhất từ giảng viên và hệ thống.
+            Cập nhật tin tức, lịch hẹn tư vấn và đánh giá mới nhất từ giảng viên và hệ thống quản lý.
           </p>
         </div>
         <button
@@ -123,7 +123,7 @@ export default function NotificationCenter() {
               </div>
             ))
           ) : (
-            <p className="text-xs text-[#6B635B] italic py-4">Không có thông báo nào.</p>
+            <p className="text-xs text-[#6B635B] italic py-4">Hiện không có thông báo nào.</p>
           )}
         </div>
       </div>

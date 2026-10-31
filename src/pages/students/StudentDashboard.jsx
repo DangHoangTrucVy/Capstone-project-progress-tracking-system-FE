@@ -85,8 +85,6 @@ export default function StudentDashboard() {
 
       let targetGroupId = null;
 
-      // 1. Nguồn chuẩn xác tuyệt đối từ Backend: /me/semesters
-      // Lấy trực tiếp nhóm của sinh viên theo kỳ học từ database (không phụ thuộc trạng thái OPEN/FULL/LOCKED)
       try {
         const semestersData = await getMySemesters();
         const semesters = Array.isArray(semestersData)
@@ -106,12 +104,10 @@ export default function StudentDashboard() {
         console.error("Không thể lấy thông tin nhóm từ /me/semesters:", scanErr);
       }
 
-      // 2. Fallback dự phòng (nếu /me/semesters không kết nối được hoặc dữ liệu cache)
       if (!targetGroupId) {
         targetGroupId = localStorage.getItem("groupId");
       }
 
-      // 3. Tải dữ liệu nhóm và xác thực user thực sự có trong nhóm
       if (targetGroupId) {
         try {
           const group = await getGroupById(targetGroupId);
@@ -132,7 +128,6 @@ export default function StudentDashboard() {
         }
       }
 
-      // 4. Nếu thực sự chưa có nhóm -> Chuyển về trang tạo nhóm / tìm nhóm
       localStorage.removeItem("groupId");
       setGroupData(null);
       setHasGroup(false);
@@ -158,7 +153,7 @@ export default function StudentDashboard() {
 
   if (groupError)
     return (
-      <div role="alert" className="p-8 text-center text-red-600 font-bold bg-[#FBF9F5] min-h-screen flex flex-col justify-center items-center">
+      <div role="alert" className="p-8 text-center text-red-600 font-bold bg-[#FBF9F5] min-h-screen flex flex-col justify-center items-center font-sans">
         <p>{groupError}</p>
         <button onClick={checkUserGroup} className="mt-3 px-4 py-2 bg-[#E65100] text-white rounded-xl text-xs">Thử lại</button>
       </div>
@@ -166,8 +161,8 @@ export default function StudentDashboard() {
 
   if (hasGroup === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FBF9F5] text-xs font-bold text-[#6B635B]">
-        Đang kiểm tra thông tin nhóm đồ án...
+      <div className="min-h-screen flex items-center justify-center bg-[#FBF9F5] text-xs font-bold text-[#6B635B] font-sans">
+        Đang kiểm tra thông tin nhóm đồ án tốt nghiệp...
       </div>
     );
   }
@@ -196,7 +191,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans overflow-hidden">
-      {/* SIDEBAR BÊN TRÁI - THIẾT KẾ TINH TẾ, SANG TRỌNG */}
+      {/* SIDEBAR BÊN TRÁI */}
       <aside className="w-76 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-6 select-none shrink-0 shadow-sm">
         <div className="space-y-6">
           <div className="flex items-center space-x-3.5">
@@ -205,10 +200,10 @@ export default function StudentDashboard() {
             </div>
             <div>
               <h2 className="font-extrabold text-sm tracking-tight text-[#2C2825]">
-                Quản Lý Sinh Viên
+                Quản lý Sinh viên
               </h2>
               <p className="text-[11px] text-[#6B635B]">
-                MatchPoint FPT Capstone.
+                Hệ thống Quản lý Đồ án FPT
               </p>
             </div>
           </div>
@@ -244,7 +239,7 @@ export default function StudentDashboard() {
                 {!hasGroup
                   ? "Chưa tham gia"
                   : isLeader
-                    ? "👑 Nhóm trưởng"
+                    ? "👑 Trưởng nhóm"
                     : "👤 Thành viên"}
               </span>
             </div>
@@ -273,7 +268,7 @@ export default function StudentDashboard() {
                 }`}
               >
                 <span>👥</span>
-                <span>Thành viên nhóm (3–5 người)</span>
+                <span>Thành viên nhóm </span>
               </button>
 
               {hasGroup && (
@@ -286,7 +281,7 @@ export default function StudentDashboard() {
                   }`}
                 >
                   <span>📝</span>
-                  <span>Đơn Apply & Vote</span>
+                  <span>Đơn ứng tuyển & Lời mời</span>
                 </button>
               )}
 
@@ -325,7 +320,7 @@ export default function StudentDashboard() {
                 }`}
               >
                 <span>🚀</span>
-                <span>Tạo nhóm</span>
+                <span>Tạo nhóm mới</span>
               </button>
               <button
                 onClick={() => setActiveTab("settings")}
@@ -381,10 +376,10 @@ export default function StudentDashboard() {
             <span className="font-extrabold text-[#E65100] bg-orange-50/80 px-3 py-1.5 rounded-xl border border-orange-100/80 shadow-2xs">
               Đợt Lập Nhóm Đầu Kỳ
             </span>
-            <span className="text-gray-300">/</span>
+            {/* <span className="text-gray-300">/</span>
             <span className="font-bold text-[#6B635B]">
-              Khoa CNTT - Đại học FPT
-            </span>
+              Khoa Công nghệ thông tin · Đại học FPT
+            </span> */}
           </div>
 
           <div className="flex items-center space-x-4">
@@ -410,15 +405,15 @@ export default function StudentDashboard() {
               }`}
             >
               {!hasGroup
-                ? "🎓 STUDENT"
+                ? "🎓 SINH VIÊN"
                 : isLeader
-                  ? "👑 Nhóm trưởng"
+                  ? "👑 Trưởng nhóm"
                   : "👤 Thành viên"}
             </span>
           </div>
         </header>
 
-        {hasGroup && (
+        {/* {hasGroup && (
           <div
             className={`mx-8 mt-6 p-4 rounded-2xl border shadow-xs ${isValidTeamSize ? "bg-emerald-50/70 border-emerald-200 text-emerald-900" : "bg-amber-50/70 border-amber-200 text-amber-900"}`}
           >
@@ -430,7 +425,7 @@ export default function StudentDashboard() {
                 <h2 className="mt-0.5 text-xs font-black">
                   {isValidTeamSize
                     ? `Nhóm đã đạt sĩ số hợp lệ (${groupMemberCount}/5 thành viên)`
-                    : `Nhóm hiện có ${groupMemberCount}/5 thành viên (Yêu cầu tối thiểu 3 thành viên)`}
+                    : `Nhóm hiện có ${groupMemberCount}/5 thành viên (Yêu cầu tối thiểu 3 thành viên chính thức)`}
                 </h2>
               </div>
               <span
@@ -440,7 +435,7 @@ export default function StudentDashboard() {
               </span>
             </div>
           </div>
-        )}
+        )} */}
 
         <div className="p-8 max-w-7xl mx-auto w-full">
           {hasGroup || isLeader ? (
@@ -450,6 +445,7 @@ export default function StudentDashboard() {
                   groupData={groupData}
                   onGroupUpdated={checkUserGroup}
                   isLeader={isLeader}
+                  onNavigateTab={(tabName) => setActiveTab(tabName)}
                 />
               )}
               {activeTab === "members" && (
@@ -464,6 +460,7 @@ export default function StudentDashboard() {
                   groupId={groupData?.id}
                   isLeader={isLeader}
                   currentUserId={currentUser?.id}
+                  onGroupUpdated={checkUserGroup}
                 />
               )}
               {activeTab === "management" && (
@@ -482,7 +479,6 @@ export default function StudentDashboard() {
                 <Profile />
               ) : (
                 <div className="space-y-6">
-                  {/* THANH TAB CHUYỂN ĐỔI ĐƯỢC THIẾT KẾ LẠI SANG TRỌNG HƠN */}
                   <div className="flex justify-center mb-2">
                     <div className="bg-white p-1.5 rounded-2xl max-w-md w-full grid grid-cols-2 gap-2 border border-[#E8E2D9] shadow-xs">
                       <button
@@ -519,7 +515,7 @@ export default function StudentDashboard() {
                           setHasGroup(true);
                           setActiveTab("overview");
                         } catch (err) {
-                          console.error("Không thể tải group sau khi Accept:", err);
+                          console.error("Không thể tải thông tin nhóm sau khi chấp nhận:", err);
                         }
                       }}
                     />

@@ -11,13 +11,11 @@ import {
 export default function GroupManagementPanel({
   groupData,
   isLeader,
-  currentUserId,
   onGroupUpdated,
 }) {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
   
-  // State phục vụ form rời nhóm và theo dõi đơn đang chờ
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [leaveReason, setLeaveReason] = useState("");
   const [activeLeaveReq, setActiveLeaveReq] = useState(null);
@@ -41,7 +39,6 @@ export default function GroupManagementPanel({
     }
   }, [groupData?.id, fetchMyLeaveRequests]);
 
-  // Xử lý khóa nhóm
   const handleLockGroup = async () => {
     if (!groupData?.id) return;
     try {
@@ -49,7 +46,7 @@ export default function GroupManagementPanel({
       await lockGroup(groupData.id);
       setNotice({
         type: "success",
-        message: "Đã khóa nhóm thành công! Không nhận đơn ứng tuyển mới.",
+        message: "Đã khóa nhóm thành công! Hệ thống sẽ tạm ngưng nhận đơn ứng tuyển mới.",
       });
       if (onGroupUpdated) await onGroupUpdated();
     } catch (err) {
@@ -62,7 +59,6 @@ export default function GroupManagementPanel({
     }
   };
 
-  // Xử lý mở khóa nhóm
   const handleUnlockGroup = async () => {
     if (!groupData?.id) return;
     try {
@@ -80,15 +76,12 @@ export default function GroupManagementPanel({
     }
   };
 
-  // Xử lý gửi yêu cầu rời nhóm
- // Xử lý gửi yêu cầu rời nhóm
   const handleLeaveGroupSubmit = async (e) => {
     e.preventDefault();
     if (!groupData?.id || !leaveReason.trim()) return;
     try {
       setLoading(true);
       
-      // Gọi API rời nhóm hoặc gửi yêu cầu rời nhóm
       await requestLeaveGroup(groupData.id, { reason: leaveReason.trim() });
       
       setNotice({
@@ -98,24 +91,21 @@ export default function GroupManagementPanel({
       setConfirmingLeave(false);
       setLeaveReason("");
 
-      // 💡 BẮT BUỘC: Xóa sạch cache nhóm trong localStorage để hệ thống nhận diện đây là sinh viên chưa có nhóm
       localStorage.removeItem("groupId");
 
-      // Gọi callback cập nhật lại toàn bộ Dashboard để chuyển về trang tạo nhóm
       if (onGroupUpdated) {
         await onGroupUpdated();
       }
     } catch (err) {
       setNotice({
         type: "error",
-        message: apiError(err, "Không thể rời nhóm."),
+        message: apiError(err, "Không thể thực hiện rời nhóm."),
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Xử lý thu hồi đơn rời nhóm đang chờ
   const handleWithdrawRequest = async (requestId) => {
     if (!requestId) return;
     try {
@@ -141,11 +131,11 @@ export default function GroupManagementPanel({
   const memberCount = groupData?.members?.length || 0;
 
   return (
-    <div className="space-y-6 text-[#2C2825] animate-fadeIn">
+    <div className="space-y-6 text-[#2C2825] font-sans">
       {/* 1. THÔNG TIN CHUNG VỀ TRẠNG THÁI NHÓM */}
       <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm space-y-3">
         <h3 className="text-xs font-black uppercase text-[#6B635B]">
-          Thông tin tổng quan trạng thái nhóm
+          Tổng quan trạng thái nhóm
         </h3>
         <div className="p-4 bg-[#FBF9F5] rounded-2xl border border-[#E8E2D9] text-xs space-y-1.5">
           <p className="font-black text-sm text-[#2C2825]">
@@ -155,7 +145,7 @@ export default function GroupManagementPanel({
             Sĩ số hiện tại: <strong className="text-[#E65100]">{memberCount}/5 thành viên</strong>
           </p>
           <p className="text-[#6B635B]">
-            Vai trò của bạn: <strong className="text-[#2C2825]">{isLeader ? "👑 Trưởng nhóm (Leader)" : "👤 Thành viên (Member)"}</strong>
+            Vai trò của bạn: <strong className="text-[#2C2825]">{isLeader ? "👑 Trưởng nhóm" : "👤 Thành viên"}</strong>
           </p>
         </div>
       </div>
@@ -170,8 +160,8 @@ export default function GroupManagementPanel({
             Trạng thái hiện tại:{" "}
             <strong className={isLocked ? "text-red-600" : "text-emerald-600"}>
               {isLocked
-                ? "🔒 Đang khóa (Không nhận đơn mới)"
-                : "🔓 Đang mở (Cho phép nhận đơn)"}
+                ? "🔒 Đang khóa (Tạm ngưng nhận đơn ứng tuyển mới)"
+                : "🔓 Đang mở (Cho phép nhận đơn ứng tuyển)"}
             </strong>
           </p>
           <div className="flex gap-3">
@@ -181,7 +171,7 @@ export default function GroupManagementPanel({
                 onClick={handleUnlockGroup}
                 className="px-5 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer hover:bg-emerald-700 disabled:opacity-50"
               >
-                Mở khóa nhóm (Unlock)
+                Mở khóa nhóm
               </button>
             ) : (
               <button
@@ -189,7 +179,7 @@ export default function GroupManagementPanel({
                 onClick={handleLockGroup}
                 className="px-5 py-2.5 bg-red-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer hover:bg-red-700 disabled:opacity-50"
               >
-                Khóa nhóm (Lock)
+                Khóa nhóm
               </button>
             )}
           </div>
@@ -206,10 +196,10 @@ export default function GroupManagementPanel({
           <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-amber-800">
-                ⏳ Đang chờ xử lý đơn rời nhóm
+                ⏳ Đang chờ hệ thống xử lý đơn xin rời nhóm
               </span>
               <span className="text-[10px] bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full font-bold">
-                PENDING
+                CHỜ XỬ LÝ
               </span>
             </div>
             <p className="text-xs text-[#6B635B]">
@@ -230,8 +220,8 @@ export default function GroupManagementPanel({
           <>
             <p className="text-xs text-[#6B635B] leading-relaxed">
               {isLeader
-                ? "Vì bạn là Trưởng nhóm, yêu cầu rời nhóm sẽ được ghi nhận. Hệ thống sẽ tự động chuyển giao quyền Leader sang thành viên tiếp theo để nhóm không bị gián đoạn."
-                : "Nếu bạn muốn rời khỏi nhóm, hãy điền lý do và gửi yêu cầu."}
+                ? "Vì bạn là Trưởng nhóm, yêu cầu rời nhóm sẽ được ghi nhận. Hệ thống sẽ hỗ trợ chuyển giao quyền Trưởng nhóm sang thành viên tiếp theo để nhóm hoạt động ổn định."
+                : "Nếu bạn có nhu cầu rời khỏi nhóm, vui lòng điền lý do chi tiết và gửi yêu cầu."}
             </p>
 
             {!confirmingLeave ? (
@@ -274,7 +264,6 @@ export default function GroupManagementPanel({
         )}
       </div>
 
-      {/* THÔNG BÁO MODAL */}
       {notice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-xl space-y-4 max-w-sm w-full">
@@ -285,11 +274,11 @@ export default function GroupManagementPanel({
             <button
               onClick={() => {
                 setNotice(null);
-                window.location.reload(); // 💡 Reload lại trang sau khi xác nhận thông báo để reset sạch state giao diện nhóm
+                window.location.reload(); 
               }}
               className="w-full py-2 bg-[#E65100] text-white font-bold text-xs rounded-xl cursor-pointer"
             >
-              OK
+              Đã hiểu
             </button>
           </div>
         </div>
