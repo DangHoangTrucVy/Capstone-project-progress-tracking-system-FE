@@ -10,7 +10,7 @@ import {
   cancelLeaderTransfer,
 } from "../../services/groupService";
 
-export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
+export default function MemberGroup({ groupId, isLeader, currentUserId, onGroupUpdated }) {
   const [groupData, setGroupData] = useState(null);
   const [memberInput, setMemberInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -221,7 +221,7 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
 
   return (
     <div className="space-y-6 animate-fadeIn text-[#2C2825]">
-      {/* 👑 KHU VỰC HIỂN THỊ YÊU CẦU BÀN GIAO LEADER (Nằm ngay trong tab Thành viên nhóm) */}
+      {/* 👑 KHU VỰC HIỂN THỊ YÊU CẦU BÀN GIAO LEADER */}
       {leaderTransfers.length > 0 && (
         <div className="bg-orange-50/80 p-6 rounded-3xl border border-orange-200 shadow-sm space-y-3">
           <div className="flex items-center space-x-2 text-[#E65100] font-black text-xs uppercase">
@@ -230,37 +230,53 @@ export default function MemberGroup({ groupId, isLeader, onGroupUpdated }) {
           </div>
 
           <div className="space-y-2">
-            {leaderTransfers.map((item) => (
-              <div key={item.id} className="bg-white p-4 rounded-2xl border border-orange-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
-                <div>
-                  <p className="font-black text-[#2C2825]">
-                    {item.fromName ? `Trưởng nhóm ${item.fromName} muốn bàn giao quyền Leader cho bạn.` : "Có yêu cầu bàn giao quyền Leader trong nhóm."}
-                  </p>
-                  <p className="text-[11px] text-[#6B635B] mt-0.5">Mã nhóm: {groupData?.groupCode || groupData?.code}</p>
-                </div>
+            {leaderTransfers.map((item) => {
+              // Kiểm tra xem user hiện tại có phải là người tạo yêu cầu (Leader cũ) hay không
+              // (Dựa vào item.fromUserId hoặc bạn có thể truyền currentUserId vào component nếu có)
+              const isSender = String(item.fromUserId) === String(currentUserId) || isLeader; 
+              // Hoặc nếu component này nhận props `isLeader`, ta có thể phân biệt:
+              // Nếu đang là Leader gửi đi -> chỉ hiện nút "Hủy đề xuất".
+              // Nếu là người nhận được đề xuất -> hiện "Chấp nhận làm Leader" và "Từ chối".
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAcceptTransfer(item.id)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Chấp nhận làm Leader
-                  </button>
-                  <button
-                    onClick={() => handleDeclineTransfer(item.id)}
-                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Từ chối
-                  </button>
-                  <button
-                    onClick={() => handleCancelTransfer(item.id)}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Hủy đề xuất
-                  </button>
+              return (
+                <div key={item.id} className="bg-white p-4 rounded-2xl border border-orange-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                  <div>
+                    <p className="font-black text-[#2C2825]">
+                      {item.fromName ? `Trưởng nhóm ${item.fromName} muốn bàn giao quyền Leader cho bạn.` : "Có yêu cầu bàn giao quyền Leader trong nhóm."}
+                    </p>
+                    <p className="text-[11px] text-[#6B635B] mt-0.5">Mã nhóm: {groupData?.groupCode || groupData?.code}</p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {isLeader ? (
+                      // 1. Giao diện dành cho LEADER (Người gửi đề xuất): Chỉ có nút Hủy đề xuất
+                      <button
+                        onClick={() => handleCancelTransfer(item.id)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition cursor-pointer"
+                      >
+                        Hủy đề xuất
+                      </button>
+                    ) : (
+                      // 2. Giao diện dành cho THÀNH VIÊN ĐƯỢC CHỈ ĐỊNH: Chấp nhận hoặc Từ chối
+                      <>
+                        <button
+                          onClick={() => handleAcceptTransfer(item.id)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Chấp nhận làm Leader
+                        </button>
+                        <button
+                          onClick={() => handleDeclineTransfer(item.id)}
+                          className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Từ chối
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

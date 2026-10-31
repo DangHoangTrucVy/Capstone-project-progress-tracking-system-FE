@@ -64,7 +64,7 @@ export default function ModeratorLeaveRequests({ semester }) {
     }
   };
 
-  const handleDecision = async (requestId, approved) => {
+ const handleDecision = async (requestId, approved) => {
     const reason = window.prompt(approved ? "Nhập lý do chấp nhận (không bắt buộc):" : "Nhập lý do từ chối khiếu nại:") || "";
     if (!approved && !reason.trim()) {
       showToast("Vui lòng nhập lý do từ chối.", "error");
@@ -72,10 +72,12 @@ export default function ModeratorLeaveRequests({ semester }) {
     }
 
     try {
+      // 🛠️ Sửa lại key gửi lên khớp với DecisionBody của Java (approve và note)
       await api.post(`/leave-requests/${requestId}/moderator-decision`, {
-        approved,
-        reason: reason.trim(),
+        approve: approved,   // Đổi từ approved thành approve
+        note: reason.trim(), // Đổi từ reason thành note
       });
+      
       showToast(approved ? "Đã chấp nhận khiếu nại rời nhóm." : "Đã từ chối khiếu nại.");
       loadRequests(selectedSemester);
     } catch (error) {
