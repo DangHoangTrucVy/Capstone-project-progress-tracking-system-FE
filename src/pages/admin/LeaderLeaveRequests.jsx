@@ -22,7 +22,6 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
   const [newLeaderUserId, setNewLeaderUserId] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // 1. Lấy danh sách môn học (UUID subjectId) của mọi học kỳ đang có, không gắn cứng mã học kỳ
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -50,7 +49,6 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
     };
   }, []);
 
-  // 2. Lấy danh sách khiếu nại/yêu cầu theo subjectId dạng UUID
   useEffect(() => {
     if (!subjectId) return;
     let cancelled = false;
@@ -160,51 +158,41 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
   };
 
   return (
-    <section className="min-h-full space-y-6 bg-[#FBF9F5] p-5 text-[#2C2825] sm:p-8">
-      {/* Header & Chọn Môn học (UUID) */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
+    <section className="min-h-full space-y-6 p-8 text-[#1A1816] animate-smooth-fade">
+      {/* Khối CSS keyframes cho hiệu ứng hiển thị mượt mà kéo dài 1.55s */}
+      <style>{`
+        @keyframes smoothFadeIn {
+          0% {
+            opacity: 0;
+            transform: translateY(14px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-smooth-fade {
+          animation: smoothFadeIn 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: opacity, transform;
+        }
+      `}</style>
+
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-[#E65100]/90 backdrop-blur-xl p-6 rounded-2xl border border-white shadow-lg shadow-black/5">
         <div>
-          <span className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-[#E65100]">
+          <span className="inline-flex rounded-md bg-orange-100 px-3 py-1 text-[11px] font-black text-[#E65100] border border-orange-200">
             QUẢN LÝ ĐIỀU PHÒI
           </span>
-          <h1 className="mt-2 text-xl font-black sm:text-2xl">
+          <h1 className="mt-2 text-2xl font-black text-[#fdfdfd] sm:text-2xl">
             Yêu cầu rời nhóm & Khiếu nại chờ xử lý
           </h1>
         </div>
-
-        {/* <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-[#6B635B]">Môn học:</span>
-          {subjects.length > 0 ? (
-            <select
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className="p-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
-            >
-              {subjects.map((sub, idx) => {
-                const id = sub.id || sub.subjectId;
-                return (
-                  <option key={idx} value={id}>
-                    {sub.name || sub.code || id}
-                  </option>
-                );
-              })}
-            </select>
-          ) : (
-            <input
-              type="text"
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              placeholder="Nhập Subject ID (UUID)..."
-              className="w-64 p-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-mono text-[#E65100] outline-none"
-            />
-          )}
-        </div> */}
 
         <button
           type="button"
           onClick={refresh}
           disabled={busy || loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E8E2D9] bg-white px-4 py-3 text-sm font-bold shadow-sm transition hover:border-orange-300 hover:bg-orange-50 cursor-pointer"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white bg-white/90 px-4 py-3 text-xs font-bold shadow-sm transition hover:bg-orange-50 text-[#E65100] cursor-pointer"
         >
           <span>↻</span>
           Làm mới
@@ -212,15 +200,15 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
       </div>
 
       {/* Filter trạng thái */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-[#E8E2D9] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-white bg-white/80 backdrop-blur-xl p-4 shadow-lg shadow-black/5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-black">Danh sách yêu cầu</h2>
-          <p className="mt-1 text-xs text-[#8A8178]">Lọc yêu cầu theo trạng thái xử lý.</p>
+          <h2 className="text-sm font-black text-[#1A1816]">Danh sách yêu cầu</h2>
+          <p className="mt-1 text-xs text-[#554D44] font-semibold">Lọc yêu cầu theo trạng thái xử lý.</p>
         </div>
 
         <select
           aria-label="Lọc trạng thái yêu cầu"
-          className="w-full rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] px-4 py-3 text-sm outline-none transition focus:border-[#E65100] sm:w-56 cursor-pointer"
+          className="w-full rounded-xl border border-white bg-white px-4 py-3 text-xs font-bold text-[#1A1816] outline-none transition focus:border-[#E65100] sm:w-56 cursor-pointer shadow-sm"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -237,7 +225,7 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
       </div>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-100 p-4 text-xs font-bold text-red-800 shadow-sm">
           <strong>Có lỗi xảy ra.</strong> {error}
         </div>
       )}
@@ -245,33 +233,33 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
       {/* Request list */}
       <div className="space-y-4">
         {loading ? (
-          <div className="rounded-2xl border border-[#E8E2D9] bg-white p-12 text-center">
+          <div className="rounded-2xl border border-white bg-white/80 backdrop-blur-xl p-12 text-center shadow-lg shadow-black/5">
             <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-orange-100 border-t-[#E65100]" />
-            <p className="text-sm font-semibold text-[#8A8178]">Đang tải danh sách yêu cầu...</p>
+            <p className="text-xs font-bold text-[#554D44]">Đang tải danh sách yêu cầu...</p>
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#D8D0C6] bg-white px-5 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-2xl">
+          <div className="rounded-2xl border border-white bg-white/80 backdrop-blur-xl px-5 py-14 text-center shadow-lg shadow-black/5">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-2xl">
               📭
             </div>
-            <h3 className="mt-4 font-bold">Chưa có yêu cầu nào</h3>
-            <p className="mt-1 text-sm text-[#8A8178]">Không tìm thấy yêu cầu phù hợp.</p>
+            <h3 className="mt-4 font-black text-[#1A1816] text-sm">Chưa có yêu cầu nào</h3>
+            <p className="mt-1 text-xs text-[#554D44] font-semibold">Không tìm thấy yêu cầu phù hợp.</p>
           </div>
         ) : (
           items.map((item) => {
             const isPending = item.status === "PENDING";
             return (
-              <article key={item.id} className="rounded-2xl border bg-white p-5 shadow-sm border-[#E8E2D9]">
+              <article key={item.id} className="rounded-2xl border bg-white/80 backdrop-blur-xl p-5 shadow-lg shadow-black/5 border-white">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-black text-[#E65100]">
+                    <span className="rounded-lg bg-orange-100 px-2.5 py-1 text-xs font-black text-[#E65100] border border-orange-200">
                       {item.groupCode || "Chưa có mã nhóm"}
                     </span>
-                    <h2 className="mt-4 text-base font-black">{item.userFullName || "Sinh viên"}</h2>
-                    <p className="mt-1 text-xs text-[#8A8178]">MSSV: {item.studentCode || "Chưa có MSSV"}</p>
-                    <div className="mt-4 rounded-xl bg-[#FBF9F5] p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-[#8A8178]">Lý do</p>
-                      <p className="mt-2 text-sm leading-6">{item.reason || "Không có lý do"}</p>
+                    <h2 className="mt-4 text-base font-black text-[#1A1816]">{item.userFullName || "Sinh viên"}</h2>
+                    <p className="mt-1 text-xs text-[#554D44] font-semibold">MSSV: {item.studentCode || "Chưa có MSSV"}</p>
+                    <div className="mt-4 rounded-xl bg-white/60 p-4 border border-white">
+                      <p className="text-[11px] font-black uppercase tracking-wide text-[#554D44]">Lý do</p>
+                      <p className="mt-2 text-xs leading-relaxed font-semibold text-[#1A1816]">{item.reason || "Không có lý do"}</p>
                     </div>
                   </div>
 
@@ -280,14 +268,14 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
                       <button
                         type="button"
                         onClick={() => openApprove(item)}
-                        className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white cursor-pointer"
+                        className="rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-3 text-xs font-bold text-white cursor-pointer shadow-sm"
                       >
                         ✓ Duyệt & Xử lý
                       </button>
                       <button
                         type="button"
                         onClick={() => reject(item)}
-                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 cursor-pointer"
+                        className="rounded-xl border border-red-200 bg-red-100 hover:bg-red-200 px-4 py-3 text-xs font-bold text-red-800 cursor-pointer shadow-sm"
                       >
                         ✕ Từ chối
                       </button>
@@ -302,13 +290,13 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
 
       {/* Modal duyệt */}
       {selected && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={approve} className="w-full max-w-lg space-y-5 rounded-3xl bg-white p-6 shadow-2xl">
-            <h2 className="text-xl font-black">Duyệt yêu cầu / khiếu nại</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+          <form onSubmit={approve} className="w-full max-w-lg space-y-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white p-6 shadow-2xl text-xs animate-smooth-fade">
+            <h2 className="text-base font-black text-[#1A1816]">Duyệt yêu cầu / khiếu nại</h2>
             <div>
-              <label className="mb-2 block text-sm font-bold">Chọn Leader mới (Nếu cần)</label>
+              <label className="mb-2 block font-bold text-[#3A3530]">Chọn Leader mới (Nếu cần)</label>
               <select
-                className="w-full rounded-xl border border-[#E8E2D9] bg-white p-3 text-sm outline-none cursor-pointer"
+                className="w-full rounded-xl border border-white bg-white p-3 font-semibold text-[#1A1816] outline-none cursor-pointer shadow-sm"
                 value={newLeaderUserId}
                 onChange={(e) => setNewLeaderUserId(e.target.value)}
               >
@@ -320,11 +308,11 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
                 ))}
               </select>
             </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <button type="button" onClick={() => setSelected(null)} className="px-5 py-3 border rounded-xl font-bold cursor-pointer">
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/80">
+              <button type="button" onClick={() => setSelected(null)} className="px-5 py-2.5 bg-white border border-white rounded-xl font-bold cursor-pointer shadow-sm hover:bg-orange-50">
                 Hủy
               </button>
-              <button type="submit" className="px-5 py-3 bg-emerald-700 text-white font-bold rounded-xl cursor-pointer">
+              <button type="submit" className="px-5 py-2.5 bg-[#E65100] text-white font-bold rounded-xl cursor-pointer shadow-lg">
                 Xác nhận
               </button>
             </div>

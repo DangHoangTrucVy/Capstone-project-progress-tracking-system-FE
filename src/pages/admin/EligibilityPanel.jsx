@@ -226,20 +226,38 @@ export default function EligibilityPanel({ onChanged }) {
   });
 
   return (
-    <div className="p-8 space-y-6 relative">
+    <div className="p-8 space-y-6 relative animate-smooth-fade">
+      {/* Khối CSS keyframes cho hiệu ứng hiển thị mượt mà từ trên xuống */}
+      <style>{`
+        @keyframes smoothFadeIn {
+          0% {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-smooth-fade {
+          animation: smoothFadeIn 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: opacity, transform;
+        }
+      `}</style>
+
       {/* Tiêu đề & Chọn học kỳ */}
-      <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs flex-wrap gap-4">
+      <div className="bg-[#E65100]/90 p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs flex-wrap gap-4">
         <div>
           <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
             QUẢN LÝ ĐIỀU KIỆN SINH VIÊN
           </span>
-          <h1 className="text-xl font-black text-[#2C2825] mt-1">
+          <h1 className="text-2xl font-black text-[#ffffff] mt-1">
             Import danh sách & Cập nhật trạng thái sinh viên
           </h1>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[#6B635B]">Chọn học kỳ:</span>
+          <span className="text-xs font-bold text-[#ffffff]">Chọn học kỳ:</span>
           <select
             value={selectedSemester}
             onChange={(e) => setSelectedSemester(e.target.value)}
@@ -299,7 +317,7 @@ export default function EligibilityPanel({ onChanged }) {
 
       {/* 🚀 LUỒNG 2: BOX IMPORT INELIGIBLE */}
       {showIneligibleModal && (
-        <div className="bg-amber-50/70 p-6 border-2 border-amber-300 rounded-2xl shadow-md space-y-4 relative">
+        <div className="bg-amber-50/70 p-6 border-2 border-amber-300 rounded-2xl shadow-md space-y-4 relative animate-smooth-fade">
           <div className="flex justify-between items-start">
             <div>
               <span className="px-2.5 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-black rounded uppercase">
@@ -459,7 +477,7 @@ export default function EligibilityPanel({ onChanged }) {
       {/* 💡 CUSTOM MODAL (POPUP NHẬP LÝ DO) */}
       {reasonModalOpen && targetStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#E8E2D9] p-6 space-y-5 text-xs">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#E8E2D9] p-6 space-y-5 text-xs animate-smooth-fade">
             <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
               <h3 className="text-sm font-black text-[#2C2825]">
                 Gắn cờ Chưa đủ điều kiện
@@ -524,7 +542,7 @@ export default function EligibilityPanel({ onChanged }) {
 
       {/* 🚀 TOAST NOTIFICATION CHUYÊN NGHIỆP */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white border border-[#E8E2D9] rounded-2xl shadow-xl text-xs transition-all">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white border border-[#E8E2D9] rounded-2xl shadow-xl text-xs transition-all animate-smooth-fade">
           <span
             className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${
               toast.type === "error" ? "bg-red-500" : "bg-emerald-500"
