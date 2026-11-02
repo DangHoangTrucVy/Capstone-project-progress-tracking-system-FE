@@ -5,8 +5,9 @@ export default function MajorPanel() {
   const [majors, setMajors] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // State form tạo mới / chỉnh sửa
-  const [isEditing, setIsEditing] = useState(false);
+  // State modal Tạo mới / Chỉnh sửa
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [majorName, setMajorName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -36,21 +37,34 @@ export default function MajorPanel() {
     fetchMajors();
   }, []);
 
-  const handleSaveMajor = async (e) => {
+  const handleCreateMajor = async (e) => {
     e.preventDefault();
     if (!majorName.trim() || submitting) return;
 
     setSubmitting(true);
     try {
-      if (isEditing) {
-        await updateMajor(editingId, { name: majorName.trim() });
-        showToast("Đổi tên chuyên ngành thành công!");
-      } else {
-        await createMajor({ name: majorName.trim() });
-        showToast("Tạo chuyên ngành mới thành công!");
-      }
+      await createMajor({ name: majorName.trim() });
+      showToast("Tạo chuyên ngành mới thành công!");
       setMajorName("");
-      setIsEditing(false);
+      setIsCreateOpen(false);
+      fetchMajors();
+    } catch (error) {
+      showToast(error.response?.data?.message || "Thực hiện thất bại.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateMajor = async (e) => {
+    e.preventDefault();
+    if (!majorName.trim() || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await updateMajor(editingId, { name: majorName.trim() });
+      showToast("Đổi tên chuyên ngành thành công!");
+      setMajorName("");
+      setIsEditOpen(false);
       setEditingId(null);
       fetchMajors();
     } catch (error) {
@@ -61,133 +75,239 @@ export default function MajorPanel() {
   };
 
   const handleStartEdit = (major) => {
-    setIsEditing(true);
     setEditingId(major.id || major.majorId);
     setMajorName(major.name || major.majorName || "");
+    setIsEditOpen(true);
   };
 
+  const majorImages = [
+    "https://cnttshop.vn/storage/images/tin-tuc/tri-tue-nhan-tao-ai/tri-tu-nhan-tao-ai-la-gi.jpg",
+    "https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=400&q=80"
+  ];
+
   return (
-   <div className="p-8 space-y-6 max-w-full mx-auto relative animate-fadeIn text-[#2C2825]">
-      {/* Tiêu đề */}
-      <div className="bg-white p-7 border border-[#E8E2D9] rounded-3xl flex justify-between items-center shadow-xs flex-wrap gap-4">
+    <div className="w-full px-8 py-6 space-y-6 animate-smooth-fade text-[#1A1816]">
+      {/* Khối CSS keyframes cho hiệu ứng hiển thị mượt mà từ trên xuống */}
+      <style>{`
+        @keyframes smoothFadeIn {
+          0% {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-smooth-fade {
+          animation: smoothFadeIn 2.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          will-change: opacity, transform;
+        }
+      `}</style>
+
+      {/* Tiêu đề & Nút Thêm chuyên ngành */}
+      <div className="bg-[#E65100]/90 backdrop-blur-xl p-6 border border-white rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center shadow-lg shadow-black/5 gap-4">
         <div>
-          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
+          <span className="px-3 py-1 bg-orange-100 text-[#E65100] text-[11px] font-black rounded border border-orange-200">
             QUẢN LÝ CHUYÊN NGÀNH
           </span>
-          <h1 className="text-xl font-black text-[#2C2825] mt-1">
+          <h1 className="text-2xl font-black text-[#ffffff] mt-1">
             Danh sách chuyên ngành đào tạo
           </h1>
-          <p className="text-xs text-[#6B635B]">
-            Quy tắc: Các nhóm đồ án Capstone sẽ được hình thành trong cùng một chuyên ngành.
+          <p className="text-xs text-[#efe9e3] font-semibold mt-0.5">
+            Quy tắc: Các nhóm đồ án Capstone sẽ được hình thành trong cùng một chuyên ngành[cite: 1].
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[#6B635B]">Tổng số:</span>
-          <span className="px-3 py-1 bg-orange-100 text-[#E65100] font-black text-xs rounded-xl">
-            {majors.length} chuyên ngành
-          </span>
-        </div>
-      </div>
 
-      {/* Form Tạo mới / Cập nhật */}
-      <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-sm font-black text-[#2C2825]">
-            {isEditing ? " Đổi tên chuyên ngành" : "Thêm chuyên ngành mới "}
-          </h3>
-          {isEditing && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditing(false);
-                setEditingId(null);
-                setMajorName("");
-              }}
-              className="text-xs font-bold text-gray-500 hover:text-black cursor-pointer"
-            >
-              Hủy chỉnh sửa ✕
-            </button>
-          )}
-        </div>
-
-        <form onSubmit={handleSaveMajor} className="flex gap-3 flex-wrap">
-          <input
-            type="text"
-            value={majorName}
-            onChange={(e) => setMajorName(e.target.value)}
-            placeholder="Nhập tên chuyên ngành (VD: Software Engineering, Information Assurance...)"
-            required
-            className="flex-1 min-w-70 px-4 py-3 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100] font-medium"
-          />
+        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+          <div className="text-xs font-extrabold text-[#3A3530] bg-white/90 px-4 py-2.5 border border-white rounded-xl shadow-sm">
+            Tổng số: <span className="text-[#E65100] font-black">{majors.length}</span> chuyên ngành
+          </div>
           <button
-            type="submit"
-            disabled={submitting || !majorName.trim()}
-            className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer transition"
+            type="button"
+            onClick={() => {
+              setMajorName("");
+              setIsCreateOpen(true);
+            }}
+            className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition"
           >
-            {submitting ? "Đang xử lý..." : isEditing ? "💾 Lưu thay đổi" : "🚀 Tạo chuyên ngành"}
+            <span>✨ Thêm chuyên ngành</span>
           </button>
-        </form>
+        </div>
       </div>
 
-      {/* Bảng danh sách chuyên ngành */}
-      <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs ">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B] text-center">
-              <th className="p-4 font-black uppercase w-16 text-center">STT</th>
-              <th className="p-4 font-black uppercase">Chuyên ngành</th>
-              <th className="p-4 font-black uppercase">Tên Chuyên Ngành</th>
-              <th className="p-4 font-black uppercase text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E8E2D9]">
-            {loading ? (
-              <tr>
-                <td colSpan="4" className="p-12 text-center text-[#6B635B]">
-                  Đang tải danh sách chuyên ngành...
-                </td>
-              </tr>
-            ) : majors.length > 0 ? (
-              majors.map((m, index) => (
-                <tr key={m.id || m.majorId || index} className="hover:bg-[#FBF9F5]/70 transition text-center">
-                  <td className="p-4 text-center font-bold text-[#6B635B]">{index + 1}</td>
-                  <td className="p-4 font-mono font-bold text-[#E65100] ">
-                    {m.code || m.majorId || `MAJ-0${index + 1}`}
-                  </td>
-                  <td className="p-4 font-bold text-[#2C2825] text-sm">
-                    {m.name || m.majorName}
-                  </td>
-                  <td className="p-4 text-right">
+      {/* Danh sách dạng Card Grid */}
+      <div>
+        {loading ? (
+          <div className="bg-white/80 backdrop-blur-xl border border-white rounded-2xl p-12 text-center text-[#554D44] font-semibold text-xs shadow-lg shadow-black/5">
+            Đang tải danh sách chuyên ngành...
+          </div>
+        ) : majors.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {majors.map((m, index) => (
+              <div 
+                key={m.id || m.majorId || index} 
+                className="bg-white/80 backdrop-blur-xl border border-white hover:border-[#E65100]/50 rounded-2xl overflow-hidden shadow-lg shadow-black/5 transition flex flex-col justify-between group"
+              >
+                <div className="relative h-36 w-full overflow-hidden bg-white/50">
+                  <img 
+                    src={majorImages[index % majorImages.length]} 
+                    alt="Major Cover" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  />
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg font-mono font-black text-[#E65100] text-[11px] shadow-sm">
+                    #{index + 1}
+                  </div>
+                </div>
+
+                <div className="p-5 space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-[#554D44] uppercase tracking-wider block">
+                      {m.code || m.majorId || `MAJ-0${index + 1}`}
+                    </span>
+                    <h3 className="font-extrabold text-[#1A1816] text-sm line-clamp-2">
+                      {m.name || m.majorName}
+                    </h3>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/80 flex items-center justify-between mt-3">
+                    <span className="text-[10px] text-[#554D44] font-semibold italic">Đào tạo chuẩn FPT</span>
                     <button
                       type="button"
                       onClick={() => handleStartEdit(m)}
-                      className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#2C2825] font-bold rounded-xl text-xs cursor-pointer transition"
+                      className="px-3 py-1.5 bg-white hover:bg-orange-50 hover:text-[#E65100] text-[#1A1816] font-bold rounded-xl text-xs cursor-pointer transition flex items-center gap-1 border border-white shadow-xs"
                     >
                       ✏️ Đổi tên
                     </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="p-12 text-center text-[#6B635B] italic">
-                  Chưa có chuyên ngành nào trong hệ thống.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white/80 backdrop-blur-xl border border-white rounded-2xl p-12 text-center text-[#554D44] italic text-xs shadow-lg shadow-black/5">
+            Chưa có chuyên ngành nào trong hệ thống[cite: 1].
+          </div>
+        )}
       </div>
+
+      {/* Modal Tạo Chuyên Ngành Mới */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white/90 backdrop-blur-2xl border border-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-smooth-fade">
+            <div className="flex justify-between items-center border-b border-white/80 pb-4">
+              <h3 className="text-sm font-black text-[#1A1816] flex items-center gap-2">
+                🚀 Thêm chuyên ngành mới
+              </h3>
+              <button 
+                onClick={() => setIsCreateOpen(false)}
+                className="text-gray-800 hover:text-black font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateMajor} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-[#3A3530] mb-1.5">Tên chuyên ngành</label>
+                <input
+                  type="text"
+                  value={majorName}
+                  onChange={(e) => setMajorName(e.target.value)}
+                  placeholder="VD: Software Engineering, Artificial Intelligence..."
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 text-xs bg-white border border-white rounded-xl focus:outline-none focus:border-[#E65100] font-semibold text-[#1A1816] shadow-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="px-4 py-2.5 bg-white hover:bg-orange-50 text-[#3A3530] text-xs font-bold rounded-xl cursor-pointer transition border border-white shadow-sm"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !majorName.trim()}
+                  className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-lg disabled:opacity-50 cursor-pointer transition"
+                >
+                  {submitting ? "Đang tạo..." : "Lưu chuyên ngành"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Đổi Tên Chuyên Ngành */}
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white/90 backdrop-blur-2xl border border-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-smooth-fade">
+            <div className="flex justify-between items-center border-b border-white/80 pb-4">
+              <h3 className="text-sm font-black text-[#1A1816] flex items-center gap-2">
+                ✏️ Đổi tên chuyên ngành
+              </h3>
+              <button 
+                onClick={() => setIsEditOpen(false)}
+                className="text-gray-800 hover:text-black font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateMajor} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-[#3A3530] mb-1.5">Tên chuyên ngành mới</label>
+                <input
+                  type="text"
+                  value={majorName}
+                  onChange={(e) => setMajorName(e.target.value)}
+                  placeholder="Nhập tên mới..."
+                  required
+                  autoFocus
+                  className="w-full px-4 py-3 text-xs bg-white border border-white rounded-xl focus:outline-none focus:border-[#E65100] font-semibold text-[#1A1816] shadow-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setEditingId(null);
+                    setMajorName("");
+                  }}
+                  className="px-4 py-2.5 bg-white hover:bg-orange-50 text-[#3A3530] text-xs font-bold rounded-xl cursor-pointer transition border border-white shadow-sm"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !majorName.trim()}
+                  className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-lg disabled:opacity-50 cursor-pointer transition"
+                >
+                  {submitting ? "Đang lưu..." : "Lưu thay đổi"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white border border-[#E8E2D9] rounded-2xl shadow-xl text-xs transition-all">
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${toast.type === "error" ? "bg-red-500" : "bg-emerald-500"}`}>
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white/95 backdrop-blur-xl border border-white rounded-2xl shadow-2xl text-xs transition-all animate-smooth-fade">
+          <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${toast.type === "error" ? "bg-red-500" : "bg-emerald-600"}`}>
             {toast.type === "error" ? "✕" : "✓"}
           </span>
           <div>
-            <p className="font-black text-[#2C2825]">{toast.type === "error" ? "Thông báo lỗi" : "Thành công"}</p>
-            <p className="text-[#6B635B]">{toast.message}</p>
+            <p className="font-black text-[#1A1816]">{toast.type === "error" ? "Thông báo lỗi" : "Thành công"}</p>
+            <p className="text-[#554D44] font-semibold">{toast.message}</p>
           </div>
         </div>
       )}

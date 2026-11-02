@@ -192,7 +192,7 @@ export default function Profile() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-neutral-500">Mã số sinh viên</p>
                     <p className="mt-1 wrap-break-words text-sm font-bold text-neutral-900">
-                      {user?.studentCode || "Chưa cập nhật"}
+                      {user?.studentCode || "QT000000"}
                     </p>
                   </div>
                 </div>
@@ -204,7 +204,7 @@ export default function Profile() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-neutral-500">Chuyên ngành</p>
                     <p className="mt-1 text-sm font-bold text-neutral-900">
-                      {user?.major || user?.majorName || "Công nghệ phần mềm"}
+                      {user?.major || user?.majorName || "Quản lý hệ thống"}
                     </p>
                   </div>
                 </div>
@@ -265,7 +265,7 @@ export default function Profile() {
 
               <InfoField
                 label="Mã số sinh viên"
-                value={user?.studentCode || "Chưa cập nhật"}
+                value={user?.studentCode || "QT000000"}
                 icon="🎓"
               />
 
@@ -277,7 +277,7 @@ export default function Profile() {
 
               <InfoField
                 label="Chuyên ngành"
-                value={user?.major || user?.majorName || "Công nghệ phần mềm"}
+                value={user?.major || user?.majorName || "Quản lý hệ thống"}
                 icon="🏛"
               />
 

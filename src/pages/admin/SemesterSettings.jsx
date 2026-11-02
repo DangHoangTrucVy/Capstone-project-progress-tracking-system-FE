@@ -176,7 +176,7 @@ export default function SemesterSettings() {
       <div className="bg-white p-7 rounded-3xl border border-[#E8E2D9] shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
           <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-black rounded-lg uppercase tracking-wider">
-            Cấu hình hệ thống · V2.9
+            Cấu hình hệ thống
           </span>
           <h1 className="text-2xl font-black text-[#2C2825]">
             Quản lý Học kỳ & Phân công Moderator
