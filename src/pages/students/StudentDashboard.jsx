@@ -319,7 +319,7 @@ export default function StudentDashboard() {
                     : "hover:bg-[#FBF9F5] text-[#6B635B]"
                 }`}
               >
-                <span>🚀</span>
+                
                 <span>Tạo nhóm mới</span>
               </button>
               <button
@@ -490,7 +490,7 @@ export default function StudentDashboard() {
                             : "text-[#6B635B] hover:bg-[#FBF9F5]"
                         }`}
                       >
-                        🚀 Tạo nhóm mới
+                         Tạo nhóm mới
                       </button>
                       <button
                         type="button"
@@ -501,7 +501,7 @@ export default function StudentDashboard() {
                             : "text-[#6B635B] hover:bg-[#FBF9F5]"
                         }`}
                       >
-                        🔍 Tìm nhóm đang tuyển
+                         Tìm nhóm đang tuyển
                       </button>
                     </div>
                   </div>

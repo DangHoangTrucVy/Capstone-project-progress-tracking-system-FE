@@ -181,7 +181,7 @@ export default function ModeratorDashboard() {
       )}
 
       {/* SIDEBAR ĐIỀU PHỐI VIÊN */}
-      <aside className="w-79 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 select-none shrink-0 h-screen min-h-0 overflow-hidden shadow-2xs">
+      <aside className="w-68 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 select-none shrink-0 h-screen min-h-0 overflow-hidden shadow-2xs">
         <div className="flex-1 min-h-0 overflow-y-auto space-y-8 pr-1">
           <div className="flex items-center space-x-3.5 px-2 pt-2">
             <div className="w-9 h-9 rounded-2xl bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-500/20 font-black">
@@ -198,7 +198,7 @@ export default function ModeratorDashboard() {
           </div>
 
           <div className="space-y-1.5 text-xs font-bold text-[#6B635B]">
-            <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mb-2 px-3">
+            <p className="text-[13px] font-black text-[#fd7f00] uppercase tracking-wider mb-2 px-3">
               Điều hành học kỳ
             </p>
             <button
@@ -209,7 +209,7 @@ export default function ModeratorDashboard() {
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>⚖️</span>
+             
               <span>Điều phối & Nhóm</span>
             </button>
             <button
@@ -220,7 +220,7 @@ export default function ModeratorDashboard() {
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>🙋</span>
+              
               <span>Khiếu nại rời nhóm</span>
             </button>
             <button
@@ -231,7 +231,7 @@ export default function ModeratorDashboard() {
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>⏱️</span>
+              
               <span>Phạm vi & Thời hạn ngành</span>
             </button>
 
@@ -243,11 +243,11 @@ export default function ModeratorDashboard() {
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>⚙️</span>
+              
               <span>Điều phối chi tiết nhóm</span>
             </button>
 
-            <p className="text-[10px] font-black text-[#9E958C] uppercase tracking-wider mt-6 mb-2 px-3">
+            <p className="text-[13px] font-black text-[#fd7f00] uppercase tracking-wider mt-6 mb-2 px-3">
               Cá nhân
             </p>
 
@@ -259,7 +259,7 @@ export default function ModeratorDashboard() {
                   : "hover:bg-[#F8F6F0]"
               }`}
             >
-              <span>⚙️</span>
+             
               <span>Hồ sơ cá nhân</span>
             </button>
           </div>

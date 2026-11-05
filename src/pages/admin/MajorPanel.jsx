@@ -4,6 +4,7 @@ import { getMajors, createMajor, updateMajor } from "../../services/majorService
 export default function MajorPanel() {
   const [majors, setMajors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [majorCode, setMajorCode] = useState("");
   
   // State modal Tạo mới / Chỉnh sửa
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -55,28 +56,34 @@ export default function MajorPanel() {
     }
   };
 
-  const handleUpdateMajor = async (e) => {
-    e.preventDefault();
-    if (!majorName.trim() || submitting) return;
+ const handleUpdateMajor = async (e) => {
+  e.preventDefault();
+  if (!majorName.trim() || submitting) return;
 
-    setSubmitting(true);
-    try {
-      await updateMajor(editingId, { name: majorName.trim() });
-      showToast("Đổi tên chuyên ngành thành công!");
-      setMajorName("");
-      setIsEditOpen(false);
-      setEditingId(null);
-      fetchMajors();
-    } catch (error) {
-      showToast(error.response?.data?.message || "Thực hiện thất bại.", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  setSubmitting(true);
+  try {
+    // Gửi kèm cả code và name theo đúng yêu cầu API
+    await updateMajor(editingId, { 
+      code: majorCode, 
+      name: majorName.trim() 
+    });
+    showToast("Đổi tên chuyên ngành thành công!");
+    setMajorName("");
+    setMajorCode("");
+    setIsEditOpen(false);
+    setEditingId(null);
+    fetchMajors();
+  } catch (error) {
+    showToast(error.response?.data?.message || "Thực hiện thất bại.", "error");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const handleStartEdit = (major) => {
     setEditingId(major.id || major.majorId);
     setMajorName(major.name || major.majorName || "");
+    setMajorCode(major.code || "");
     setIsEditOpen(true);
   };
 
@@ -102,7 +109,7 @@ export default function MajorPanel() {
           }
         }
         .animate-smooth-fade {
-          animation: smoothFadeIn 2.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: smoothFadeIn 1.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           will-change: opacity, transform;
         }
       `}</style>
@@ -133,7 +140,7 @@ export default function MajorPanel() {
             }}
             className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition"
           >
-            <span>✨ Thêm chuyên ngành</span>
+            <span> Thêm chuyên ngành</span>
           </button>
         </div>
       </div>
@@ -179,7 +186,7 @@ export default function MajorPanel() {
                       onClick={() => handleStartEdit(m)}
                       className="px-3 py-1.5 bg-white hover:bg-orange-50 hover:text-[#E65100] text-[#1A1816] font-bold rounded-xl text-xs cursor-pointer transition flex items-center gap-1 border border-white shadow-xs"
                     >
-                      ✏️ Đổi tên
+                       Đổi tên
                     </button>
                   </div>
                 </div>
@@ -199,7 +206,7 @@ export default function MajorPanel() {
           <div className="bg-white/90 backdrop-blur-2xl border border-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-smooth-fade">
             <div className="flex justify-between items-center border-b border-white/80 pb-4">
               <h3 className="text-sm font-black text-[#1A1816] flex items-center gap-2">
-                🚀 Thêm chuyên ngành mới
+               Thêm chuyên ngành mới
               </h3>
               <button 
                 onClick={() => setIsCreateOpen(false)}
@@ -250,7 +257,7 @@ export default function MajorPanel() {
           <div className="bg-white/90 backdrop-blur-2xl border border-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-smooth-fade">
             <div className="flex justify-between items-center border-b border-white/80 pb-4">
               <h3 className="text-sm font-black text-[#1A1816] flex items-center gap-2">
-                ✏️ Đổi tên chuyên ngành
+                 Đổi tên chuyên ngành
               </h3>
               <button 
                 onClick={() => setIsEditOpen(false)}

@@ -172,7 +172,7 @@ export default function LeaderLeaveRequests({ selectedId, onChanged }) {
           }
         }
         .animate-smooth-fade {
-          animation: smoothFadeIn 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: smoothFadeIn 1.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           will-change: opacity, transform;
         }
       `}</style>
