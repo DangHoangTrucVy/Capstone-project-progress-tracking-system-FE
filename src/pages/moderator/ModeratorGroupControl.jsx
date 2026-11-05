@@ -17,6 +17,7 @@ export default function ModeratorGroupControl({ semester }) {
   const [groups, setGroups] = useState([]);
   const [scopes, setScopes] = useState([]);
   const [unassignedList, setUnassignedList] = useState([]);
+  const [ineligibleList, setIneligibleList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal thêm sinh viên vào nhóm
@@ -57,7 +58,7 @@ export default function ModeratorGroupControl({ semester }) {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [scopeToFinalize, setScopeToFinalize] = useState(null);
 
-  // Modal xác nhận chỉ định trưởng nhóm (Thay thế window.confirm)
+  // Modal xác nhận chỉ định trưởng nhóm
   const [leaderModalOpen, setLeaderModalOpen] = useState(false);
   const [leaderTarget, setLeaderTarget] = useState({ groupId: null, userId: null, userName: "" });
 
@@ -81,34 +82,40 @@ export default function ModeratorGroupControl({ semester }) {
   const loadData = async (sem) => {
     setLoading(true);
     try {
-      const [groupsRes, scopesRes, unassignedRes] = await Promise.all([
+      const [groupsRes, scopesRes, studentsRes] = await Promise.all([
         getGroupsBySemester(sem).catch(() => []),
         api.get(`/semesters/${sem}/scopes`).catch(() => ({ data: [] })),
-        api
-          .get(`/semesters/${sem}/students?hasGroup=false`)
-          .catch(() => ({ data: [] })),
+        // Lấy toàn bộ sinh viên chưa có nhóm của học kỳ
+        api.get(`/semesters/${sem}/students?hasGroup=false`).catch(() => ({ data: [] })),
       ]);
 
-      const groupList = Array.isArray(groupsRes)
-        ? groupsRes
-        : groupsRes.content || groupsRes.items || [];
+      const groupList = Array.isArray(groupsRes) ? groupsRes : groupsRes.content || groupsRes.items || [];
       setGroups(groupList);
 
-      const scopeList = Array.isArray(scopesRes.data)
-        ? scopesRes.data
-        : scopesRes.data.content || [];
+      const scopeList = Array.isArray(scopesRes.data) ? scopesRes.data : scopesRes.data.content || [];
       setScopes(scopeList);
       if (scopeList.length > 0 && !selectedScopeId) {
         setSelectedScopeId(scopeList[0].id || scopeList[0].scopeId);
       }
 
-      const unassignedData = Array.isArray(unassignedRes.data)
-        ? unassignedRes.data
-        : unassignedRes.data.content || unassignedRes.data.items || [];
-      setUnassignedList(unassignedData);
+      const allUnassigned = Array.isArray(studentsRes.data)
+        ? studentsRes.data
+        : studentsRes.data.content || studentsRes.data.items || [];
+
+      // Phân tách rõ ràng dựa trên trạng thái điều kiện (sync từ Admin)[cite: 6, 8, 13]
+      const eligible = allUnassigned.filter(
+        (s) => s.eligibility !== "INELIGIBLE" && s.eligible !== false
+      );
+      const ineligible = allUnassigned.filter(
+        (s) => s.eligibility === "INELIGIBLE" || s.eligible === false
+      );
+
+      setUnassignedList(eligible);
+      setIneligibleList(ineligible);
     } catch {
       setGroups([]);
       setUnassignedList([]);
+      setIneligibleList([]);
     } finally {
       setLoading(false);
     }
@@ -246,13 +253,11 @@ export default function ModeratorGroupControl({ semester }) {
     }
   };
 
-  // Mở modal xác nhận chỉ định Trưởng nhóm
   const handleMakeLeader = (groupId, userId, userName) => {
     setLeaderTarget({ groupId, userId, userName });
     setLeaderModalOpen(true);
   };
 
-  // Thực thi gọi API đổi Trưởng nhóm
   const executeMakeLeader = async () => {
     if (!leaderTarget.groupId || !leaderTarget.userId) return;
     try {
@@ -367,7 +372,7 @@ export default function ModeratorGroupControl({ semester }) {
                     onClick={() => handleFinalize(scId)}
                     className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-lg border border-emerald-200 cursor-pointer"
                   >
-                    🔒 Chốt
+                     Chốt
                   </button>
                 )}
               </div>
@@ -376,14 +381,14 @@ export default function ModeratorGroupControl({ semester }) {
         </div>
       </div>
 
-      {/* DANH SÁCH SINH VIÊN CHƯA CÓ NHÓM */}
+      {/* 1. DANH SÁCH SINH VIÊN CHƯA CÓ NHÓM - ĐỦ ĐIỀU KIỆN */}
       <div className="bg-white border border-[#E8E2D9] rounded-2xl p-6 shadow-xs space-y-4">
         <div>
-          <h3 className="text-sm font-black text-[#2C2825]">
-            🎓 Danh sách sinh viên chưa có nhóm ({unassignedList.length})
+          <h3 className="text-sm font-black text-[#2C2825] flex items-center gap-2">
+            Danh sách sinh viên chưa có nhóm & Đủ điều kiện ({unassignedList.length})
           </h3>
           <p className="text-[11px] text-[#6B635B]">
-            Các sinh viên lẻ chưa thuộc nhóm nào trong học kỳ này để điều phối viên chủ động phân bổ.
+            Các sinh viên đủ điều kiện nhưng chưa thuộc nhóm nào, điều phối viên có thể chủ động phân bổ hoặc đưa vào nhóm.
           </p>
         </div>
 
@@ -395,36 +400,75 @@ export default function ModeratorGroupControl({ semester }) {
                 <th className="p-3 font-black uppercase">Mã số sinh viên</th>
                 <th className="p-3 font-black uppercase">Họ và tên</th>
                 <th className="p-3 font-black uppercase">Email</th>
+                <th className="p-3 font-black uppercase text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E2D9]">
               {unassignedList.length > 0 ? (
                 unassignedList.map((stu, index) => (
-                  <tr
-                    key={stu.id || stu.studentCode}
-                    className="hover:bg-[#FBF9F5]/70 transition"
-                  >
-                    <td className="p-3 text-center font-bold text-[#6B635B]">
-                      {index + 1}
-                    </td>
-                    <td className="p-3 font-mono font-bold text-[#171311]">
-                      {stu.studentCode || stu.code || "—"}
-                    </td>
-                    <td className="p-3 font-bold text-[#2C2825]">
-                      {stu.fullName || stu.name || "—"}
-                    </td>
-                    <td className="p-3 text-[#6B635B]">
-                      {stu.email || stu.userEmail || "—"}
+                  <tr key={stu.id || stu.studentCode} className="hover:bg-[#FBF9F5]/70 transition">
+                    <td className="p-3 text-center font-bold text-[#6B635B]">{index + 1}</td>
+                    <td className="p-3 font-mono font-bold text-[#171311]">{stu.studentCode || stu.code || "—"}</td>
+                    <td className="p-3 font-bold text-[#2C2825]">{stu.fullName || stu.name || "—"}</td>
+                    <td className="p-3 text-[#6B635B]">{stu.email || stu.userEmail || "—"}</td>
+                    <td className="p-3 text-center">
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-lg border border-emerald-200 text-[10px]">
+                        Đủ điều kiện
+                      </span>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan="4"
-                    className="p-8 text-center text-[#6B635B] italic"
-                  >
-                    Tuyệt vời! Tất cả sinh viên trong học kỳ đều đã có nhóm.
+                  <td colSpan="5" className="p-6 text-center text-[#6B635B] italic">
+                    Không có sinh viên đủ điều kiện nào đang chờ xếp nhóm.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 2. DANH SÁCH SINH VIÊN CHƯA CÓ NHÓM - KHÔNG ĐỦ ĐIỀU KIỆN */}
+      <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-xs space-y-4">
+        <div>
+          <h3 className="text-sm font-black text-red-700 flex items-center gap-2">
+             Danh sách sinh viên KHÔNG đủ điều kiện ({ineligibleList.length})
+          </h3>
+          <p className="text-[11px] text-[#6B635B]">
+            Các sinh viên chưa đạt điều kiện học kỳ (nợ môn tiên quyết, thiếu học phí, v.v.) nên không thể tham gia xếp nhóm.
+          </p>
+        </div>
+
+        <div className="border border-red-100 rounded-xl overflow-hidden">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-red-50/50 border-b border-red-100 text-red-800">
+                <th className="p-3 font-black uppercase w-16 text-center">STT</th>
+                <th className="p-3 font-black uppercase">Mã số sinh viên</th>
+                <th className="p-3 font-black uppercase">Họ và tên</th>
+                <th className="p-3 font-black uppercase">Email</th>
+                <th className="p-3 font-black uppercase">Lý do</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-red-100">
+              {ineligibleList.length > 0 ? (
+                ineligibleList.map((stu, index) => (
+                  <tr key={stu.id || stu.studentCode} className="hover:bg-red-50/30 transition">
+                    <td className="p-3 text-center font-bold text-gray-500">{index + 1}</td>
+                    <td className="p-3 font-mono font-bold text-gray-800">{stu.studentCode || stu.code || "—"}</td>
+                    <td className="p-3 font-bold text-gray-900">{stu.fullName || stu.name || "—"}</td>
+                    <td className="p-3 text-gray-600">{stu.email || stu.userEmail || "—"}</td>
+                    <td className="p-3 text-red-600 font-semibold">
+                     {stu.eligibilityReason || stu.reason || stu.ineligibleReason|| "Không đủ điều kiện"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="p-6 text-center text-[#6B635B] italic">
+                    Không có sinh viên nào bị loại khỏi danh sách điều kiện.
                   </td>
                 </tr>
               )}
@@ -474,7 +518,7 @@ export default function ModeratorGroupControl({ semester }) {
                       onClick={() => handleOpenMergeModal(g)}
                       className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold rounded-xl border border-purple-200 text-xs cursor-pointer"
                     >
-                      🔗 Gộp nhóm khác vào
+                       Gộp nhóm khác vào
                     </button>
                   </div>
                 </div>
@@ -1007,7 +1051,7 @@ export default function ModeratorGroupControl({ semester }) {
         </div>
       )}
 
-      {/* MODAL XÁC NHẬN CHỈ ĐỊNH TRƯỞNG NHÓM (THAY THẾ WINDOW.CONFIRM) */}
+      {/* MODAL XÁC NHẬN CHỈ ĐỊNH TRƯỞNG NHÓM */}
       {leaderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md space-y-5 rounded-3xl bg-white p-6 shadow-2xl text-xs">

@@ -235,7 +235,7 @@ export default function Profile() {
               </div>
 
               <span className="inline-flex items-center gap-2 rounded-xl border border-neutral-200/80 bg-white/80 px-3 py-2 text-xs font-semibold text-neutral-700 shadow-xs">
-                <span className="text-[#E65100]">▤</span>
+               
                 Chỉ xem
               </span>
             </div>

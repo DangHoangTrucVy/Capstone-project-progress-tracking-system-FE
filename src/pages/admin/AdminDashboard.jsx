@@ -452,7 +452,7 @@ export default function AdminDashboard() {
           }
         }
         .animate-smooth-fade {
-          animation: smoothFadeIn 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: smoothFadeIn 1.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           will-change: opacity, transform;
         }
       `}</style>
@@ -1360,7 +1360,7 @@ export default function AdminDashboard() {
                     QUẢN TRỊ HỆ THỐNG NHÓM
                   </span>
                   <h2 className="text-2xl font-black text-[#fdfdfd] mt-1">
-                    Quản lý danh sách nhóm đồ án Capstone
+                    Quản lý danh sách nhóm đồ án 
                   </h2>
                   <p className="text-xs text-[#efe9e3] font-semibold">
                     Bấm vào mã nhóm để xem chi tiết thành viên, đề tài Capstone

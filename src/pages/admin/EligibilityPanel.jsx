@@ -240,7 +240,7 @@ export default function EligibilityPanel({ onChanged }) {
           }
         }
         .animate-smooth-fade {
-          animation: smoothFadeIn 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: smoothFadeIn 1.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           will-change: opacity, transform;
         }
       `}</style>
@@ -381,8 +381,8 @@ export default function EligibilityPanel({ onChanged }) {
             className="px-4 py-2.5 text-xs font-bold bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
           >
             <option value="ALL">Tất cả trạng thái</option>
-            <option value="ELIGIBLE">✓ Đủ điều kiện</option>
-            <option value="INELIGIBLE">✕ Chưa đủ điều kiện</option>
+            <option value="ELIGIBLE">Đủ điều kiện</option>
+            <option value="INELIGIBLE" style={{color: 'red'}}>Chưa đủ điều kiện</option>
           </select>
 
           <span className="text-xs font-bold text-[#6B635B] ml-2">
