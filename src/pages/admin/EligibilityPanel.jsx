@@ -5,31 +5,25 @@ import {
   updateStudentEligibility,
 } from "../../services/eligibilityService";
 
-export default function EligibilityPanel({ onChanged }) {
+export default function EligibilityPanel({ selectedSemesterCode, onChanged }) {
   const [semesters, setSemesters] = useState([]);
-  const [selectedSemester, setSelectedSemester] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState(selectedSemesterCode || "");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
-  
-  // 🔍 State cho bộ lọc trạng thái điều kiện: "ALL" | "ELIGIBLE" | "INELIGIBLE"
   const [eligibilityFilter, setEligibilityFilter] = useState("ALL");
 
-  // States cho luồng 1: Import danh sách ban đầu
   const [initialFile, setInitialFile] = useState(null);
   const [importingInitial, setImportingInitial] = useState(false);
 
-  // States cho luồng 2: Import cập nhật điều kiện (Ineligible) với popup toggle
   const [showIneligibleModal, setShowIneligibleModal] = useState(false);
   const [ineligibleFile, setIneligibleFile] = useState(null);
   const [importingIneligible, setImportingIneligible] = useState(false);
 
-  // States cho Modal Custom nhập lý do (thay thế window.prompt)
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
   const [targetStudent, setTargetStudent] = useState(null);
   const [ineligibleReason, setIneligibleReason] = useState("");
 
-  // State Toast Notification chuyên nghiệp
   const [toast, setToast] = useState(null);
 
   const showToast = (message, type = "success") => {
@@ -39,13 +33,18 @@ export default function EligibilityPanel({ onChanged }) {
     }, 3000);
   };
 
-  // 1. Tải danh sách học kỳ khi mở trang
+  useEffect(() => {
+    if (selectedSemesterCode) {
+      setSelectedSemester(selectedSemesterCode);
+    }
+  }, [selectedSemesterCode]);
+
   useEffect(() => {
     getSemesters({ size: 1000 })
       .then((res) => {
         const list = Array.isArray(res) ? res : res?.data || res?.content || [];
         setSemesters(list);
-        if (list.length > 0) {
+        if (!selectedSemester && list.length > 0) {
           const firstCode = list[0].code || list[0].name || list[0];
           setSelectedSemester(firstCode);
         }
@@ -53,7 +52,6 @@ export default function EligibilityPanel({ onChanged }) {
       .catch(() => setSemesters([]));
   }, []);
 
-  // 2. Tải danh sách sinh viên theo học kỳ được chọn
   useEffect(() => {
     if (selectedSemester) {
       loadStudents(selectedSemester);
@@ -75,7 +73,6 @@ export default function EligibilityPanel({ onChanged }) {
     }
   };
 
-  // 3. Xử lý Import danh sách ban đầu
   const handleImportInitial = async (e) => {
     e.preventDefault();
     if (!initialFile || !selectedSemester) {
@@ -109,7 +106,6 @@ export default function EligibilityPanel({ onChanged }) {
     }
   };
 
-  // 4. Xử lý Import cập nhật điều kiện (Ineligible)
   const handleImportIneligible = async (e) => {
     e.preventDefault();
     if (!ineligibleFile || !selectedSemester) {
@@ -146,18 +142,13 @@ export default function EligibilityPanel({ onChanged }) {
     }
   };
 
-  // 5. Khi bấm nút Gắn/Gỡ cờ
-  
   const handleToggleClick = (student) => {
     const isEligible = student.eligibility !== "INELIGIBLE";
-
     if (isEligible) {
-      // Đang đủ điều kiện -> Muốn gắn cờ Ineligible -> Mở Modal nhập lý do
       setTargetStudent(student);
       setIneligibleReason("");
       setReasonModalOpen(true);
     } else {
-      // 🛠️ Đang chưa đủ điều kiện -> Muốn gỡ cờ về Đủ điều kiện -> Gọi hàm với chuỗi "ELIGIBLE"
       handleConfirmEligibilityChange(student, "ELIGIBLE", "Gỡ cờ đủ điều kiện");
     }
   };
@@ -173,7 +164,6 @@ export default function EligibilityPanel({ onChanged }) {
       return;
     }
 
-    // Xác định giá trị gửi lên (nếu là chuỗi dùng luôn, nếu là boolean thì quy đổi)
     let eligibilityValue = "ELIGIBLE";
     if (typeof newEligibleOrStatus === "string") {
       eligibilityValue = newEligibleOrStatus;
@@ -188,7 +178,7 @@ export default function EligibilityPanel({ onChanged }) {
 
     try {
       await updateStudentEligibility(enrollmentId, {
-        eligibility: eligibilityValue, // Gửi chuỗi "ELIGIBLE" hoặc "INELIGIBLE"
+        eligibility: eligibilityValue,
         reason: reasonText ? reasonText.trim() : "",
       });
 
@@ -202,9 +192,7 @@ export default function EligibilityPanel({ onChanged }) {
     }
   };
 
-  // 🔍 Lọc sinh viên theo từ khóa (tên, email, MSSV) và trạng thái điều kiện
   const filteredStudents = students.filter((s) => {
-    // 1. Lọc theo từ khóa tìm kiếm
     const keyword = searchKeyword.toLowerCase();
     const matchesKeyword =
       !searchKeyword ||
@@ -213,7 +201,6 @@ export default function EligibilityPanel({ onChanged }) {
       (s.studentCode && s.studentCode.toLowerCase().includes(keyword)) ||
       (s.mssv && s.mssv.toLowerCase().includes(keyword));
 
-    // 2. Lọc theo trạng thái điều kiện
     const isEligible = s.eligibility !== "INELIGIBLE";
     let matchesEligibility = true;
     if (eligibilityFilter === "ELIGIBLE") {
@@ -226,190 +213,135 @@ export default function EligibilityPanel({ onChanged }) {
   });
 
   return (
-    <div className="p-8 space-y-6 relative animate-smooth-fade">
-      {/* Khối CSS keyframes cho hiệu ứng hiển thị mượt mà từ trên xuống */}
-      <style>{`
-        @keyframes smoothFadeIn {
-          0% {
-            opacity: 0;
-            transform: translateY(12px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-smooth-fade {
-          animation: smoothFadeIn 1.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          will-change: opacity, transform;
-        }
-      `}</style>
-
-      {/* Tiêu đề & Chọn học kỳ */}
-      <div className="bg-[#E65100]/90 p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs flex-wrap gap-4">
-        <div>
-          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">
-            QUẢN LÝ ĐIỀU KIỆN SINH VIÊN
-          </span>
-          <h1 className="text-2xl font-black text-[#ffffff] mt-1">
-            Import danh sách & Cập nhật trạng thái sinh viên
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[#ffffff]">Chọn học kỳ:</span>
-          <select
-            value={selectedSemester}
-            onChange={(e) => setSelectedSemester(e.target.value)}
-            className="px-4 py-2.5 text-xs font-bold bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-          >
-            {semesters.map((sem, idx) => {
-              const code = sem.code || sem;
-              return (
-                <option key={idx} value={code}>
-                  {sem.name || code}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-      </div>
-
-      {/* 🚀 LUỒNG 1: IMPORT DANH SÁCH BAN ĐẦU */}
-      <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl shadow-xs space-y-3">
-        <div className="flex justify-between items-center flex-wrap gap-2">
+    <div className="space-y-6 relative font-sans text-xs">
+      {/* LUỒNG 1: IMPORT BAN ĐẦU */}
+      <div className="bg-white/90 backdrop-blur-xl p-6 border border-white rounded-3xl shadow-xl shadow-black/5 space-y-4">
+        <div className="flex justify-between items-center flex-wrap gap-4 pb-3 border-b border-gray-100">
           <div>
-            <h3 className="text-sm font-black text-[#2C2825]">
-              1. Import danh sách sinh viên ban đầu
+            <span className="px-2.5 py-1 bg-orange-100 text-[#E65100] text-[10px] font-black rounded-lg uppercase">
+              Bước 1
+            </span>
+            <h3 className="text-sm font-black text-[#1A1816] mt-1">
+              Import danh sách sinh viên ban đầu
             </h3>
-            <p className="text-[11px] text-[#6B635B]">
-              Đưa toàn bộ danh sách sinh viên chuẩn bị vào kỳ luận án lên hệ thống để bắt đầu tạo nhóm.
+            <p className="text-[11px] text-[#554D44] font-semibold mt-0.5">
+              Đưa toàn bộ danh sách sinh viên chuẩn bị vào kỳ luận án lên hệ thống.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowIneligibleModal(true)}
-            className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-black rounded-xl transition cursor-pointer flex items-center gap-2 shadow-sm"
           >
             <span>📂</span> Cập nhật danh sách (Trượt môn / Thiếu điều kiện)
           </button>
         </div>
 
-        <form
-          onSubmit={handleImportInitial}
-          className="flex items-center gap-4 flex-wrap pt-2"
-        >
+        <form onSubmit={handleImportInitial} className="flex items-center gap-4 flex-wrap pt-1">
           <input
             type="file"
             accept=".xlsx, .xls, .csv"
             onChange={(e) => setInitialFile(e.target.files[0])}
-            className="text-xs text-[#6B635B] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-[#E65100] hover:file:bg-orange-100 cursor-pointer"
+            className="text-xs text-[#554D44] font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-orange-100 file:text-[#E65100] hover:file:bg-orange-200 cursor-pointer bg-orange-50/50 p-1.5 rounded-2xl border border-orange-100"
           />
           <button
             type="submit"
             disabled={importingInitial || !initialFile}
-            className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
+            className="px-6 py-3 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-black rounded-xl shadow-lg shadow-orange-600/20 disabled:opacity-50 cursor-pointer transition"
           >
-            {importingInitial ? "Đang import..." : "Xác nhận Import danh sách ban đầu"}
+            {importingInitial ? "Đang import..." : "🚀 Xác nhận Import danh sách ban đầu"}
           </button>
         </form>
       </div>
 
-      {/* 🚀 LUỒNG 2: BOX IMPORT INELIGIBLE */}
+      {/* LUỒNG 2: BOX IMPORT INELIGIBLE (MODAL ACCORDION) */}
       {showIneligibleModal && (
-        <div className="bg-amber-50/70 p-6 border-2 border-amber-300 rounded-2xl shadow-md space-y-4 relative animate-smooth-fade">
-          <div className="flex justify-between items-start">
+        <div className="bg-amber-50/95 backdrop-blur-xl p-6 border-2 border-amber-300 rounded-3xl shadow-xl space-y-4 animate-smooth-fade">
+          <div className="flex justify-between items-start pb-3 border-b border-amber-200">
             <div>
-              <span className="px-2.5 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-black rounded uppercase">
-                Cập nhật danh sách
+              <span className="px-2.5 py-1 bg-amber-200 text-amber-900 text-[10px] font-black rounded-lg uppercase">
+                Cập nhật bổ sung
               </span>
               <h3 className="text-sm font-black text-amber-950 mt-1">
-                2. Import danh sách sinh viên <u>chưa đủ điều kiện</u>
+                Import danh sách sinh viên <u>chưa đủ điều kiện</u>
               </h3>
+              <p className="text-[11px] text-amber-900 font-medium mt-0.5">
+                File Excel chứa danh sách sinh viên rớt môn hoặc không đủ điều kiện học kỳ này.
+              </p>
             </div>
             <button
               type="button"
               onClick={() => setShowIneligibleModal(false)}
-              className="w-7 h-7 rounded-xl bg-white border border-amber-300 text-amber-900 font-bold flex items-center justify-center hover:bg-amber-100 cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-white border border-amber-300 text-amber-900 font-black flex items-center justify-center cursor-pointer shadow-sm hover:bg-amber-100 transition"
             >
               ✕
             </button>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-amber-200 text-xs text-[#2C2825] space-y-1.5 shadow-xs">
-            <p className="font-bold text-amber-900">📌 Hướng dẫn chức năng:</p>
-            <p>• Chức năng này dùng khi Phòng đào tạo gửi file danh sách sinh viên <b>trượt môn, thiếu chứng chỉ ngoại ngữ hoặc không đủ điều kiện</b> làm Capstone.</p>
-            <p>• Hệ thống sẽ tự động quét, <b>gắn cờ Không Đủ Điều Kiện</b> và tự động loại các sinh viên có trong file ra khỏi nhóm hiện tại của họ.</p>
-          </div>
-
-          <form
-            onSubmit={handleImportIneligible}
-            className="flex items-center gap-4 flex-wrap pt-1"
-          >
+          <form onSubmit={handleImportIneligible} className="flex items-center gap-4 flex-wrap">
             <input
               type="file"
               accept=".xlsx, .xls, .csv"
               onChange={(e) => setIneligibleFile(e.target.files[0])}
-              className="text-xs text-[#6B635B] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-900 hover:file:bg-amber-200 cursor-pointer bg-white p-1 rounded-xl border border-amber-200"
+              className="text-xs text-amber-900 font-semibold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-amber-200 file:text-amber-950 cursor-pointer bg-white p-1.5 rounded-2xl border border-amber-200 shadow-sm"
             />
             <button
               type="submit"
               disabled={importingIneligible || !ineligibleFile}
-              className="px-5 py-2.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 cursor-pointer"
+              className="px-6 py-3 bg-amber-800 hover:bg-amber-900 text-white text-xs font-black rounded-xl shadow-md disabled:opacity-50 cursor-pointer transition"
             >
-              {importingIneligible ? "Đang cập nhật..." : "Xác nhận Import danh sách"}
+              {importingIneligible ? "Đang cập nhật..." : "📥 Xác nhận Cập nhật danh sách"}
             </button>
           </form>
         </div>
       )}
 
-      {/* Thanh tìm kiếm & Bộ lọc trạng thái điều kiện */}
-      <div className="bg-white p-4 border border-[#E8E2D9] rounded-2xl flex items-center justify-between shadow-xs flex-wrap gap-4">
-        <input
-          type="text"
-          value={searchKeyword}
-          onChange={(e) => setSearchKeyword(e.target.value)}
-          placeholder="🔍 Tìm kiếm theo tên, email hoặc MSSV..."
-          className="w-full md:w-96 px-4 py-2.5 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
-        />
+      {/* THANH TÌM KIẾM & BỘ LỌC */}
+      <div className="bg-white/85 backdrop-blur-xl p-4 border border-white rounded-2xl flex items-center justify-between shadow-lg shadow-black/5 flex-wrap gap-4">
+        <div className="relative flex-1 min-w-65">
+          <input
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="🔍 Tìm kiếm theo tên, email, MSSV..."
+            className="w-full px-4 py-2.5 text-xs bg-white border border-gray-200 rounded-xl outline-none focus:border-[#E65100] font-semibold text-[#1A1816] shadow-xs"
+          />
+        </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-[#6B635B]">Lọc trạng thái:</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-bold text-[#554D44]">Lọc trạng thái:</span>
           <select
             value={eligibilityFilter}
             onChange={(e) => setEligibilityFilter(e.target.value)}
-            className="px-4 py-2.5 text-xs font-bold bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl focus:outline-none focus:border-[#E65100]"
+            className="px-3.5 py-2.5 text-xs font-black bg-white border border-gray-200 rounded-xl outline-none focus:border-[#E65100] text-[#E65100] cursor-pointer shadow-xs"
           >
             <option value="ALL">Tất cả trạng thái</option>
-            <option value="ELIGIBLE">Đủ điều kiện</option>
-            <option value="INELIGIBLE" style={{color: 'red'}}>Chưa đủ điều kiện</option>
+            <option value="ELIGIBLE">✓ Đủ điều kiện</option>
+            <option value="INELIGIBLE">✕ Chưa đủ điều kiện</option>
           </select>
-
-          <span className="text-xs font-bold text-[#6B635B] ml-2">
-            Tổng số: {filteredStudents.length} sinh viên
+          <span className="px-3 py-1 bg-orange-50 text-[#E65100] font-black text-xs rounded-lg border border-orange-100">
+            Tổng: {filteredStudents.length} sinh viên
           </span>
         </div>
       </div>
 
-      {/* Bảng danh sách sinh viên */}
-      <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
+      {/* BẢNG DANH SÁCH SINH VIÊN */}
+      <div className="bg-white/85 backdrop-blur-xl border border-white rounded-2xl overflow-hidden shadow-xl shadow-black/5">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
+            <tr className="bg-white/80 border-b border-gray-100 text-[#554D44]">
               <th className="p-4 font-black uppercase w-16 text-center">STT</th>
               <th className="p-4 font-black uppercase">MSSV</th>
               <th className="p-4 font-black uppercase">Họ và tên</th>
               <th className="p-4 font-black uppercase">Email</th>
-              <th className="p-4 font-black uppercase">Trạng thái điều kiện</th>
-              <th className="p-4 font-black uppercase text-right">
-                Thao tác riêng từng dòng
-              </th>
+              <th className="p-4 font-black uppercase">Trạng thái</th>
+              <th className="p-4 font-black uppercase text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E8E2D9]">
+          <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan="6" className="p-12 text-center text-[#6B635B]">
+                <td colSpan="6" className="p-12 text-center text-[#554D44] italic font-semibold">
                   Đang tải danh sách sinh viên...
                 </td>
               </tr>
@@ -417,28 +349,13 @@ export default function EligibilityPanel({ onChanged }) {
               filteredStudents.map((student, index) => {
                 const isEligible = student.eligibility !== "INELIGIBLE";
                 return (
-                  <tr
-                    key={student.id || student.studentCode || index}
-                    className="hover:bg-[#FBF9F5]/70 transition"
-                  >
-                    <td className="p-4 text-center font-bold text-[#6B635B]">
-                      {index + 1}
-                    </td>
-                    <td className="p-4 font-bold font-mono text-[#E65100]">
-                      {student.studentCode || student.mssv}
-                    </td>
-                    <td className="p-4 font-bold text-[#2C2825]">
-                      {student.fullName}
-                    </td>
-                    <td className="p-4 text-[#6B635B]">{student.email}</td>
+                  <tr key={student.id || index} className="hover:bg-orange-50/40 transition">
+                    <td className="p-4 text-center font-bold text-[#554D44]">{index + 1}</td>
+                    <td className="p-4 font-mono font-black text-[#E65100]">{student.studentCode || student.mssv}</td>
+                    <td className="p-4 font-extrabold text-[#1A1816]">{student.fullName}</td>
+                    <td className="p-4 text-[#554D44] font-semibold">{student.email}</td>
                     <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 font-bold rounded-lg text-[10px] ${
-                          isEligible
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-red-50 text-red-600 border border-red-200"
-                        }`}
-                      >
+                      <span className={`px-3 py-1 font-black rounded-lg text-[10px] border ${isEligible ? "bg-emerald-100 text-emerald-900 border-emerald-200" : "bg-red-100 text-red-900 border-red-200"}`}>
                         {isEligible ? "✓ Đủ điều kiện" : "✕ Chưa đủ điều kiện"}
                       </span>
                     </td>
@@ -446,15 +363,13 @@ export default function EligibilityPanel({ onChanged }) {
                       <button
                         type="button"
                         onClick={() => handleToggleClick(student)}
-                        className={`px-3.5 py-1.5 font-bold rounded-xl text-xs cursor-pointer transition ${
+                        className={`px-3 py-1.5 font-black rounded-xl text-[11px] cursor-pointer shadow-xs transition ${
                           isEligible
-                            ? "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
-                            : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                            ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                            : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
                         }`}
                       >
-                        {isEligible
-                          ? "Gắn cờ Ineligible"
-                          : "Gỡ cờ (Đủ điều kiện)"}
+                        {isEligible ? "🚩 Gắn cờ Ineligible" : "✨ Gỡ cờ (Đủ điều kiện)"}
                       </button>
                     </td>
                   </tr>
@@ -462,11 +377,8 @@ export default function EligibilityPanel({ onChanged }) {
               })
             ) : (
               <tr>
-                <td
-                  colSpan="6"
-                  className="p-12 text-center text-[#6B635B] italic"
-                >
-                  Không tìm thấy sinh viên nào phù hợp với bộ lọc.
+                <td colSpan="6" className="p-12 text-center text-[#554D44] italic font-semibold">
+                  Không tìm thấy sinh viên phù hợp.
                 </td>
               </tr>
             )}
@@ -474,64 +386,49 @@ export default function EligibilityPanel({ onChanged }) {
         </table>
       </div>
 
-      {/* 💡 CUSTOM MODAL (POPUP NHẬP LÝ DO) */}
+      {/* MODAL LÝ DO GẮN CỜ */}
       {reasonModalOpen && targetStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#E8E2D9] p-6 space-y-5 text-xs animate-smooth-fade">
-            <div className="flex justify-between items-center border-b border-[#E8E2D9] pb-3">
-              <h3 className="text-sm font-black text-[#2C2825]">
-                Gắn cờ Chưa đủ điều kiện
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white p-7 space-y-4 text-xs animate-smooth-fade">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h3 className="text-sm font-black text-[#1A1816]">Gắn cờ Chưa đủ điều kiện</h3>
               <button
                 type="button"
                 onClick={() => setReasonModalOpen(false)}
-                className="w-7 h-7 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold flex items-center justify-center cursor-pointer"
+                className="w-7 h-7 rounded-xl bg-gray-100 text-gray-700 font-bold flex items-center justify-center hover:bg-gray-200 cursor-pointer"
               >
                 ✕
               </button>
             </div>
-
-            <div className="space-y-1">
-              <p className="font-bold text-[#6B635B]">Sinh viên:</p>
-              <p className="font-black text-sm text-[#2C2825]">
-                {targetStudent.fullName} (
-                {targetStudent.studentCode || targetStudent.mssv})
+            <div>
+              <p className="text-gray-500 font-semibold">Sinh viên:</p>
+              <p className="font-extrabold text-[#1A1816] text-sm mt-0.5">
+                {targetStudent.fullName} ({targetStudent.studentCode || targetStudent.mssv})
               </p>
             </div>
-
-            <div className="space-y-2">
-              <label className="block font-bold text-[#2C2825]">
-                Nhập lý do chưa đủ điều kiện{" "}
-                <span className="text-red-500">*</span>:
-              </label>
+            <div className="space-y-1">
+              <label className="font-bold text-[#554D44]">Lý do chưa đủ điều kiện:</label>
               <input
                 type="text"
                 value={ineligibleReason}
                 onChange={(e) => setIneligibleReason(e.target.value)}
-                placeholder="VD: Trượt môn tiên quyết, thiếu chứng chỉ..."
+                placeholder="VD: Trượt môn PRF192, thiếu chứng chỉ ngoại ngữ..."
                 autoFocus
-                className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] focus:outline-none focus:border-[#E65100]"
+                className="w-full p-3 rounded-xl border border-gray-200 bg-white outline-none focus:border-[#E65100] font-semibold text-[#1A1816] shadow-xs"
               />
             </div>
-
-            <div className="flex justify-end gap-2 border-t border-[#E8E2D9] pt-3">
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setReasonModalOpen(false)}
-                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl cursor-pointer"
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl cursor-pointer transition"
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  handleConfirmEligibilityChange(
-                    targetStudent,
-                    false,
-                    ineligibleReason,
-                  )
-                }
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-sm cursor-pointer"
+                onClick={() => handleConfirmEligibilityChange(targetStudent, false, ineligibleReason)}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-md cursor-pointer transition"
               >
                 Xác nhận gắn cờ
               </button>
@@ -540,22 +437,13 @@ export default function EligibilityPanel({ onChanged }) {
         </div>
       )}
 
-      {/* 🚀 TOAST NOTIFICATION CHUYÊN NGHIỆP */}
+      {/* TOAST THÔNG BÁO */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white border border-[#E8E2D9] rounded-2xl shadow-xl text-xs transition-all animate-smooth-fade">
-          <span
-            className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-white ${
-              toast.type === "error" ? "bg-red-500" : "bg-emerald-500"
-            }`}
-          >
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 bg-white/95 backdrop-blur-xl border border-white rounded-2xl shadow-2xl text-xs animate-bounce">
+          <span className={`w-6 h-6 rounded-xl flex items-center justify-center text-white font-bold shadow-sm ${toast.type === "error" ? "bg-red-600" : "bg-emerald-600"}`}>
             {toast.type === "error" ? "✕" : "✓"}
           </span>
-          <div>
-            <p className="font-black text-[#2C2825]">
-              {toast.type === "error" ? "Thông báo lỗi" : "Thành công"}
-            </p>
-            <p className="text-[#6B635B]">{toast.message}</p>
-          </div>
+          <p className="font-black text-[#1A1816]">{toast.message}</p>
         </div>
       )}
     </div>
