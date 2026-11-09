@@ -57,38 +57,73 @@ const getManagedRole = (role) => {
 };
 
 // Hàm xác định 1 trong 4 giai đoạn chính của Học kỳ
+// Hàm xác định 1 trong 4 giai đoạn chính của Học kỳ
 const getSemesterStage = (sem) => {
-  if (!sem) return { label: "Mở học kỳ", color: "bg-blue-100 text-blue-800 border-blue-200" };
-  
+  if (!sem)
+    return {
+      label: "Mở học kỳ",
+      color: "bg-blue-100 text-blue-800 border-blue-200",
+    };
+
   const now = new Date();
   const startDate = sem.startDate ? new Date(sem.startDate) : null;
   const opensAt = sem.formationOpensAt ? new Date(sem.formationOpensAt) : null;
   const deadline = sem.defaultDeadline ? new Date(sem.defaultDeadline) : null;
   const endDate = sem.endDate ? new Date(sem.endDate) : null;
 
-  // Nếu có trường status từ Backend trả về trực tiếp
-  const rawStatus = String(sem.status || "").toUpperCase();
-  if (rawStatus === "FINISHED" || rawStatus === "CLOSED" || (endDate && now > endDate)) {
-    return { label: "Kết thúc ghép nhóm", color: "bg-gray-100 text-gray-800 border-gray-300" };
+  // Nếu có trường status hoặc phase từ Backend trả về trực tiếp
+  const rawStatus = String(sem.phase || sem.status || "").toUpperCase();
+  
+  if (
+    rawStatus === "FINISHED" ||
+    rawStatus === "CLOSED" ||
+    rawStatus === "LOCKED" ||
+    rawStatus === "DEADLINE_LOCKED" ||
+    rawStatus === "FINALIZED" ||
+    (endDate && now > endDate)
+  ) {
+    return {
+      label: "Kết thúc ghép nhóm",
+      color: "bg-gray-100 text-gray-800 border-gray-300",
+    };
   }
-  if (rawStatus === "ADDITIONAL" || rawStatus === "PHASE_2") {
-    return { label: "Bổ sung", color: "bg-purple-100 text-purple-800 border-purple-200" };
+  if (
+    rawStatus === "SUPPLEMENT" ||
+    rawStatus === "ADJUSTING" ||
+    rawStatus === "ROUND2" ||
+    rawStatus === "FINALIZING"
+  ) {
+    return {
+      label: "Bổ sung",
+      color: "bg-purple-100 text-purple-800 border-purple-200",
+    };
   }
-  if (rawStatus === "GROUPING" || rawStatus === "PHASE_1") {
-    return { label: "Lập nhóm", color: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+  if (rawStatus === "FORMING" || rawStatus === "ROUND1" || rawStatus === "OPENING") {
+    return {
+      label: "Lập nhóm",
+      color: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    };
   }
 
-  // Tự động tính toán theo mốc thời gian nếu không có status
+  // Tự động tính toán theo mốc thời gian nếu không khớp status
   if (deadline && now > deadline) {
-    return { label: "Kết thúc ghép nhóm", color: "bg-gray-100 text-gray-800 border-gray-300" };
+    return {
+      label: "Kết thúc ghép nhóm",
+      color: "bg-gray-100 text-gray-800 border-gray-300",
+    };
   }
   if (opensAt && now >= opensAt) {
-    return { label: "Lập nhóm", color: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+    return {
+      label: "Lập nhóm",
+      color: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    };
   }
-  
-  return { label: "Mở học kỳ", color: "bg-blue-100 text-blue-800 border-blue-200" };
-};
 
+  return {
+    label: "Mở học kỳ",
+    color: "bg-blue-100 text-blue-800 border-blue-200",
+  };
+};
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState("monitoring");
@@ -110,7 +145,8 @@ export default function AdminDashboard() {
   const [semesters, setSemesters] = useState([]);
 
   // State lọc học kỳ ở Trang Giám sát tổng quan ("ALL" hoặc mã kỳ cụ thể như "SP27", "FA26",...)
-  const [selectedOverviewSemester, setSelectedOverviewSemester] = useState("ALL");
+  const [selectedOverviewSemester, setSelectedOverviewSemester] =
+    useState("ALL");
 
   // State lọc tài khoản theo học kỳ và tab xem tài khoản ("semester_students" hoặc "all_system_users")
   const [accountViewMode, setAccountViewMode] = useState("all_system_users");
@@ -248,9 +284,7 @@ export default function AdminDashboard() {
           userId: targetUserId,
           newLeaderUserId: targetUserId,
         })
-        .catch(() =>
-          replaceGroupLeader(roomId, { userId: targetUserId }),
-        );
+        .catch(() => replaceGroupLeader(roomId, { userId: targetUserId }));
 
       setLeaderModalOpen(false);
       setSelectedGroup(null);
@@ -312,7 +346,9 @@ export default function AdminDashboard() {
       const activeCode =
         activeSemesterDetailCode ||
         accountSemesterFilter ||
-        (finalSemList.length > 0 ? finalSemList[0].code || finalSemList[0] : "");
+        (finalSemList.length > 0
+          ? finalSemList[0].code || finalSemList[0]
+          : "");
 
       if (finalSemList.length > 0) {
         if (!activeSemesterDetailCode) {
@@ -333,7 +369,18 @@ export default function AdminDashboard() {
           const list = Array.isArray(groupRes.data)
             ? groupRes.data
             : groupRes.data?.content || groupRes.data?.items || [];
-          const mappedList = list.map((g) => ({
+
+          // CHỈ LẤY CÁC PHÒNG ĐÃ ĐƯỢC CHỐT THÀNH NHÓM CHÍNH THỨC
+          // (Dựa vào trạng thái finalized, isFinalized hoặc có groupCode chính thức)
+          const finalizedGroups = list.filter(
+            (g) =>
+              g.finalized === true ||
+              g.status === "FINALIZED" ||
+              g.finalizeStatus === "APPROVED" ||
+              Boolean(g.groupCode),
+          );
+
+          const mappedList = finalizedGroups.map((g) => ({
             ...g,
             semester: g.semester || semCode,
             semesterModerator: sem.moderator,
@@ -496,21 +543,23 @@ export default function AdminDashboard() {
   const displayedSemestersOverview =
     selectedOverviewSemester === "ALL"
       ? semesters
-      : semesters.filter(
-          (s) => (s.code || s) === selectedOverviewSemester,
-        );
+      : semesters.filter((s) => (s.code || s) === selectedOverviewSemester);
 
   const overviewFilteredGroups =
     selectedOverviewSemester === "ALL"
       ? groups
       : groups.filter(
-          (g) => String(g.semester).toUpperCase() === String(selectedOverviewSemester).toUpperCase(),
+          (g) =>
+            String(g.semester).toUpperCase() ===
+            String(selectedOverviewSemester).toUpperCase(),
         );
 
   const totalGroupsOverview =
     selectedOverviewSemester === "ALL"
-      ? semesters.reduce((sum, sem) => sum + (sem.groupCount || 0), 0) || groups.length
-      : (semesters.find((s) => (s.code || s) === selectedOverviewSemester)?.groupCount ?? overviewFilteredGroups.length);
+      ? semesters.reduce((sum, sem) => sum + (sem.groupCount || 0), 0) ||
+        groups.length
+      : (semesters.find((s) => (s.code || s) === selectedOverviewSemester)
+          ?.groupCount ?? overviewFilteredGroups.length);
 
   const totalStudentsOverview =
     selectedOverviewSemester === "ALL"
@@ -806,17 +855,24 @@ export default function AdminDashboard() {
                     Giám sát tổng quan hệ thống
                   </span>
                   <h1 className="text-2xl font-black text-[rgb(255,245,235)] mt-1">
-                    Thống kê tổng hợp {selectedOverviewSemester === "ALL" ? "tất cả các kỳ" : `học kỳ ${selectedOverviewSemester}`}
+                    Thống kê tổng hợp{" "}
+                    {selectedOverviewSemester === "ALL"
+                      ? "tất cả các kỳ"
+                      : `học kỳ ${selectedOverviewSemester}`}
                   </h1>
                 </div>
 
                 <div className="flex items-center gap-3">
                   {/* Ô CHỌN LỌC HỌC KỲ */}
                   <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white shadow-sm">
-                    <span className="text-xs font-bold text-[#3A3530]">🔍 Lọc kỳ:</span>
+                    <span className="text-xs font-bold text-[#3A3530]">
+                      🔍 Lọc kỳ:
+                    </span>
                     <select
                       value={selectedOverviewSemester}
-                      onChange={(e) => setSelectedOverviewSemester(e.target.value)}
+                      onChange={(e) =>
+                        setSelectedOverviewSemester(e.target.value)
+                      }
                       className="text-xs font-black text-[#E65100] bg-transparent outline-none cursor-pointer"
                     >
                       <option value="ALL">🌐 Tất cả các kỳ</option>
@@ -898,7 +954,9 @@ export default function AdminDashboard() {
                         Tổng số nhóm đồ án
                       </p>
                       <span className="text-[10px] font-black text-[#E65100] bg-orange-100 px-1.5 py-0.5 rounded">
-                        {selectedOverviewSemester === "ALL" ? "Tất cả các kỳ" : `Kỳ ${selectedOverviewSemester}`}
+                        {selectedOverviewSemester === "ALL"
+                          ? "Tất cả các kỳ"
+                          : `Kỳ ${selectedOverviewSemester}`}
                       </span>
                     </div>
                     <p className="mt-2 text-2xl font-black text-[#1A1816]">
@@ -938,14 +996,18 @@ export default function AdminDashboard() {
                         Sinh viên đăng ký
                       </p>
                       <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
-                        {selectedOverviewSemester === "ALL" ? "Tất cả các kỳ" : `Kỳ ${selectedOverviewSemester}`}
+                        {selectedOverviewSemester === "ALL"
+                          ? "Tất cả các kỳ"
+                          : `Kỳ ${selectedOverviewSemester}`}
                       </span>
                     </div>
                     <p className="mt-2 text-2xl font-black text-[#1A1816]">
                       {totalStudentsOverview}
                     </p>
                     <p className="text-[10px] text-[#554D44] font-semibold mt-1">
-                      {selectedOverviewSemester === "ALL" ? "Toàn hệ thống FPT" : `Thuộc học kỳ ${selectedOverviewSemester}`}
+                      {selectedOverviewSemester === "ALL"
+                        ? "Toàn hệ thống FPT"
+                        : `Thuộc học kỳ ${selectedOverviewSemester}`}
                     </p>
                   </div>
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -968,7 +1030,8 @@ export default function AdminDashboard() {
                       Giảng viên hướng dẫn và quản lý nhóm theo học kỳ
                     </h3>
                     <p className="text-[11px] text-[#554D44] font-semibold">
-                      Bấm trực tiếp vào từng học kỳ bên dưới để xem danh sách nhóm chi tiết của kỳ đó.
+                      Bấm trực tiếp vào từng học kỳ bên dưới để xem danh sách
+                      nhóm chi tiết của kỳ đó.
                     </p>
                   </div>
                   <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-black rounded-lg border border-purple-200">
@@ -1006,8 +1069,12 @@ export default function AdminDashboard() {
 
                           {/* DÒNG TRẠNG THÁI GIAI ĐOẠN HỌC KỲ (Mở học kỳ, Lập nhóm, Bổ sung, Kết thúc ghép nhóm) */}
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-[#554D44] font-bold">Giai đoạn:</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${stage.color}`}>
+                            <span className="text-[#554D44] font-bold">
+                              Giai đoạn:
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-black border ${stage.color}`}
+                            >
                               ● {stage.label}
                             </span>
                           </div>
@@ -1104,7 +1171,9 @@ export default function AdminDashboard() {
 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl border border-white shadow-lg shadow-black/5 space-y-5">
                   <h3 className="text-sm font-black text-[#1A1816]">
-                    📈 Thống kê sĩ số nhóm đồ án (3 - 5 người) {selectedOverviewSemester !== "ALL" && `— Kỳ ${selectedOverviewSemester}`}
+                    📈 Thống kê sĩ số nhóm đồ án (3 - 5 người){" "}
+                    {selectedOverviewSemester !== "ALL" &&
+                      `— Kỳ ${selectedOverviewSemester}`}
                   </h3>
                   <div className="space-y-4 pt-2">
                     {(() => {
@@ -1115,9 +1184,12 @@ export default function AdminDashboard() {
                           (Array.isArray(g.members) ? g.members.length : 0);
                         return count >= 3 && count <= 5;
                       }).length;
-                      const invalidGroups = overviewFilteredGroups.length - validGroups;
+                      const invalidGroups =
+                        overviewFilteredGroups.length - validGroups;
                       const validPercent = overviewFilteredGroups.length
-                        ? Math.round((validGroups / overviewFilteredGroups.length) * 100)
+                        ? Math.round(
+                            (validGroups / overviewFilteredGroups.length) * 100,
+                          )
                         : 0;
 
                       return (
@@ -1338,14 +1410,26 @@ export default function AdminDashboard() {
                               </td>
                               <td className="p-4 text-[11px] text-[#3A3530] font-semibold space-y-0.5">
                                 <div>
-                                  Mở: {formatDateTimeStr(sem.formationOpensAt)}
+                                  Mở:{" "}
+                                  {formatDateTimeStr(
+                                    sem.formationOpensAt ||
+                                      sem.timeline?.formationOpensAt,
+                                  )}
                                 </div>
                                 <div>
-                                  Đóng: {formatDateTimeStr(sem.defaultDeadline)}
+                                  Đóng:{" "}
+                                  {formatDateTimeStr(
+                                    sem.defaultDeadline ||
+                                      sem.deadline ||
+                                      sem.timeline?.defaultDeadline ||
+                                      sem.timeline?.deadline,
+                                  )}
                                 </div>
                               </td>
                               <td className="p-4">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${stage.color}`}>
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-black border ${stage.color}`}
+                                >
                                   {stage.label}
                                 </span>
                               </td>
@@ -2204,7 +2288,7 @@ export default function AdminDashboard() {
                             <td className="p-3 text-right">
                               {isLeader ? (
                                 <span className="px-2.5 py-1 bg-purple-100 text-purple-900 font-bold rounded-lg text-[10px] border border-purple-200">
-                                  👑 Trưởng nhóm
+                                  Trưởng nhóm
                                 </span>
                               ) : (
                                 <span className="px-2.5 py-1 bg-white text-gray-800 font-bold rounded-lg text-[10px] border border-white">

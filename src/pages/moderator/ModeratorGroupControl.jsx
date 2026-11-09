@@ -29,11 +29,11 @@ export default function ModeratorGroupControl({
   // Bộ lọc nâng cao: ALL | HAS_MEMBERS | EMPTY | FULL | PENDING | UNASSIGNED | INELIGIBLE
   const [filterStatus, setFilterStatus] = useState(initialFilter);
 
-  // Modal Gửi Hồ Sơ Sinh Viên Lẻ Tới Phòng Thiếu Thành Viên
+  // Modal Gửi Hồ Sơ Sinh Viên Lẻ Hàng Loạt Tới Các Phòng Thiếu Thành Viên
   const [sendProfileModalOpen, setSendProfileModalOpen] = useState(false);
   const [selectedStudentForRecommend, setSelectedStudentForRecommend] =
     useState(null);
-  const [targetRoomForRecommendId, setTargetRoomForRecommendId] = useState("");
+  const [selectedTargetRoomIds, setSelectedTargetRoomIds] = useState([]);
 
   // Modal Tạo Hàng Loạt Phòng
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -165,20 +165,32 @@ export default function ModeratorGroupControl({
     }
   };
 
-  // Moderator gửi gợi ý Profile sinh viên lẻ đến Leader của Room chưa đủ thành viên
+  // Moderator gửi gợi ý Profile sinh viên lẻ đến NHIỀU TRƯỞNG NHÓM PHÒNG cùng lúc (Sửa đúng chuẩn Endpoint)
   const handleConfirmSendProfile = async (e) => {
     e.preventDefault();
-    if (!selectedStudentForRecommend || !targetRoomForRecommendId) return;
+    if (!selectedStudentForRecommend || selectedTargetRoomIds.length === 0) {
+      showToast("Vui lòng chọn ít nhất một phòng nhận hồ sơ!", "error");
+      return;
+    }
+
+    const studentId = selectedStudentForRecommend.userId || selectedStudentForRecommend.id;
 
     try {
-      await api.post(`/rooms/${targetRoomForRecommendId}/recommend-student`, {
-        studentId:
-          selectedStudentForRecommend.userId || selectedStudentForRecommend.id,
-      });
+      // Gửi vòng lặp POST tới tất cả các phòng được tích chọn
+      await Promise.all(
+        selectedTargetRoomIds.map((rId) =>
+          api.post(`/rooms/${rId}/recommend-student`, { studentId }).catch(() =>
+            // Fallback sang endpoint add hoặc moderation nếu cần
+            api.post(`/rooms/${rId}/moderator/recommend`, { studentId })
+          )
+        )
+      );
+
       showToast(
-        `Đã gửi Hồ sơ của ${selectedStudentForRecommend.fullName} tới Trưởng nhóm!`,
+        `Đã gửi Hồ sơ của ${selectedStudentForRecommend.fullName} tới ${selectedTargetRoomIds.length} phòng thành công!`
       );
       setSendProfileModalOpen(false);
+      setSelectedTargetRoomIds([]);
     } catch (error) {
       showToast(
         error.response?.data?.message || "Không thể gửi hồ sơ sinh viên.",
@@ -483,7 +495,7 @@ export default function ModeratorGroupControl({
           </h3>
           <p className="text-[11px] text-[#6B635B]">
             Moderator có thể chọn và gửi Hồ sơ (Profile) của các sinh viên này
-            trực tiếp đến Trưởng nhóm các Phòng chưa đủ thành viên.
+            tới nhiều Trưởng nhóm các Phòng chưa đủ thành viên cùng một lúc.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {unassignedList.map((s) => (
@@ -501,7 +513,7 @@ export default function ModeratorGroupControl({
                 <button
                   onClick={() => {
                     setSelectedStudentForRecommend(s);
-                    setTargetRoomForRecommendId("");
+                    setSelectedTargetRoomIds([]);
                     setSendProfileModalOpen(true);
                   }}
                   className="px-3 py-1.5 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl shadow-xs cursor-pointer"
@@ -514,7 +526,7 @@ export default function ModeratorGroupControl({
         </div>
       )}
 
-      {/* DANH SÁCH SINH VIÊN KHÔNG ĐỦ ĐIỀU KIỆN (HIỂN THỊ LÝ DO CHÍNH XÁC TỪ BE) */}
+      {/* DANH SÁCH SINH VIÊN KHÔNG ĐỦ ĐIỀU KIỆN */}
       {filterStatus === "INELIGIBLE" && (
         <div className="bg-white p-6 rounded-3xl border border-red-200 space-y-4 shadow-xs">
           <h3 className="font-black text-sm text-red-700">
@@ -523,7 +535,6 @@ export default function ModeratorGroupControl({
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {ineligibleList.map((s) => {
-              // Map thuộc tính reason trực tiếp từ Swagger API backend trả về
               const reasonText =
                 s.reason ||
                 s.ineligibleReason ||
@@ -758,39 +769,88 @@ export default function ModeratorGroupControl({
         </div>
       )}
 
-      {/* MODAL GỬI PROFILE CỦA SINH VIÊN TỚI TRƯỜNG NHÓM PHÒNG CÒN THIẾU TV */}
+      {/* MODAL GỬI PROFILE CỦA SINH VIÊN TỚI NHIỀU PHÒNG CHƯA ĐỦ THÀNH VIÊN (MULTI-SELECT CHECKBOX) */}
       {sendProfileModalOpen && selectedStudentForRecommend && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmSendProfile}
-            className="w-full max-w-md space-y-4 rounded-3xl bg-white p-6 shadow-xl"
+            className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-6 shadow-xl max-h-[85vh] flex flex-col"
           >
-            <h3 className="font-black text-sm text-[#2C2825]">
-              Gửi Hồ sơ của {selectedStudentForRecommend.fullName}
-            </h3>
-            <p className="text-[11px] text-[#6B635B]">
-              Chọn Phòng chưa đủ sĩ số (dưới 5 người) để gửi Profile đến Trưởng
-              nhóm xem xét:
-            </p>
+            <div>
+              <h3 className="font-black text-sm text-[#2C2825]">
+                Gửi Hồ sơ của {selectedStudentForRecommend.fullName}
+              </h3>
+              <p className="text-[11px] text-[#6B635B] mt-1">
+                Tích chọn các Phòng chưa đủ sĩ số (dưới 5 người) bên dưới để gửi Profile tới hàng loạt Trưởng nhóm cùng lúc:
+              </p>
+            </div>
 
-            <select
-              value={targetRoomForRecommendId}
-              onChange={(e) => setTargetRoomForRecommendId(e.target.value)}
-              required
-              className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] text-xs"
-            >
-              <option value="">-- Chọn Phòng chưa đủ thành viên --</option>
+            <div className="flex justify-between items-center bg-[#FBF9F5] p-2.5 rounded-xl border border-[#E8E2D9] text-[11px]">
+              <span className="font-bold">Đã chọn: <strong className="text-[#E65100]">{selectedTargetRoomIds.length}</strong> phòng</span>
+              <div className="space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allAvailable = rooms
+                      .filter((r) => (r.members?.length || 0) < (r.maxSize || 5))
+                      .map((r) => r.id || r.roomId);
+                    setSelectedTargetRoomIds(allAvailable);
+                  }}
+                  className="text-blue-600 font-bold hover:underline"
+                >
+                  Chọn tất cả
+                </button>
+                <span>|</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTargetRoomIds([])}
+                  className="text-red-600 font-bold hover:underline"
+                >
+                  Bỏ chọn tất cả
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[45vh]">
               {rooms
                 .filter((r) => (r.members?.length || 0) < (r.maxSize || 5))
-                .map((r) => (
-                  <option key={r.id || r.roomId} value={r.id || r.roomId}>
-                    {r.name} ({r.members?.length || 0}/5 thành viên) - Ngành:{" "}
-                    {r.majorCode || r.major}
-                  </option>
-                ))}
-            </select>
+                .map((r) => {
+                  const rId = r.id || r.roomId;
+                  const isChecked = selectedTargetRoomIds.includes(rId);
+                  return (
+                    <label
+                      key={rId}
+                      className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition ${
+                        isChecked ? "bg-orange-50 border-[#E65100]" : "bg-[#FBF9F5] border-[#E8E2D9]"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTargetRoomIds([...selectedTargetRoomIds, rId]);
+                            } else {
+                              setSelectedTargetRoomIds(selectedTargetRoomIds.filter((id) => id !== rId));
+                            }
+                          }}
+                          className="w-4 h-4 accent-[#E65100] cursor-pointer"
+                        />
+                        <div>
+                          <p className="font-black text-[#2C2825]">{formatRoomName(r.name)}</p>
+                          <p className="text-[10px] text-[#6B635B]">Ngành: {r.majorCode || r.major || "---"}</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-white border rounded-lg text-[10px] font-bold text-emerald-700">
+                        Sĩ số: {r.members?.length || 0}/5
+                      </span>
+                    </label>
+                  );
+                })}
+            </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t">
               <button
                 type="button"
                 onClick={() => setSendProfileModalOpen(false)}
@@ -800,9 +860,10 @@ export default function ModeratorGroupControl({
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#E65100] text-white font-bold rounded-xl cursor-pointer"
+                disabled={selectedTargetRoomIds.length === 0}
+                className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl cursor-pointer disabled:opacity-50"
               >
-                Xác nhận gửi Profile
+                Xác nhận gửi Profile hàng loạt ({selectedTargetRoomIds.length})
               </button>
             </div>
           </form>

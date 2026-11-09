@@ -54,7 +54,7 @@ export const inviteToGroup = async (groupId, data) =>
   (await api.post(`/groups/${groupId}/invitations`, data)).data;
 
 export const getGroupRequests = async (groupId) =>
-  (await api.get(`/groups/${groupId}/requests`)).data;
+  (await api.get(`/rooms/${groupId}/requests`)).data;
 
 // Lấy danh sách đơn ứng tuyển / lời mời của tôi theo môn học (chuẩn Swagger /subjects/{subjectId}/my-requests)[cite: 21]
 export const getSubjectMyRequests = async (subjectId) =>

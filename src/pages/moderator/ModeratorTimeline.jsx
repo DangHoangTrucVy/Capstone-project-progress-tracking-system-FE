@@ -15,6 +15,34 @@ export default function ModeratorTimeline({ semester, onRefresh }) {
 
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
+  // Hàm chuyển đổi Giai đoạn học kỳ (Chuyển sang Bổ sung hoặc Kết thúc)
+ const handleUpdatePhase = async (actionType) => {
+    let endpoint = "";
+    let actionName = "";
+
+    if (actionType === "start-formation") {
+      endpoint = `/semesters/${semester}/start-formation`;
+      actionName = "Mở học kỳ -> Lập nhóm";
+    } else if (actionType === "finalize-round1") {
+      endpoint = `/semesters/${semester}/finalize-round1`;
+      actionName = "Chốt đợt 1 (Sang Bổ sung / Kết thúc)";
+    } else if (actionType === "finalize-round2") {
+      endpoint = `/semesters/${semester}/finalize-round2`;
+      actionName = "Chốt đợt 2 (Kết thúc ghép nhóm hoàn toàn)";
+    }
+
+    if (!window.confirm(`Xác nhận thực hiện thao tác: ${actionName}?`)) return;
+
+    try {
+      await api.post(endpoint);
+      showToast(`Thực hiện thành công: ${actionName}!`);
+      loadTimelineData(semester);
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      showToast(error.response?.data?.message || "Thực hiện thất bại.", "error");
+    }
+  };
+
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
@@ -250,6 +278,44 @@ export default function ModeratorTimeline({ semester, onRefresh }) {
             Cập nhật Deadline chung
           </button>
         </form>
+      </div>
+      {/* KHỐI ĐIỀU HƯỚNG GIAI ĐOẠN HỌC KỲ CHO MODERATOR THEO SWAGGER */}
+      <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-xs space-y-4">
+        <div className="flex items-center space-x-2 border-b border-[#E8E2D9] pb-3">
+          <span className="text-base">🚀</span>
+          <h3 className="font-black text-sm text-[#2C2825]">
+            Điều phối Chuyển Giai đoạn Học kỳ (Theo Swagger)
+          </h3>
+        </div>
+        <p className="text-[11px] text-[#6B635B]">
+          Thực hiện các mốc chuyển giai đoạn chuẩn của hệ thống:
+        </p>
+
+        <div className="flex flex-wrap gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => handleUpdatePhase("start-formation")}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer transition"
+          >
+            ▶️ Mở học kỳ → Lập nhóm (Start Formation)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleUpdatePhase("finalize-round1")}
+            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-xs cursor-pointer transition"
+          >
+            🔄 Chốt đợt 1 (Finalize Round 1)
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => handleUpdatePhase("finalize-round2")}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs cursor-pointer transition"
+          >
+            ✓ Chốt đợt 2 / Kết thúc (Finalize Round 2)
+          </button>
+        </div>
       </div>
     </div>
   );
