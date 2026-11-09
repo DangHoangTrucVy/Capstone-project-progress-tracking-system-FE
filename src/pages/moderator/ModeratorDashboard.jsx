@@ -39,8 +39,11 @@ const getCurrentStageIndex = (phase) => {
   const p = (phase || "").toUpperCase();
   if (p === "OPEN" || p === "INIT") return 1;
   if (p === "FORMING" || p === "ROUND1") return 2;
-  if (p === "ADJUSTING" || p === "ROUND2" || p === "FINALIZING") return 3;
-  if (p === "FINISHED" || p === "LOCKED" || p === "DEADLINE_LOCKED" || p === "FINALIZED") return 4;
+  if (p === "SUPPLEMENT" || p === "ADJUSTING" || p === "ROUND2" || p === "FINALIZING") return 3;
+  
+  // Bổ sung "CLOSED", "FINISHED", "LOCKED"... vào đây để nhận diện bước 4
+  if (p === "CLOSED" || p === "FINISHED" || p === "LOCKED" || p === "DEADLINE_LOCKED" || p === "FINALIZED") return 4;
+  
   return 2;
 };
 
