@@ -1,65 +1,93 @@
 import { useEffect, useState } from "react";
 import {
-  getGroupsBySemester,
+  getSemesterRoomsForMod,
   getSemesterStatistics,
   exportSemesterExcel,
-  dissolveGroupsBatch,
+  dissolveSubMinimumRooms,
 } from "../../services/moderatorService";
-import { getSemesters } from "../../services/eligibilityService";
+import { getSemesters } from "../../services/semesterService";
 import { getCurrentUser } from "../../services/authService";
+import api from "../../services/api";
 import Profile from "../../auth/Profile";
 import ModeratorLeaveRequests from "./ModeratorLeaveRequests";
-import ModeratorScopes from "./ModeratorScopes";
+import ModeratorTimeline from "./ModeratorTimeline";
 import ModeratorGroupControl from "./ModeratorGroupControl";
 import NotificationBell from "../../components/NotificationBell";
+
+const StatBar = ({ value, total, color }) => {
+  const percent = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+  return (
+    <div className="w-full bg-[#F3EFEA] h-3 rounded-full overflow-hidden mt-2">
+      <div
+        className={`h-full transition-all duration-500 ${color}`}
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
+};
+
+const SEMESTER_STAGES = [
+  { id: 1, key: "OPEN", title: "1. Mở học kỳ", desc: "Khởi tạo dữ liệu danh sách sinh viên" },
+  { id: 2, key: "FORMING", title: "2. Lập nhóm", desc: "Sinh viên tự do ghép phòng" },
+  { id: 3, key: "ADJUSTING", title: "3. Bổ sung", desc: "Điều phối & Gộp phòng" },
+  { id: 4, key: "FINISHED", title: "4. Kết thúc ghép nhóm", desc: "Khóa & Bàn giao" },
+];
+
+const getCurrentStageIndex = (phase) => {
+  const p = (phase || "").toUpperCase();
+  if (p === "OPEN" || p === "INIT") return 1;
+  if (p === "FORMING" || p === "ROUND1") return 2;
+  if (p === "ADJUSTING" || p === "ROUND2" || p === "FINALIZING") return 3;
+  if (p === "FINISHED" || p === "LOCKED" || p === "DEADLINE_LOCKED" || p === "FINALIZED") return 4;
+  return 2;
+};
 
 export default function ModeratorDashboard() {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState("groups");
   const [semesters, setSemesters] = useState([]);
   const [selectedSemester, setSelectedSemester] = useState("");
-  const [groups, setGroups] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filterUnder3, setFilterUnder3] = useState(false);
 
-  const [toast, setToast] = useState({
-    show: false,
-    message: "",
-    type: "success",
-  });
+  const [controlFilterStatus, setControlFilterStatus] = useState("ALL");
+
+  const [studentsModalOpen, setStudentsModalOpen] = useState(false);
+  const [studentList, setStudentList] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentSearchTerm, setStudentSearchTerm] = useState("");
+  const [studentFilter, setStudentFilter] = useState("ALL"); // ALL | HAS_GROUP | NO_GROUP | INELIGIBLE
+
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3000);
-  };
-
-  const fetchModeratorData = async () => {
-    try {
-      const currentUser = await getCurrentUser().catch(() => null);
-      setUser(currentUser);
-
-      const semRes = await getSemesters({ size: 1000 }).catch(() => []);
-      const semList = Array.isArray(semRes) ? semRes : semRes.content || [];
-      setSemesters(semList);
-      if (semList.length > 0 && !selectedSemester) {
-        const firstCode = semList[0].code || semList[0].name || semList[0];
-        setSelectedSemester(firstCode);
-      }
-    } catch (error) {
-      console.error("Lỗi tải dữ liệu Điều phối viên:", error);
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
   };
 
   useEffect(() => {
+    const fetchModeratorData = async () => {
+      try {
+        const currentUser = await getCurrentUser().catch(() => null);
+        setUser(currentUser);
+
+        const semRes = await getSemesters({ size: 1000 }).catch(() => []);
+        const semList = Array.isArray(semRes) ? semRes : semRes.content || [];
+        setSemesters(semList);
+        if (semList.length > 0 && !selectedSemester) {
+          const firstCode = semList[0].code || semList[0].name || semList[0];
+          setSelectedSemester(firstCode);
+        }
+      } catch (error) {
+        console.error("Lỗi tải dữ liệu:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchModeratorData();
   }, []);
 
-  // Tự động tải lại dữ liệu khi đổi học kỳ hoặc khi chuyển về tab quản lý nhóm
   useEffect(() => {
     if (selectedSemester) {
       loadSemesterData(selectedSemester);
@@ -68,53 +96,57 @@ export default function ModeratorDashboard() {
 
   const loadSemesterData = async (semester) => {
     try {
-      const [groupsRes, statsRes] = await Promise.all([
-        getGroupsBySemester(semester).catch(() => []),
+      const [roomsRes, statsRes] = await Promise.all([
+        getSemesterRoomsForMod(semester).catch(() => []),
         getSemesterStatistics(semester).catch(() => null),
       ]);
-      setGroups(
-        Array.isArray(groupsRes)
-          ? groupsRes
-          : groupsRes.content || groupsRes.items || [],
-      );
+      setRooms(Array.isArray(roomsRes) ? roomsRes : roomsRes.content || roomsRes.items || []);
       setStats(statsRes);
     } catch {
-      setGroups([]);
+      setRooms([]);
       setStats(null);
     }
   };
 
-  const handleDissolveUnder3 = async () => {
-    const under3Groups = groups.filter((g) => {
-      const count =
-        g.memberCount ??
-        g.numberOfMembers ??
-        (Array.isArray(g.members) ? g.members.length : 0);
-      return count < 3;
-    });
-
-    if (under3Groups.length === 0) {
-      showToast("Không có nhóm nào dưới 3 thành viên để giải tán.", "error");
-      return;
-    }
-
-    if (
-      !window.confirm(
-        `Bạn có chắc muốn giải tán toàn bộ ${under3Groups.length} nhóm dưới 3 người không?`,
-      )
-    )
-      return;
-
+  const handleOpenStudentsModal = async (filterType = "ALL") => {
+    setStudentFilter(filterType);
+    setStudentsModalOpen(true);
+    setLoadingStudents(true);
     try {
-      const groupIds = under3Groups.map((g) => g.id);
-      await dissolveGroupsBatch(groupIds);
-      showToast("Đã giải tán các nhóm dưới chuẩn thành công!");
+      const res = await api.get(`/semesters/${selectedSemester}/students`).catch(() => ({ data: [] }));
+      const list = Array.isArray(res.data) ? res.data : res.data?.content || res.data?.items || [];
+      setStudentList(list);
+    } catch {
+      setStudentList([]);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const handleNavigateToGroupControl = (filterStatus = "ALL") => {
+    setControlFilterStatus(filterStatus);
+    setActiveMenu("group-control");
+  };
+
+  const handleFinalizeBatch = async (batchNumber) => {
+    if (!window.confirm(`Xác nhận duyệt Chốt danh sách nhóm Đợt ${batchNumber}?`)) return;
+    try {
+      await api.post(`/semesters/${selectedSemester}/finalize-batch`, { batch: batchNumber });
+      showToast(`Đã chốt nhóm thành công cho Đợt ${batchNumber}!`);
       loadSemesterData(selectedSemester);
     } catch (error) {
-      showToast(
-        error.response?.data?.message || "Thực hiện thất bại.",
-        "error",
-      );
+      showToast(error.response?.data?.message || `Thao tác Chốt đợt ${batchNumber} thất bại.`, "error");
+    }
+  };
+
+  const handleDissolveSubMin = async () => {
+    if (!window.confirm("Xác nhận giải tán tất cả các Phòng có sĩ số dưới mức tối thiểu?")) return;
+    try {
+      await dissolveSubMinimumRooms(selectedSemester, { allBelowMinimum: true });
+      showToast("Đã giải tán các Phòng dưới sĩ số tối thiểu!");
+      loadSemesterData(selectedSemester);
+    } catch (error) {
+      showToast(error.response?.data?.message || "Giải tán thất bại.", "error");
     }
   };
 
@@ -124,16 +156,13 @@ export default function ModeratorDashboard() {
       const url = window.URL.createObjectURL(new Blob([blobData]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute(
-        "download",
-        `Danh_sach_ghep_nhom_${selectedSemester}.xlsx`,
-      );
+      link.setAttribute("download", `Bao_cao_ghep_nhom_${selectedSemester}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      showToast("Tải xuống tệp Excel bàn giao thành công!");
-    } catch (error) {
-      showToast("Không thể xuất tệp lúc này.", "error");
+      showToast("Tải file Excel bàn giao thành công!");
+    } catch {
+      showToast("Không thể xuất file lúc này.", "error");
     }
   };
 
@@ -142,168 +171,132 @@ export default function ModeratorDashboard() {
     window.location.replace("/login");
   };
 
-  const getInitials = (name) => {
-    if (!name) return "ĐP";
-    const words = name.trim().split(" ");
-    return words.length > 1
-      ? words[words.length - 2][0] + words[words.length - 1][0]
-      : words[0].slice(0, 2).toUpperCase();
-  };
-
-  const filteredGroups = groups.filter((g) => {
-    const count =
-      g.memberCount ??
-      g.numberOfMembers ??
-      (Array.isArray(g.members) ? g.members.length : 0);
-    if (filterUnder3) return count < 3;
-    return true;
-  });
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FBF9F5] flex items-center justify-center text-xs font-bold text-[#6B635B]">
-        Đang tải phân vùng Điều phối viên...
+        Đang tải phân vùng Người điều phối...
       </div>
     );
   }
 
+  const totalObj = stats?.total || stats || {};
+  const currentPhase = stats?.phase || totalObj?.phase || "FORMING";
+  const currentStageIdx = getCurrentStageIndex(currentPhase);
+
+  const totalStudents = totalObj.totalStudents ?? 0;
+  const totalRoomsCount = totalObj.totalRooms ?? rooms.length;
+  const subMinCount = totalObj.roomsBelowMinimum ?? totalObj.underMinCount ?? 0;
+  const withGroupCount = totalObj.withGroup ?? 0;
+  const unassignedCount = totalObj.withoutGroup ?? totalObj.unassignedCount ?? 0;
+
+  const filteredStudentList = studentList.filter((s) => {
+    const matchesSearch =
+      (s.fullName || "").toLowerCase().includes(studentSearchTerm.toLowerCase()) ||
+      (s.studentCode || s.code || "").toLowerCase().includes(studentSearchTerm.toLowerCase());
+    
+    const isIneligible = s.eligibility === "INELIGIBLE" || s.eligible === false;
+    const hasRoom = Boolean(s.hasGroup || s.roomId || s.roomName);
+
+    if (studentFilter === "HAS_GROUP") return matchesSearch && hasRoom && !isIneligible;
+    if (studentFilter === "NO_GROUP") return matchesSearch && !hasRoom && !isIneligible;
+    if (studentFilter === "INELIGIBLE") return matchesSearch && isIneligible;
+    return matchesSearch;
+  });
+
   return (
     <div className="min-h-screen bg-[#FBF9F5] flex text-[#2C2825] font-sans overflow-hidden relative">
       {toast.show && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white transition-all duration-300 flex items-center gap-2 animate-bounce ${
-            toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"
-          }`}
-        >
-          <span>{toast.type === "error" ? "❌" : "✨"}</span>
-          <span>{toast.message}</span>
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white ${toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"}`}>
+          {toast.message}
         </div>
       )}
 
-      {/* SIDEBAR ĐIỀU PHỐI VIÊN */}
-      <aside className="w-68 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 select-none shrink-0 h-screen min-h-0 overflow-hidden shadow-2xs">
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-8 pr-1">
-          <div className="flex items-center space-x-3.5 px-2 pt-2">
-            <div className="w-9 h-9 rounded-2xl bg-[#E65100] flex items-center justify-center text-white shadow-md shadow-orange-500/20 font-black">
+      {/* SIDEBAR */}
+      <aside className="w-68 bg-white border-r border-[#E8E2D9] flex flex-col justify-between p-4 shrink-0 h-screen overflow-hidden shadow-2xs select-none">
+        <div className="flex-1 space-y-6 overflow-y-auto pr-1">
+          <div className="flex items-center space-x-3 px-2 pt-2">
+            <div className="w-9 h-9 rounded-2xl bg-[#E65100] flex items-center justify-center text-white font-black shadow-md">
               ✓
             </div>
             <div>
-              <h2 className="font-black text-sm text-[#2C2825]">
-                Điều Phối Viên
-              </h2>
-              <p className="text-[10px] text-[#6B635B]">
-                Hệ thống Quản lý Đồ án FPT
-              </p>
+              <h2 className="font-black text-sm text-[#2C2825]">Người Điều Phối</h2>
+              <p className="text-[10px] text-[#6B635B]">Hệ thống Quản lý Đồ án</p>
             </div>
           </div>
 
           <div className="space-y-1.5 text-xs font-bold text-[#6B635B]">
-            <p className="text-[13px] font-black text-[#fd7f00] uppercase tracking-wider mb-2 px-3">
-              Điều hành học kỳ
+            <p className="text-[11px] font-black text-[#E65100] uppercase tracking-wider mb-2 px-3">
+              Quản lý Học kỳ
             </p>
             <button
               onClick={() => setActiveMenu("groups")}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
-                activeMenu === "groups"
-                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
-                  : "hover:bg-[#F8F6F0]"
+                activeMenu === "groups" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"
               }`}
             >
-             
-              <span>Điều phối & Nhóm</span>
+              <span>📊 Trang Tổng quan</span>
+            </button>
+            <button
+              onClick={() => handleNavigateToGroupControl("ALL")}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                activeMenu === "group-control" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>🚪 Danh sách & Điều phối Phòng</span>
+            </button>
+            <button
+              onClick={() => setActiveMenu("timeline")}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
+                activeMenu === "timeline" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"
+              }`}
+            >
+              <span>⏱ Lịch trình & Giai đoạn</span>
             </button>
             <button
               onClick={() => setActiveMenu("leave-requests")}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
-                activeMenu === "leave-requests"
-                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
-                  : "hover:bg-[#F8F6F0]"
+                activeMenu === "leave-requests" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"
               }`}
             >
-              
-              <span>Khiếu nại rời nhóm</span>
-            </button>
-            <button
-              onClick={() => setActiveMenu("scopes")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
-                activeMenu === "scopes"
-                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
-                  : "hover:bg-[#F8F6F0]"
-              }`}
-            >
-              
-              <span>Phạm vi & Thời hạn ngành</span>
+              <span>📝 Khiếu nại rời Phòng</span>
             </button>
 
-            <button
-              onClick={() => setActiveMenu("group-control")}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
-                activeMenu === "group-control"
-                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
-                  : "hover:bg-[#F8F6F0]"
-              }`}
-            >
-              
-              <span>Điều phối chi tiết nhóm</span>
-            </button>
-
-            <p className="text-[13px] font-black text-[#fd7f00] uppercase tracking-wider mt-6 mb-2 px-3">
+            <p className="text-[11px] font-black text-[#E65100] uppercase tracking-wider mt-6 mb-2 px-3">
               Cá nhân
             </p>
-
             <button
               onClick={() => setActiveMenu("profile")}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition cursor-pointer ${
-                activeMenu === "profile"
-                  ? "bg-[#E65100] text-white shadow-md shadow-orange-500/20"
-                  : "hover:bg-[#F8F6F0]"
+                activeMenu === "profile" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#F8F6F0]"
               }`}
             >
-             
-              <span>Hồ sơ cá nhân</span>
+              <span>👤 Hồ sơ cá nhân</span>
             </button>
           </div>
         </div>
 
-        <div className="shrink-0 pt-4 mt-3 border-t border-[#E8E2D9] space-y-3">
+        <div className="pt-4 border-t border-[#E8E2D9] space-y-3">
           <div className="flex items-center space-x-3">
-            {user?.avatarUrl || user?.avatar ? (
-              <img
-                src={user.avatarUrl || user.avatar}
-                alt="Avatar"
-                className="w-10 h-10 rounded-xl object-cover shadow-xs border border-[#E8E2D9]"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs shadow-xs">
-                {getInitials(user?.fullName)}
-              </div>
-            )}
+            <div className="w-9 h-9 bg-orange-100 text-[#E65100] font-black rounded-xl flex items-center justify-center text-xs">
+              {user?.fullName?.slice(0, 2).toUpperCase() || "ĐP"}
+            </div>
             <div className="overflow-hidden">
-              <h4 className="text-xs font-black truncate">
-                {user?.fullName || "Điều phối viên"}
-              </h4>
-              <p className="text-[10px] text-[#6B635B] truncate">
-                {user?.email}
-              </p>
+              <h4 className="text-xs font-black truncate">{user?.fullName || "Người điều phối"}</h4>
+              <p className="text-[10px] text-[#6B635B] truncate">{user?.email}</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition cursor-pointer"
-          >
+          <button onClick={handleLogout} className="w-full py-2 bg-red-50 text-red-600 font-bold rounded-xl text-xs cursor-pointer">
             Đăng xuất
           </button>
         </div>
       </aside>
 
-      {/* CONTENT CHÍNH */}
+      {/* NỘI DUNG CHÍNH */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto">
         <header className="h-18 bg-white border-b border-[#E8E2D9] px-8 flex justify-between items-center text-xs shrink-0 shadow-2xs">
-          <div className="flex items-center space-x-3">
-            <span className="font-extrabold text-[#E65100] bg-orange-50/80 px-3 py-1.5 rounded-xl border border-orange-100/80 shadow-2xs">
-              Điều Phối Viên — {activeMenu === "groups" ? "QUẢN LÝ NHÓM" : activeMenu === "leave-requests" ? "KHIẾU NẠI RỜI NHÓM" : activeMenu === "scopes" ? "PHẠM VI & THỜI HẠN" : activeMenu === "group-control" ? "ĐIỀU PHỐI CHI TIẾT" : "HỒ SƠ CÁ NHÂN"}
-            </span>
-          </div>
+          <span className="font-extrabold text-[#E65100] bg-orange-50 px-3 py-1.5 rounded-xl border border-orange-100 uppercase">
+            Người Điều Phối — {activeMenu === "groups" ? "TRANG TỔNG QUAN HỌC KỲ" : activeMenu === "group-control" ? "DANH SÁCH & ĐIỀU PHỐI PHÒNG" : activeMenu === "timeline" ? "LỊCH TRÌNH & GIAI ĐOẠN" : activeMenu === "leave-requests" ? "KHIẾU NẠI RỜI PHÒNG" : "HỒ SƠ CÁ NHÂN"}
+          </span>
 
           <div className="flex items-center space-x-4">
             <select
@@ -311,211 +304,205 @@ export default function ModeratorDashboard() {
               onChange={(e) => setSelectedSemester(e.target.value)}
               className="px-4 py-2 text-xs bg-[#FBF9F5] border border-[#E8E2D9] rounded-xl font-bold text-[#E65100] outline-none cursor-pointer"
             >
-              {semesters.map((sem, idx) => {
-                const code = sem.code || sem;
-                return (
-                  <option key={idx} value={code}>
-                    {code}
-                  </option>
-                );
-              })}
+              {semesters.map((sem, idx) => (
+                <option key={idx} value={sem.code || sem.name || sem}>
+                  Học kỳ: {sem.code || sem.name || sem}
+                </option>
+              ))}
             </select>
-
             <NotificationBell />
-
-            <div className="text-right hidden sm:block pl-3 border-l border-[#E8E2D9]">
-              <p className="font-extrabold text-[#2C2825] text-xs">
-                {user?.fullName || "Điều phối viên"}
-              </p>
-              <p className="text-[10px] text-[#6B635B]">{user?.email}</p>
-            </div>
           </div>
         </header>
 
         <div className="w-full flex-1 flex flex-col">
           {activeMenu === "groups" && (
             <div className="p-8 space-y-6">
-              <div className="bg-white p-6 border border-[#E8E2D9] rounded-3xl shadow-sm flex justify-between items-center flex-wrap gap-4">
-                <div>
-                  <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-lg">
-                    ĐIỀU PHỐI VIÊN · QUẢN LÝ HỌC KỲ
-                  </span>
-                  <h1 className="text-xl font-black text-[#2C2825] mt-1">
-                    Quản lý nhóm đồ án & Xuất báo cáo bàn giao
-                  </h1>
-                </div>
-                <div>
-                  <button
-                    onClick={handleExport}
-                    className="px-5 py-2.5 bg-[#E65100] hover:bg-[#D84315] text-white text-xs font-bold rounded-xl cursor-pointer shadow-md transition"
-                  >
-                    ↓ Xuất Excel bàn giao (.xlsx)
-                  </button>
-                </div>
-              </div>
+              
+              {/* TIMELINE GIAI ĐOẠN */}
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-3xl shadow-xs space-y-5">
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                  <div>
+                    <h2 className="text-base font-black text-[#2C2825]"> Tiến trình Giai đoạn Học kỳ {selectedSemester}</h2>
+                    <p className="text-[11px] text-[#6B635B]">Hệ thống đang chạy theo cột mốc 4 giai đoạn chuẩn của học kỳ</p>
+                  </div>
 
-              {stats && (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
-                    <p className="text-xs font-bold text-[#6B635B]">
-                      Tổng sinh viên
-                    </p>
-                    <p className="text-2xl font-black text-[#2C2825] mt-1">
-                      {stats.total?.totalStudents || stats.totalStudents || 0}
-                    </p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
-                    <p className="text-xs font-bold text-[#6B635B]">
-                      Tổng số nhóm
-                    </p>
-                    <p className="text-2xl font-black text-[#E65100] mt-1">
-                      {stats.total?.totalGroups ||
-                        stats.totalGroups ||
-                        groups.length}
-                    </p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
-                    <p className="text-xs font-bold text-[#6B635B]">
-                      Nhóm dưới 3 người
-                    </p>
-                    <p className="text-2xl font-black text-red-600 mt-1">
-                      {stats?.under3GroupsCount ??
-                        stats?.total?.under3GroupsCount ??
-                        groups.filter(
-                          (g) => (g.members?.length || g.memberCount || 0) < 3,
-                        ).length}
-                    </p>
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border border-[#E8E2D9] shadow-sm">
-                    <p className="text-xs font-bold text-[#6B635B]">
-                      Sinh viên chưa có nhóm
-                    </p>
-                    <p className="text-2xl font-black text-amber-600 mt-1">
-                      {stats.total?.withoutGroup ||
-                        stats.unassignedStudents ||
-                        0}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleFinalizeBatch(1)}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition"
+                    >
+                      Chốt Nhóm Đợt 1
+                    </button>
+                    <button
+                      onClick={() => handleFinalizeBatch(2)}
+                      className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition"
+                    >
+                      Chốt Nhóm Đợt 2 (Chốt Hết)
+                    </button>
+                    <button
+                      onClick={handleExport}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition"
+                    >
+                      ↓ Xuất Excel (.xlsx)
+                    </button>
                   </div>
                 </div>
-              )}
 
-              <div className="bg-white p-5 border border-[#E8E2D9] rounded-3xl flex items-center justify-between shadow-sm flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-[#6B635B]">
-                    Bộ lọc:
-                  </span>
-                  <button
-                    onClick={() => setFilterUnder3(false)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                      !filterUnder3
-                        ? "bg-[#E65100] text-white shadow-xs"
-                        : "bg-[#FBF9F5] text-[#6B635B] border border-[#E8E2D9]"
-                    }`}
-                  >
-                    Tất cả nhóm ({groups.length})
-                  </button>
-                  <button
-                    onClick={() => setFilterUnder3(true)}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                      filterUnder3
-                        ? "bg-red-600 text-white shadow-xs"
-                        : "bg-red-50 text-red-700 border border-red-200"
-                    }`}
-                  >
-                    ⚠️ Nhóm dưới 3 người
-                  </button>
-                </div>
-
-                <button
-                  onClick={handleDissolveUnder3}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer transition"
-                >
-                  💥 Giải tán tất cả nhóm dưới 3 người
-                </button>
-              </div>
-
-              <div className="bg-white border border-[#E8E2D9] rounded-3xl overflow-hidden shadow-sm">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
-                      <th className="p-4 font-black uppercase">Tên Nhóm</th>
-                      <th className="p-4 font-black uppercase">Sĩ số</th>
-                      <th className="p-4 font-black uppercase">Trạng thái</th>
-                      <th className="p-4 font-black uppercase text-right">
-                        Quyền điều phối
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E8E2D9]">
-                    {filteredGroups.length > 0 ? (
-                      filteredGroups.map((g) => {
-                        const count =
-                          g.memberCount ??
-                          g.numberOfMembers ??
-                          (Array.isArray(g.members) ? g.members.length : 0);
-                        const isValid = count >= 3 && count <= 5;
-                        return (
-                          <tr
-                            key={g.id}
-                            className="hover:bg-[#FBF9F5]/70 transition"
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 relative pt-2">
+                  {SEMESTER_STAGES.map((stage) => {
+                    const isCurrent = stage.id === currentStageIdx;
+                    const isPassed = stage.id < currentStageIdx;
+                    return (
+                      <div
+                        key={stage.id}
+                        className={`p-4 rounded-2xl border transition flex flex-col justify-between space-y-2 ${
+                          isCurrent
+                            ? "bg-orange-50 border-[#E65100] shadow-sm ring-2 ring-orange-200"
+                            : isPassed
+                            ? "bg-emerald-50 border-emerald-200 opacity-90"
+                            : "bg-[#FAF8F5] border-[#E8E2D9] opacity-60"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[11px] ${
+                              isCurrent
+                                ? "bg-[#E65100] text-white"
+                                : isPassed
+                                ? "bg-emerald-600 text-white"
+                                : "bg-gray-300 text-gray-700"
+                            }`}
                           >
-                            <td className="p-4 font-bold text-[#E65100]">
-                              {g.groupCode || g.name}
-                            </td>
-                            <td className="p-4">
-                              <span
-                                className={`px-3 py-1 font-bold rounded-xl text-[10px] ${isValid ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}
-                              >
-                                {count}/5 người (
-                                {isValid ? "Hợp lệ" : "Chưa đạt chuẩn"})
-                              </span>
-                            </td>
-                            <td className="p-4 font-bold">
-                              {g.locked || g.isLocked ? (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 border border-red-200 rounded-xl text-[10px]">
-                                  Nhóm đã khóa
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-[10px]">
-                                  Nhóm đang mở
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-4 text-right">
-                              <span className="text-xs text-[#6B635B] italic bg-[#FBF9F5] px-3 py-1.5 rounded-xl border border-[#E8E2D9]">
-                                Giảng viên điều phối có toàn quyền thêm/bớt/gộp
-                                nhóm
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan="4"
-                          className="p-12 text-center text-[#6B635B] italic"
-                        >
-                          Không tìm thấy nhóm nào phù hợp.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                            {isPassed ? "✓" : stage.id}
+                          </span>
+                          {isCurrent && (
+                            <span className="px-2 py-0.5 bg-[#E65100] text-white text-[9px] font-black rounded-full animate-pulse">
+                              ĐANG DIỄN RA
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className={`font-black text-xs ${isCurrent ? "text-[#E65100]" : "text-[#2C2825]"}`}>
+                            {stage.title}
+                          </h4>
+                          <p className="text-[10px] text-[#6B635B] mt-0.5">{stage.desc}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CARD THỐNG KÊ */}
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+                <div
+                  onClick={() => handleOpenStudentsModal("ALL")}
+                  className="bg-white p-5 rounded-3xl border border-[#E8E2D9] shadow-xs space-y-1 cursor-pointer hover:border-[#E65100] hover:shadow-md transition group"
+                >
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold text-[#6B635B] group-hover:text-[#E65100]">Tổng số Sinh viên</p>
+                    <span className="text-[10px] text-[#6B635B] opacity-0 group-hover:opacity-100 transition">Xem danh sách ↗</span>
+                  </div>
+                  <p className="text-3xl font-black text-[#2C2825]">{totalStudents}</p>
+                  <StatBar value={totalStudents} total={totalStudents} color="bg-blue-600" />
+                </div>
+
+                <div
+                  onClick={() => handleNavigateToGroupControl("HAS_MEMBERS")}
+                  className="bg-white p-5 rounded-3xl border border-[#E8E2D9] shadow-xs space-y-1 cursor-pointer hover:border-emerald-500 hover:shadow-md transition group"
+                >
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold text-emerald-700">Sinh viên đã vào Phòng</p>
+                    <span className="text-[10px] text-emerald-600 opacity-0 group-hover:opacity-100 transition">Chuyển sang tab ↗</span>
+                  </div>
+                  <p className="text-3xl font-black text-emerald-600">{withGroupCount}</p>
+                  <StatBar value={withGroupCount} total={totalStudents} color="bg-emerald-500" />
+                </div>
+
+                <div
+                  onClick={() => handleNavigateToGroupControl("ALL")}
+                  className="bg-white p-5 rounded-3xl border border-[#E8E2D9] shadow-xs space-y-1 cursor-pointer hover:border-orange-500 hover:shadow-md transition group"
+                >
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold text-[#6B635B] group-hover:text-[#E65100]">Tổng số Phòng hiện tại</p>
+                    <span className="text-[10px] text-[#E65100] opacity-0 group-hover:opacity-100 transition">Quản lý phòng ↗</span>
+                  </div>
+                  <p className="text-3xl font-black text-[#E65100]">{totalRoomsCount}</p>
+                  <StatBar value={totalRoomsCount} total={totalRoomsCount} color="bg-orange-500" />
+                </div>
+
+                <div
+                  onClick={() => handleNavigateToGroupControl("ALL")}
+                  className="bg-white p-5 rounded-3xl border border-[#E8E2D9] shadow-xs space-y-1 cursor-pointer hover:border-red-500 hover:shadow-md transition group"
+                >
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold text-red-600">Phòng dưới sĩ số min</p>
+                    <span className="text-[10px] text-red-600 opacity-0 group-hover:opacity-100 transition">Xử lý ngay ↗</span>
+                  </div>
+                  <p className="text-3xl font-black text-red-600">{subMinCount}</p>
+                  <StatBar value={subMinCount} total={totalRoomsCount} color="bg-red-500" />
+                </div>
+
+                <div
+                  onClick={() => handleOpenStudentsModal("NO_GROUP")}
+                  className="bg-[#FAF8F5] p-5 rounded-3xl border border-amber-200 shadow-xs space-y-1 cursor-pointer hover:border-amber-500 hover:shadow-md transition group"
+                >
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold text-amber-800">Sinh viên chưa có Phòng</p>
+                    <span className="text-[10px] text-amber-800 opacity-0 group-hover:opacity-100 transition">Xem chi tiết ↗</span>
+                  </div>
+                  <p className="text-3xl font-black text-amber-600">{unassignedCount}</p>
+                  <StatBar value={unassignedCount} total={totalStudents} color="bg-amber-500" />
+                </div>
+              </div>
+
+              {/* PHÂN BỔ TRẠNG THÁI PHÒNG */}
+              <div className="bg-white p-6 border border-[#E8E2D9] rounded-3xl shadow-xs space-y-4">
+                <h3 className="font-black text-sm text-[#2C2825]">📊 Biểu đồ phân bổ Trạng thái Phòng</h3>
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-emerald-700">Phòng Đủ Đạt Chuẩn (Sĩ số từ 3 - 5 sinh viên)</span>
+                      <span>{totalRoomsCount - subMinCount} Phòng</span>
+                    </div>
+                    <StatBar value={totalRoomsCount - subMinCount} total={totalRoomsCount} color="bg-emerald-500" />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-red-600">Phòng Dưới 3 người (Cần giải tán / gộp)</span>
+                      <span>{subMinCount} Phòng</span>
+                    </div>
+                    <StatBar value={subMinCount} total={totalRoomsCount} color="bg-red-500" />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-3">
+                  <button
+                    onClick={handleDissolveSubMin}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    💥 Giải tán nhanh tất cả Phòng dưới 3 thành viên
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
+          {activeMenu === "group-control" && (
+            <ModeratorGroupControl
+              semester={selectedSemester}
+              initialFilter={controlFilterStatus}
+              onGroupUpdated={() => loadSemesterData(selectedSemester)}
+            />
+          )}
+
+          {activeMenu === "timeline" && (
+            <ModeratorTimeline semester={selectedSemester} onRefresh={() => loadSemesterData(selectedSemester)} />
+          )}
+
           {activeMenu === "leave-requests" && (
             <ModeratorLeaveRequests semester={selectedSemester} />
-          )}
-
-          {activeMenu === "scopes" && (
-            <ModeratorScopes semester={selectedSemester} />
-          )}
-
-          {activeMenu === "group-control" && (
-            <ModeratorGroupControl semester={selectedSemester} onGroupUpdated={() => loadSemesterData(selectedSemester)} />
           )}
 
           {activeMenu === "profile" && (
@@ -525,6 +512,117 @@ export default function ModeratorDashboard() {
           )}
         </div>
       </main>
+
+      {/* MODAL DANH SÁCH SINH VIÊN KÈM LÝ DO KHÔNG ĐỦ ĐIỀU KIỆN */}
+      {studentsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-4xl max-h-[85vh] bg-white rounded-3xl p-6 shadow-2xl flex flex-col space-y-4 overflow-hidden">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="font-black text-sm text-[#2C2825]">Danh sách Sinh viên Học kỳ {selectedSemester}</h3>
+                <p className="text-[11px] text-[#6B635B]">Chi tiết điều kiện tham gia ghép nhóm đồ án</p>
+              </div>
+              <button onClick={() => setStudentsModalOpen(false)} className="px-3 py-1 bg-gray-100 rounded-xl text-xs font-bold hover:bg-gray-200">
+                ✕ Đóng
+              </button>
+            </div>
+
+            <div className="flex gap-2 flex-wrap items-center justify-between">
+              <input
+                type="text"
+                placeholder="Tìm theo Tên sinh viên hoặc MSSV..."
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                className="flex-1 min-w-55 p-2.5 rounded-xl border border-[#E8E2D9] text-xs bg-[#FBF9F5] outline-none"
+              />
+              <div className="flex gap-1 bg-[#FBF9F5] p-1 rounded-xl border border-[#E8E2D9] text-xs font-bold">
+                <button
+                  onClick={() => setStudentFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg ${studentFilter === "ALL" ? "bg-white shadow-xs text-[#E65100]" : "text-[#6B635B]"}`}
+                >
+                  Tất cả ({studentList.length})
+                </button>
+                <button
+                  onClick={() => setStudentFilter("HAS_GROUP")}
+                  className={`px-3 py-1.5 rounded-lg ${studentFilter === "HAS_GROUP" ? "bg-white shadow-xs text-emerald-600" : "text-[#6B635B]"}`}
+                >
+                  🟢 Đã vào phòng
+                </button>
+                <button
+                  onClick={() => setStudentFilter("NO_GROUP")}
+                  className={`px-3 py-1.5 rounded-lg ${studentFilter === "NO_GROUP" ? "bg-white shadow-xs text-amber-600" : "text-[#6B635B]"}`}
+                >
+                  🟡 Chưa có phòng
+                </button>
+                <button
+                  onClick={() => setStudentFilter("INELIGIBLE")}
+                  className={`px-3 py-1.5 rounded-lg ${studentFilter === "INELIGIBLE" ? "bg-white shadow-xs text-red-600" : "text-[#6B635B]"}`}
+                >
+                  🔴 Không đủ điều kiện
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {loadingStudents ? (
+                <div className="text-center py-12 text-[#6B635B] text-xs font-bold">Đang tải danh sách sinh viên...</div>
+              ) : filteredStudentList.length > 0 ? (
+                filteredStudentList.map((s, idx) => {
+                  const isIneligible = s.eligibility === "INELIGIBLE" || s.eligible === false;
+                  const hasRoom = Boolean(s.hasGroup || s.roomId || s.roomName);
+                  const ineligibilityReason = s.ineligibleReason || s.reason || "Nợ môn điều kiện / Thiếu tín chỉ tích lũy";
+
+                  return (
+                    <div
+                      key={s.userId || s.id || idx}
+                      className={`p-3.5 border rounded-2xl flex justify-between items-center text-xs ${
+                        isIneligible ? "bg-red-50/50 border-red-200" : "bg-[#FBF9F5] border-[#E8E2D9]"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-bold text-[#2C2825] flex items-center gap-2">
+                          <span>{s.fullName}</span>
+                          {isIneligible && (
+                            <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">
+                              Không đủ điều kiện
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-[#6B635B] mt-0.5">
+                          MSSV: {s.studentCode || s.code || "---"} • Ngành: {s.majorCode || s.majorName || "---"}
+                        </p>
+                        {isIneligible && (
+                          <p className="text-[10px] text-red-600 font-bold mt-1">
+                            ⚠️ Lý do: {ineligibilityReason}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        {isIneligible ? (
+                          <span className="px-3 py-1 bg-red-100 text-red-700 border border-red-300 rounded-lg text-[10px] font-bold">
+                            🚫 Không đủ điều kiện
+                          </span>
+                        ) : hasRoom ? (
+                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold">
+                            ✓ {s.roomName ? `Phòng: ${s.roomName}` : "Đã vào phòng"}
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-bold">
+                            ⚠️ Chưa có phòng
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 text-[#6B635B] italic text-xs">Không tìm thấy sinh viên nào phù hợp.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

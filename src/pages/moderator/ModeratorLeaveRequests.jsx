@@ -1,14 +1,10 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
-import { getSemesters } from "../../services/eligibilityService";
 
 export default function ModeratorLeaveRequests({ semester }) {
-  const [semesters, setSemesters] = useState([]);
-  const [selectedSemester, setSelectedSemester] = useState(semester || "");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal xử lý quyết định khiếu nại (thay thế window.prompt)
   const [decisionModalOpen, setDecisionModalOpen] = useState(false);
   const [activeRequest, setActiveRequest] = useState(null);
   const [isApprovedAction, setIsApprovedAction] = useState(true);
@@ -23,43 +19,25 @@ export default function ModeratorLeaveRequests({ semester }) {
 
   useEffect(() => {
     if (semester) {
-      setSelectedSemester(semester);
-    } else {
-      getSemesters()
-        .then((res) => {
-          const list = Array.isArray(res) ? res : res.content || [];
-          setSemesters(list);
-          if (list.length > 0) setSelectedSemester(list[0].code || list[0]);
-        })
-        .catch(() => {});
+      loadRequests(semester);
     }
   }, [semester]);
-
-  useEffect(() => {
-    if (selectedSemester) {
-      loadRequests(selectedSemester);
-    }
-  }, [selectedSemester]);
 
   const loadRequests = async (semCode) => {
     setLoading(true);
     try {
-      const subRes = await api.get(`/semesters/${semCode}/subjects`).catch(() => ({ data: [] }));
-      const subjects = subRes.data?.content || subRes.data || [];
+      // Đã cập nhật đúng Endpoint Swagger: GET /api/v1/semesters/{semester}/complaints
+      const compRes = await api
+        .get(`/semesters/${semCode}/complaints`)
+        .catch(() =>
+          // Fallback nếu server cũ còn dùng endpoint leave-requests
+          api.get(`/semesters/${semCode}/leave-requests`).catch(() => ({ data: [] }))
+        );
 
-      let allComplaints = [];
-
-      for (const sub of subjects) {
-        try {
-          const compRes = await api.get(`/subjects/${sub.id}/complaints`).catch(() => ({ data: [] }));
-          const compList = Array.isArray(compRes.data) ? compRes.data : compRes.data?.content || compRes.data?.items || [];
-          
-          const mapped = compList.map(item => ({ ...item, subjectCode: sub.code || sub.name }));
-          allComplaints = [...allComplaints, ...mapped];
-        } catch (e) {}
-      }
-
-      setRequests(allComplaints);
+      const compList = Array.isArray(compRes.data)
+        ? compRes.data
+        : compRes.data?.content || compRes.data?.items || [];
+      setRequests(compList);
     } catch {
       setRequests([]);
     } finally {
@@ -83,53 +61,75 @@ export default function ModeratorLeaveRequests({ semester }) {
 
     try {
       const requestId = activeRequest.id || activeRequest.requestId;
+      // Endpoint đúng theo Swagger: POST /api/v1/leave-requests/{requestId}/moderator-decision
       await api.post(`/leave-requests/${requestId}/moderator-decision`, {
         approve: isApprovedAction,
         note: decisionNote.trim(),
+        reason: decisionNote.trim(),
       });
-      
-      showToast(isApprovedAction ? "Đã chấp nhận khiếu nại rời nhóm." : "Đã từ chối khiếu nại.");
+
+      showToast(
+        isApprovedAction ? "Đã chấp nhận yêu cầu rời Room." : "Đã từ chối yêu cầu rời Room."
+      );
       setDecisionModalOpen(false);
-      loadRequests(selectedSemester);
+      loadRequests(semester);
     } catch (error) {
       showToast(error.response?.data?.message || "Thực hiện thất bại.", "error");
     }
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-8 space-y-6 text-xs">
       {toast.show && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-xs font-bold text-white ${toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"}`}>
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl font-bold text-white ${
+            toast.type === "error" ? "bg-red-600" : "bg-[#2C2825]"
+          }`}
+        >
           {toast.message}
         </div>
       )}
 
-      <div className="bg-white p-6 border border-[#E8E2D9] rounded-2xl flex justify-between items-center shadow-xs">
+      <div className="bg-white p-6 border border-[#E8E2D9] rounded-3xl flex justify-between items-center shadow-xs">
         <div>
-          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded">ĐIỀU PHỐI VIÊN · KHIẾU NẠI & RỜI NHÓM</span>
-          <h1 className="text-xl font-black text-[#2C2825] mt-1">Xử lý yêu cầu rời nhóm và khiếu nại</h1>
+          <span className="px-3 py-1 bg-orange-50 text-[#E65100] text-[11px] font-bold rounded-lg">
+            ĐIỀU PHỐI VIÊN · KHIẾU NẠI & RỜI ROOM
+          </span>
+          <h1 className="text-xl font-black text-[#2C2825] mt-1">
+            Xử lý yêu cầu rời Room và khiếu nại
+          </h1>
         </div>
       </div>
 
-      <div className="bg-white border border-[#E8E2D9] rounded-2xl overflow-hidden shadow-xs">
+      <div className="bg-white border border-[#E8E2D9] rounded-3xl overflow-hidden shadow-xs">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-[#FBF9F5] border-b border-[#E8E2D9] text-[#6B635B]">
               <th className="p-4 font-black uppercase">Sinh viên</th>
-              <th className="p-4 font-black uppercase">Nhóm hiện tại</th>
-              <th className="p-4 font-black uppercase">Lý do</th>
+              <th className="p-4 font-black uppercase">Room hiện tại</th>
+              <th className="p-4 font-black uppercase">Lý do / Nội dung khiếu nại</th>
               <th className="p-4 font-black uppercase text-right">Quyết định</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E8E2D9]">
             {loading ? (
-              <tr><td colSpan="4" className="p-12 text-center text-[#6B635B]">Đang tải danh sách khiếu nại...</td></tr>
+              <tr>
+                <td colSpan="4" className="p-12 text-center text-[#6B635B]">
+                  Đang tải danh sách khiếu nại...
+                </td>
+              </tr>
             ) : requests.length > 0 ? (
               requests.map((req) => (
                 <tr key={req.id || req.requestId} className="hover:bg-[#FBF9F5]/70 transition">
-                  <td className="p-4 font-bold text-[#2C2825]">{req.studentName || req.userName || req.fullName || "—"}</td>
-                  <td className="p-4 font-bold text-[#E65100]">{req.groupCode || req.groupName || "—"}</td>
-                  <td className="p-4 text-[#6B635B]">{req.reason || req.content || "Yêu cầu rời nhóm / Khiếu nại"}</td>
+                  <td className="p-4 font-bold text-[#2C2825]">
+                    {req.studentName || req.fullName || req.studentCode || "—"}
+                  </td>
+                  <td className="p-4 font-bold text-[#E65100]">
+                    {req.roomName || req.groupCode || req.roomId || "—"}
+                  </td>
+                  <td className="p-4 text-[#6B635B]">
+                    {req.reason || req.content || req.description || "Yêu cầu rời Room"}
+                  </td>
                   <td className="p-4 text-right space-x-2">
                     <button
                       onClick={() => handleOpenDecisionModal(req, true)}
@@ -147,55 +147,46 @@ export default function ModeratorLeaveRequests({ semester }) {
                 </tr>
               ))
             ) : (
-              <tr><td colSpan="4" className="p-12 text-center text-[#6B635B] italic">Không có khiếu nại hay yêu cầu rời nhóm nào cần xử lý.</td></tr>
+              <tr>
+                <td colSpan="4" className="p-12 text-center text-[#6B635B] italic">
+                  Không có khiếu nại hay yêu cầu rời Room nào cần xử lý.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* MODAL NHẬP LÝ DO QUYẾT ĐỊNH KHIẾU NẠI (THAY THẾ WINDOW.PROMPT) */}
       {decisionModalOpen && activeRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmDecision}
-            className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-xl text-xs"
+            className="w-full max-w-md space-y-4 rounded-3xl bg-white p-6 shadow-xl text-xs"
           >
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-sm font-black text-[#2C2825]">
-                {isApprovedAction ? "Xác nhận chấp nhận khiếu nại" : "Xác nhận từ chối khiếu nại"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setDecisionModalOpen(false)}
-                className="font-bold text-gray-400 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-[#6B635B]">
-              {isApprovedAction 
-                ? "Bạn có muốn ghi chú thêm lý do chấp nhận không? (Không bắt buộc)" 
-                : "Vui lòng nhập lý do từ chối yêu cầu này:"}
-            </p>
+            <h3 className="font-black text-sm">
+              {isApprovedAction ? "Đồng ý cho sinh viên rời Room" : "Từ chối yêu cầu rời Room"}
+            </h3>
             <textarea
               value={decisionNote}
               onChange={(e) => setDecisionNote(e.target.value)}
               placeholder="Nhập ghi chú hoặc lý do..."
               required={!isApprovedAction}
               rows={3}
-              className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5] outline-none"
+              className="w-full p-3 rounded-xl border border-[#E8E2D9] bg-[#FBF9F5]"
             />
-            <div className="flex justify-end gap-2 border-t pt-3">
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setDecisionModalOpen(false)}
-                className="px-4 py-2 bg-gray-100 font-bold rounded-xl cursor-pointer"
+                className="px-4 py-2 bg-gray-100 font-bold rounded-xl"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className={`px-4 py-2 text-white font-bold rounded-xl cursor-pointer ${isApprovedAction ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
+                className={`px-4 py-2 text-white font-bold rounded-xl ${
+                  isApprovedAction ? "bg-emerald-600" : "bg-red-600"
+                }`}
               >
                 Xác nhận
               </button>

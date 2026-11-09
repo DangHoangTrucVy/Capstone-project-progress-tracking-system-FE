@@ -65,3 +65,45 @@ export const deleteSemester = async (semester) => {
     const response = await api.delete(`/semesters/${semester}`);
     return response.data;
 };
+
+// Bắt đầu Lập nhóm (Mở học kỳ -> Lập nhóm)
+export const startFormation = async (semester) => {
+  const response = await api.post(`/semesters/${semester}/start-formation`);
+  return response.data;
+};
+
+// Chốt đợt 1 (Moderator)
+export const finalizeRound1 = async (semester, params) => {
+  const response = await api.post(`/semesters/${semester}/finalize-round1`, null, { params });
+  return response.data;
+};
+
+// Chốt đợt 2 (Moderator)
+export const finalizeRound2 = async (semester) => {
+  const response = await api.post(`/semesters/${semester}/finalize-round2`);
+  return response.data;
+};
+
+// Kiểm tra điều kiện chuyển phase (Warnings / Blockers)
+export const checkPhaseTransition = async (semester) => {
+  const response = await api.get(`/semesters/${semester}/phase-check`);
+  return response.data;
+};
+
+// Lấy danh sách Rules của học kỳ
+export const getSemesterRules = async (semester) => {
+  const response = await api.get(`/semesters/${semester}/rules`);
+  return response.data;
+};
+
+// Cập nhật Rules của học kỳ (Moderator)
+export const updateSemesterRules = async (semester, data) => {
+  const response = await api.put(`/semesters/${semester}/rules`, data);
+  return response.data;
+};
+
+// Đặt hoặc gia hạn Deadline dùng chung của học kỳ
+export const setSemesterDeadline = async (semester, data) => {
+  const response = await api.put(`/semesters/${semester}/deadline`, data);
+  return response.data;
+};

@@ -56,6 +56,39 @@ const getManagedRole = (role) => {
   return aliases[normalizedRole] || normalizedRole;
 };
 
+// Hàm xác định 1 trong 4 giai đoạn chính của Học kỳ
+const getSemesterStage = (sem) => {
+  if (!sem) return { label: "Mở học kỳ", color: "bg-blue-100 text-blue-800 border-blue-200" };
+  
+  const now = new Date();
+  const startDate = sem.startDate ? new Date(sem.startDate) : null;
+  const opensAt = sem.formationOpensAt ? new Date(sem.formationOpensAt) : null;
+  const deadline = sem.defaultDeadline ? new Date(sem.defaultDeadline) : null;
+  const endDate = sem.endDate ? new Date(sem.endDate) : null;
+
+  // Nếu có trường status từ Backend trả về trực tiếp
+  const rawStatus = String(sem.status || "").toUpperCase();
+  if (rawStatus === "FINISHED" || rawStatus === "CLOSED" || (endDate && now > endDate)) {
+    return { label: "Kết thúc ghép nhóm", color: "bg-gray-100 text-gray-800 border-gray-300" };
+  }
+  if (rawStatus === "ADDITIONAL" || rawStatus === "PHASE_2") {
+    return { label: "Bổ sung", color: "bg-purple-100 text-purple-800 border-purple-200" };
+  }
+  if (rawStatus === "GROUPING" || rawStatus === "PHASE_1") {
+    return { label: "Lập nhóm", color: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+  }
+
+  // Tự động tính toán theo mốc thời gian nếu không có status
+  if (deadline && now > deadline) {
+    return { label: "Kết thúc ghép nhóm", color: "bg-gray-100 text-gray-800 border-gray-300" };
+  }
+  if (opensAt && now >= opensAt) {
+    return { label: "Lập nhóm", color: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+  }
+  
+  return { label: "Mở học kỳ", color: "bg-blue-100 text-blue-800 border-blue-200" };
+};
+
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState("monitoring");
@@ -76,8 +109,11 @@ export default function AdminDashboard() {
   // States cho quản lý tài khoản & học kỳ
   const [semesters, setSemesters] = useState([]);
 
+  // State lọc học kỳ ở Trang Giám sát tổng quan ("ALL" hoặc mã kỳ cụ thể như "SP27", "FA26",...)
+  const [selectedOverviewSemester, setSelectedOverviewSemester] = useState("ALL");
+
   // State lọc tài khoản theo học kỳ và tab xem tài khoản ("semester_students" hoặc "all_system_users")
-  const [accountViewMode, setAccountViewMode] = useState("semester_students");
+  const [accountViewMode, setAccountViewMode] = useState("all_system_users");
   const [accountSemesterFilter, setAccountSemesterFilter] = useState("");
   const [semesterStudents, setSemesterStudents] = useState([]);
   const [loadingSemesterStudents, setLoadingSemesterStudents] = useState(false);
@@ -153,25 +189,15 @@ export default function AdminDashboard() {
 
   const openLeaderModal = async (group) => {
     try {
-      const groupId = group.id || group.groupId;
-      const detail = await getGroupById(groupId).catch(() => null);
+      const roomId = group.id || group.groupId || group.roomId;
+      const detailRes = await api.get(`/rooms/${roomId}`).catch(() => null);
+      const detail = detailRes?.data || detailRes || {};
 
-      let membersList = detail?.members || group.members || [];
-      if (membersList.length === 0 && groupId) {
-        try {
-          const membersRes = await api
-            .get(`/groups/${groupId}/members`)
-            .catch(() => null);
-          membersList = Array.isArray(membersRes?.data)
-            ? membersRes.data
-            : membersRes?.data?.content || [];
-        } catch (e) {
-          console.error("Không thể tải danh sách thành viên:", e);
-        }
-      }
+      let membersList = detail.members || group.members || [];
 
       setSelectedGroup({
-        ...(detail || group),
+        ...group,
+        ...detail,
         members: membersList,
       });
       setNewLeaderId("");
@@ -194,7 +220,7 @@ export default function AdminDashboard() {
     const members = selectedGroup.members || [];
     const nextLeader = members.find(
       (member) =>
-        String(member.userId || member.profile?.userId) ===
+        String(member.userId || member.profile?.userId || member.id) ===
           String(newLeaderId) && !member.leader,
     );
 
@@ -206,21 +232,31 @@ export default function AdminDashboard() {
     const memberName =
       nextLeader.fullName || nextLeader.profile?.fullName || "Thành viên";
     const confirmed = window.confirm(
-      `Đổi Trưởng nhóm ${selectedGroup.groupCode} sang ${memberName}?`,
+      `Đổi Trưởng nhóm ${selectedGroup.groupCode || selectedGroup.roomName || "nhóm"} sang ${memberName}?`,
     );
     if (!confirmed) return;
 
     setChangingLeader(true);
     try {
-      const targetUserId = nextLeader.userId || nextLeader.profile?.userId;
-      await replaceGroupLeader(selectedGroup.id, {
-        userId: targetUserId,
-      });
+      const targetUserId =
+        nextLeader.userId || nextLeader.profile?.userId || nextLeader.id;
+      const roomId =
+        selectedGroup.id || selectedGroup.groupId || selectedGroup.roomId;
+
+      await api
+        .put(`/rooms/${roomId}/leader`, {
+          userId: targetUserId,
+          newLeaderUserId: targetUserId,
+        })
+        .catch(() =>
+          replaceGroupLeader(roomId, { userId: targetUserId }),
+        );
+
       setLeaderModalOpen(false);
       setSelectedGroup(null);
       setNewLeaderId("");
       await fetchAdminData();
-      showToast(`Đổi Trưởng nhóm ${selectedGroup.groupCode} thành công.`);
+      showToast(`Đổi Trưởng nhóm thành công.`);
     } catch (error) {
       showToast(
         error.response?.data?.message || "Đổi Trưởng nhóm thất bại.",
@@ -264,12 +300,6 @@ export default function AdminDashboard() {
       });
       setModerators(modList);
 
-      const groupsRes = await getAllGroups().catch(() => []);
-      const groupList = Array.isArray(groupsRes)
-        ? groupsRes
-        : groupsRes?.content || groupsRes?.items || groupsRes?.data || [];
-      setGroups(groupList);
-
       const semRes = await getSemesters({ size: 1000 }).catch(() => []);
       const semList = Array.isArray(semRes)
         ? semRes
@@ -279,12 +309,17 @@ export default function AdminDashboard() {
         : [semList].filter(Boolean);
       setSemesters(finalSemList);
 
+      const activeCode =
+        activeSemesterDetailCode ||
+        accountSemesterFilter ||
+        (finalSemList.length > 0 ? finalSemList[0].code || finalSemList[0] : "");
+
       if (finalSemList.length > 0) {
         if (!activeSemesterDetailCode) {
-          setActiveSemesterDetailCode(finalSemList[0].code || finalSemList[0]);
+          setActiveSemesterDetailCode(activeCode);
         }
         if (!accountSemesterFilter) {
-          setAccountSemesterFilter(finalSemList[0].code || finalSemList[0]);
+          setAccountSemesterFilter(activeCode);
         }
       }
 
@@ -293,7 +328,7 @@ export default function AdminDashboard() {
         const semCode = sem.code || sem;
         try {
           const groupRes = await api
-            .get(`/semesters/${semCode}/groups`)
+            .get(`/semesters/${semCode}/rooms`)
             .catch(() => ({ data: [] }));
           const list = Array.isArray(groupRes.data)
             ? groupRes.data
@@ -325,7 +360,7 @@ export default function AdminDashboard() {
     if (activeSemesterDetailCode) {
       setLoadingSemesterGroups(true);
       api
-        .get(`/semesters/${activeSemesterDetailCode}/groups`)
+        .get(`/semesters/${activeSemesterDetailCode}/rooms`)
         .then((res) => {
           const list = Array.isArray(res.data)
             ? res.data
@@ -339,7 +374,7 @@ export default function AdminDashboard() {
 
   // Tải danh sách sinh viên theo học kỳ được chọn ở trang tài khoản
   useEffect(() => {
-    if (activeMenu === "accounts" && accountSemesterFilter) {
+    if (accountSemesterFilter) {
       setLoadingSemesterStudents(true);
       api
         .get(`/semesters/${accountSemesterFilter}/students`)
@@ -352,7 +387,7 @@ export default function AdminDashboard() {
         .catch(() => setSemesterStudents([]))
         .finally(() => setLoadingSemesterStudents(false));
     }
-  }, [activeMenu, accountSemesterFilter]);
+  }, [accountSemesterFilter]);
 
   const handleSaveSemesterFromModal = async (e) => {
     e.preventDefault();
@@ -457,6 +492,31 @@ export default function AdminDashboard() {
     .map((account) => ({ ...account, role: getManagedRole(account.role) }))
     .filter((account) => manageableRoles.includes(account.role));
 
+  // --- TÍNH TOÁN DỮ LIỆU BỘ LỌC TẠI TRANG GIÁM SÁT TỔNG QUAN ---
+  const displayedSemestersOverview =
+    selectedOverviewSemester === "ALL"
+      ? semesters
+      : semesters.filter(
+          (s) => (s.code || s) === selectedOverviewSemester,
+        );
+
+  const overviewFilteredGroups =
+    selectedOverviewSemester === "ALL"
+      ? groups
+      : groups.filter(
+          (g) => String(g.semester).toUpperCase() === String(selectedOverviewSemester).toUpperCase(),
+        );
+
+  const totalGroupsOverview =
+    selectedOverviewSemester === "ALL"
+      ? semesters.reduce((sum, sem) => sum + (sem.groupCount || 0), 0) || groups.length
+      : (semesters.find((s) => (s.code || s) === selectedOverviewSemester)?.groupCount ?? overviewFilteredGroups.length);
+
+  const totalStudentsOverview =
+    selectedOverviewSemester === "ALL"
+      ? manageableUsers.filter((u) => u.role === "STUDENT").length
+      : semesterStudents.length;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FAF6F0] flex items-center justify-center text-xs font-bold text-[#1A1816]">
@@ -492,22 +552,12 @@ export default function AdminDashboard() {
         }
       `}</style>
 
-      {/* <div
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat filter brightness-110 contrast-95 scale-105"
-        style={{
-          backgroundImage: `url('https://cdn-lab.fpt.edu.vn/innovationlab/media/2026/04/P.Zo-9862-scaled-1.jpg')`,
-        }}
-      >
-        <div className="absolute inset-0 bg-white/50 backdrop-blur-[3px]"></div>
-      </div> */}
-
       <div
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat filter brightness-110 contrast-95 scale-105"
         style={{
           backgroundImage: `url('https://cdn-lab.fpt.edu.vn/innovationlab/media/2026/04/P.Zo-9862-scaled-1.jpg')`,
         }}
       >
-        {/* Đổi bg-white/50 thành lớp phủ màu be ấm (beige tint) */}
         <div className="absolute inset-0 bg-[#FAF6F0]/60 backdrop-blur-[3px]"></div>
       </div>
 
@@ -654,23 +704,6 @@ export default function AdminDashboard() {
               <span className="text-base shrink-0">👤</span>
               {isSidebarOpen && <span className="truncate">Tài khoản</span>}
             </button>
-            {/* <button
-              onClick={() => {
-                setActiveMenu("groups");
-                setSearchQuery("");
-              }}
-              title="Danh sách nhóm"
-              className={`w-full flex items-center space-x-3 px-3 py-3 rounded-xl transition cursor-pointer font-bold ${
-                activeMenu === "groups"
-                  ? "bg-[#E65100] text-white shadow-lg shadow-orange-600/30 font-black"
-                  : "hover:bg-white/90 text-[#1A1816]"
-              } ${!isSidebarOpen && "justify-center px-0"}`}
-            >
-              <span className="text-base shrink-0">👥</span>
-              {isSidebarOpen && (
-                <span className="truncate">Danh sách nhóm</span>
-              )}
-            </button> */}
 
             {isSidebarOpen && (
               <p className="text-[10px] font-black text-[#7A7065] uppercase tracking-wider mt-5 mb-2 px-3">
@@ -763,80 +796,165 @@ export default function AdminDashboard() {
         <div className="w-full flex-1 flex flex-col">
           {activeMenu === "monitoring" && (
             <section className="pt-2 p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
+              {/* BANNER THỐNG KÊ TỔNG HỢP CÓ BỘ LỌC HỌC KỲ */}
               <div
-                className="bg-[#E65100]/80 backdrop-blur-xl p-6 border border-white space-y-2 rounded-2xl flex justify-between items-center shadow-lg shadow-black/5 animate-smooth-fade"
+                className="bg-[#E65100]/80 backdrop-blur-xl p-6 border border-white space-y-2 rounded-2xl flex justify-between items-center shadow-lg shadow-black/5 animate-smooth-fade flex-wrap gap-4"
                 style={{ animationDelay: "0.01s" }}
               >
                 <div>
                   <span className="px-3 py-1 bg-orange-100 text-[#E65100] text-[11px] font-black rounded-md border border-orange-200">
-                    Giám sát tổng quan toàn hệ thống
+                    Giám sát tổng quan hệ thống
                   </span>
                   <h1 className="text-2xl font-black text-[rgb(255,245,235)] mt-1">
-                    Thống kê tổng hợp toàn bộ các kỳ
+                    Thống kê tổng hợp {selectedOverviewSemester === "ALL" ? "tất cả các kỳ" : `học kỳ ${selectedOverviewSemester}`}
                   </h1>
                 </div>
-                <button
-                  onClick={fetchAdminData}
-                  className="px-4 py-2 bg-white hover:bg-orange-50 text-[#E65100] text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 border border-white shadow-sm"
-                >
-                  Làm mới dữ liệu
-                </button>
+
+                <div className="flex items-center gap-3">
+                  {/* Ô CHỌN LỌC HỌC KỲ */}
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white shadow-sm">
+                    <span className="text-xs font-bold text-[#3A3530]">🔍 Lọc kỳ:</span>
+                    <select
+                      value={selectedOverviewSemester}
+                      onChange={(e) => setSelectedOverviewSemester(e.target.value)}
+                      className="text-xs font-black text-[#E65100] bg-transparent outline-none cursor-pointer"
+                    >
+                      <option value="ALL">🌐 Tất cả các kỳ</option>
+                      {semesters.map((sem, idx) => {
+                        const code = sem.code || sem;
+                        const name = sem.name || code;
+                        return (
+                          <option key={idx} value={code}>
+                            Kỳ {code} - {name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={fetchAdminData}
+                    className="px-4 py-2 bg-white hover:bg-orange-50 text-[#E65100] text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 border border-white shadow-sm"
+                  >
+                    Làm mới dữ liệu
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[
-                  {
-                    label: "Tổng tài khoản",
-                    value: manageableUsers.length,
-                    icon: "👤",
-                    bg: "bg-blue-100 text-blue-700 border border-blue-200",
-                    delay: "0.1s",
-                  },
-                  {
-                    label: "Tổng số nhóm đồ án",
-                    value: semesters.reduce(
-                      (sum, sem) => sum + (sem.groupCount || 0),
-                      0,
-                    ),
-                    icon: "👥",
-                    bg: "bg-orange-100 text-[#E65100] border border-orange-200",
-                    delay: "0.15s",
-                  },
-                  {
-                    label: "Sinh viên",
-                    value: manageableUsers.filter((u) => u.role === "STUDENT")
-                      .length,
-                    icon: "🎓",
-                    bg: "bg-emerald-100 text-emerald-800 border border-emerald-200",
-                    delay: "0.2s",
-                  },
-                ].map((metric) => (
-                  <div
-                    key={metric.label}
-                    className="rounded-2xl border border-white bg-white/80 backdrop-blur-xl p-5 flex items-center justify-between shadow-lg shadow-black/5 transition-transform duration-200 hover:-translate-y-1 animate-smooth-fade opacity-0"
-                    style={{
-                      animationDelay: metric.delay,
-                      animationFillMode: "forwards",
-                    }}
-                  >
-                    <div>
+                {/* CARD 1: TỔNG TÀI KHOẢN TOÀN HỆ THỐNG */}
+                <div
+                  onClick={() => {
+                    setAccountViewMode("all_system_users");
+                    setActiveMenu("accounts");
+                  }}
+                  className="rounded-2xl border border-white bg-white/80 backdrop-blur-xl p-5 flex items-center justify-between shadow-lg shadow-black/5 transition-all duration-200 hover:-translate-y-1 hover:border-[#E65100] cursor-pointer animate-smooth-fade opacity-0"
+                  style={{
+                    animationDelay: "0.1s",
+                    animationFillMode: "forwards",
+                  }}
+                  title="Bấm để xem toàn bộ tài khoản ở trang Tài khoản"
+                >
+                  <div>
+                    <div className="flex items-center gap-1.5">
                       <p className="text-xs font-bold text-[#554D44]">
-                        {metric.label}
+                        Tổng tài khoản
                       </p>
-                      <p className="mt-2 text-2xl font-black text-[#1A1816]">
-                        {metric.value}
-                      </p>
+                      <span className="text-[10px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                        Tất cả các kỳ
+                      </span>
                     </div>
-                    <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold ${metric.bg}`}
-                    >
-                      {metric.icon}
-                    </div>
+                    <p className="mt-2 text-2xl font-black text-[#1A1816]">
+                      {manageableUsers.length}
+                    </p>
+                    <p className="text-[10px] text-[#E65100] font-bold mt-1 hover:underline">
+                      Xem danh sách ở trang Tài khoản →
+                    </p>
                   </div>
-                ))}
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                    👤
+                  </div>
+                </div>
+
+                {/* CARD 2: TỔNG SỐ NHÓM ĐỒ ÁN */}
+                <div
+                  onClick={() => {
+                    if (selectedOverviewSemester !== "ALL") {
+                      setActiveSemesterDetailCode(selectedOverviewSemester);
+                    }
+                    setSemesterActiveTab("groups");
+                    setActiveMenu("semesters");
+                  }}
+                  className="rounded-2xl border border-white bg-white/80 backdrop-blur-xl p-5 flex items-center justify-between shadow-lg shadow-black/5 transition-all duration-200 hover:-translate-y-1 hover:border-[#E65100] cursor-pointer animate-smooth-fade opacity-0"
+                  style={{
+                    animationDelay: "0.15s",
+                    animationFillMode: "forwards",
+                  }}
+                  title="Bấm để xem danh sách nhóm theo từng kỳ"
+                >
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-[#554D44]">
+                        Tổng số nhóm đồ án
+                      </p>
+                      <span className="text-[10px] font-black text-[#E65100] bg-orange-100 px-1.5 py-0.5 rounded">
+                        {selectedOverviewSemester === "ALL" ? "Tất cả các kỳ" : `Kỳ ${selectedOverviewSemester}`}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-2xl font-black text-[#1A1816]">
+                      {totalGroupsOverview}
+                    </p>
+                    <p className="text-[10px] text-[#554D44] font-semibold mt-1">
+                      Đã được Giảng viên chốt
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold bg-orange-100 text-[#E65100] border border-orange-200">
+                    👥
+                  </div>
+                </div>
+
+                {/* CARD 3: SINH VIÊN ĐĂNG KÝ */}
+                <div
+                  onClick={() => {
+                    if (selectedOverviewSemester !== "ALL") {
+                      setAccountSemesterFilter(selectedOverviewSemester);
+                      setAccountViewMode("semester_students");
+                    } else {
+                      setAccountViewMode("all_system_users");
+                    }
+                    setSelectedRole("STUDENT");
+                    setActiveMenu("accounts");
+                  }}
+                  className="rounded-2xl border border-white bg-white/80 backdrop-blur-xl p-5 flex items-center justify-between shadow-lg shadow-black/5 transition-all duration-200 hover:-translate-y-1 hover:border-[#E65100] cursor-pointer animate-smooth-fade opacity-0"
+                  style={{
+                    animationDelay: "0.2s",
+                    animationFillMode: "forwards",
+                  }}
+                  title="Bấm để xem danh sách sinh viên ở trang Tài khoản"
+                >
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-[#554D44]">
+                        Sinh viên đăng ký
+                      </p>
+                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                        {selectedOverviewSemester === "ALL" ? "Tất cả các kỳ" : `Kỳ ${selectedOverviewSemester}`}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-2xl font-black text-[#1A1816]">
+                      {totalStudentsOverview}
+                    </p>
+                    <p className="text-[10px] text-[#554D44] font-semibold mt-1">
+                      {selectedOverviewSemester === "ALL" ? "Toàn hệ thống FPT" : `Thuộc học kỳ ${selectedOverviewSemester}`}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    🎓
+                  </div>
+                </div>
               </div>
 
-              {/* Giảng viên hướng dẫn và quản lý nhóm theo học kỳ (Bấm vào tên học kỳ sẽ chuyển sang tab Quản lý học kỳ và mở kỳ đó)[cite: 1] */}
+              {/* Giảng viên hướng dẫn và quản lý nhóm theo học kỳ (Hiển thị 4 Giai đoạn chuẩn) */}
               <div
                 className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl border border-white shadow-lg shadow-black/5 space-y-4 animate-smooth-fade opacity-0"
                 style={{
@@ -847,25 +965,25 @@ export default function AdminDashboard() {
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-sm font-black text-[#1A1816]">
-                      👑 Giảng viên hướng dẫn và quản lý nhóm theo học kỳ
+                      Giảng viên hướng dẫn và quản lý nhóm theo học kỳ
                     </h3>
                     <p className="text-[11px] text-[#554D44] font-semibold">
-                      Bấm trực tiếp vào tên/mã học kỳ bên dưới để xem danh sách
-                      nhóm chi tiết của kỳ đó[cite: 1].
+                      Bấm trực tiếp vào từng học kỳ bên dưới để xem danh sách nhóm chi tiết của kỳ đó.
                     </p>
                   </div>
                   <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-black rounded-lg border border-purple-200">
-                    {semesters.length} Kỳ hoạt động
+                    {displayedSemestersOverview.length} Kỳ hiển thị
                   </span>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {semesters.length > 0 ? (
-                    semesters.map((sem, idx) => {
+                  {displayedSemestersOverview.length > 0 ? (
+                    displayedSemestersOverview.map((sem, idx) => {
                       const code = sem.code || sem;
                       const name = sem.name || code;
                       const mod = sem.moderator;
                       const groupCount = sem.groupCount || 0;
+                      const stage = getSemesterStage(sem);
 
                       return (
                         <div
@@ -875,17 +993,26 @@ export default function AdminDashboard() {
                             setSemesterActiveTab("groups");
                             setActiveMenu("semesters");
                           }}
-                          className="p-4 rounded-xl border border-white bg-white/60 backdrop-blur-md space-y-2 shadow-sm cursor-pointer hover:border-[#E65100] transition group"
+                          className="p-4 rounded-xl border border-white bg-white/60 backdrop-blur-md space-y-3 shadow-sm cursor-pointer hover:border-[#E65100] transition group"
                         >
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-start gap-2">
                             <span className="font-black text-xs text-[#E65100] group-hover:underline flex items-center gap-1">
                               <span>📅</span> {code} — {name}
                             </span>
-                            <span className="px-2 py-0.5 bg-orange-100 text-orange-900 text-[10px] font-black rounded">
+                            <span className="px-2 py-0.5 bg-orange-100 text-orange-900 text-[10px] font-black rounded shrink-0">
                               {groupCount} nhóm
                             </span>
                           </div>
-                          <div className="text-xs space-y-1 pt-1 border-t border-white">
+
+                          {/* DÒNG TRẠNG THÁI GIAI ĐOẠN HỌC KỲ (Mở học kỳ, Lập nhóm, Bổ sung, Kết thúc ghép nhóm) */}
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#554D44] font-bold">Giai đoạn:</span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${stage.color}`}>
+                              ● {stage.label}
+                            </span>
+                          </div>
+
+                          <div className="text-xs space-y-1 pt-2 border-t border-white">
                             <p className="text-[#554D44] font-bold">
                               Giảng viên phụ trách:
                             </p>
@@ -907,7 +1034,7 @@ export default function AdminDashboard() {
                     })
                   ) : (
                     <div className="col-span-full py-6 text-center text-[#554D44] italic text-xs">
-                      Chưa có dữ liệu học kỳ.
+                      Không có dữ liệu cho học kỳ được chọn.
                     </div>
                   )}
                 </div>
@@ -977,20 +1104,20 @@ export default function AdminDashboard() {
 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl border border-white shadow-lg shadow-black/5 space-y-5">
                   <h3 className="text-sm font-black text-[#1A1816]">
-                    📈 Thống kê sĩ số nhóm đồ án (3 - 5 người)
+                    📈 Thống kê sĩ số nhóm đồ án (3 - 5 người) {selectedOverviewSemester !== "ALL" && `— Kỳ ${selectedOverviewSemester}`}
                   </h3>
                   <div className="space-y-4 pt-2">
                     {(() => {
-                      const validGroups = groups.filter((g) => {
+                      const validGroups = overviewFilteredGroups.filter((g) => {
                         const count =
                           g.memberCount ??
                           g.numberOfMembers ??
                           (Array.isArray(g.members) ? g.members.length : 0);
                         return count >= 3 && count <= 5;
                       }).length;
-                      const invalidGroups = groups.length - validGroups;
-                      const validPercent = groups.length
-                        ? Math.round((validGroups / groups.length) * 100)
+                      const invalidGroups = overviewFilteredGroups.length - validGroups;
+                      const validPercent = overviewFilteredGroups.length
+                        ? Math.round((validGroups / overviewFilteredGroups.length) * 100)
                         : 0;
 
                       return (
@@ -1162,6 +1289,7 @@ export default function AdminDashboard() {
                         semesters.map((sem, index) => {
                           const code = sem.code || sem;
                           const name = sem.name || code;
+                          const stage = getSemesterStage(sem);
                           const formatDateTimeStr = (dt) => {
                             if (!dt) return "—";
                             try {
@@ -1217,8 +1345,8 @@ export default function AdminDashboard() {
                                 </div>
                               </td>
                               <td className="p-4">
-                                <span className="px-2.5 py-1 font-bold rounded-lg text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                  Hoạt động
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${stage.color}`}>
+                                  {stage.label}
                                 </span>
                               </td>
                               <td className="p-4 text-right space-x-2">
@@ -1370,16 +1498,13 @@ export default function AdminDashboard() {
                         <th className="p-3 font-black uppercase">
                           Sĩ số thành viên
                         </th>
-                        {/* <th className="p-3 font-black uppercase text-right">
-                          Thao tác
-                        </th> */}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/60">
                       {loadingSemesterGroups ? (
                         <tr>
                           <td
-                            colSpan="4"
+                            colSpan="3"
                             className="p-8 text-center text-[#554D44] italic"
                           >
                             Đang tải danh sách nhóm của học kỳ{" "}
@@ -1405,15 +1530,20 @@ export default function AdminDashboard() {
                                   type="button"
                                   onClick={async () => {
                                     try {
-                                      const groupId = g.id || g.groupId;
-                                      const detailRes = await getGroupById(
-                                        groupId,
-                                      ).catch(() => null);
+                                      const roomId =
+                                        g.id || g.groupId || g.roomId;
+
+                                      const detailRes = await api
+                                        .get(`/rooms/${roomId}`)
+                                        .catch(() => null);
+                                      const detail =
+                                        detailRes?.data || detailRes || {};
+
                                       setSelectedGroupDetail({
                                         ...g,
-                                        ...(detailRes || {}),
+                                        ...detail,
                                         members:
-                                          detailRes?.members || g.members || [],
+                                          detail.members || g.members || [],
                                         semester:
                                           activeSemesterDetailCode ||
                                           g.semester,
@@ -1437,22 +1567,13 @@ export default function AdminDashboard() {
                                   {count}/5 thành viên
                                 </span>
                               </td>
-                              {/* <td className="p-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => openLeaderModal(g)}
-                                  className="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold rounded-lg text-[10px]"
-                                >
-                                  👑 Đổi Trưởng nhóm
-                                </button>
-                              </td> */}
                             </tr>
                           );
                         })
                       ) : (
                         <tr>
                           <td
-                            colSpan="4"
+                            colSpan="3"
                             className="p-8 text-center text-[#554D44] italic"
                           >
                             Chưa có nhóm nào đăng ký trong học kỳ{" "}
@@ -1467,7 +1588,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TRANG TÀI KHOẢN (ĐÃ FIX LỖI BỘ LỌC VAI TRÒ HỆ THỐNG VÀ LỌC HỌC KỲ) */}
+          {/* TRANG TÀI KHOẢN */}
           {activeMenu === "accounts" && (
             <div className="p-8 space-y-6 animate-smooth-fade">
               <div className="flex justify-between items-center bg-[#E65100]/90 backdrop-blur-xl p-6 border border-white rounded-2xl shadow-lg shadow-black/5 flex-wrap gap-4">
@@ -1490,7 +1611,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* THANH CHỌN CHẾ ĐỘ XEM TÀI KHOẢN (THEO HỌC KỲ HOẶC TOÀN HỆ THỐNG) */}
+              {/* THANH CHỌN CHẾ ĐỘ XEM TÀI KHOẢN */}
               <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl p-4 border border-white rounded-2xl shadow-lg shadow-black/5 flex-wrap gap-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-xs font-bold text-[#554D44]">
@@ -1581,7 +1702,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* BẢNG HIỂN THỊ TÀI KHOẢN (HỖ TRỢ ĐỒNG BỘ CẢ 2 NGUỒN VÀ LỌC VAI TRÒ CHUẨN XÁC) */}
+              {/* BẢNG HIỂN THỊ TÀI KHOẢN */}
               <div className="bg-white/80 backdrop-blur-xl border border-white rounded-2xl overflow-hidden shadow-lg shadow-black/5">
                 <div className="p-4 bg-white/60 border-b border-white flex justify-between items-center text-xs font-black">
                   <span>
@@ -1853,15 +1974,22 @@ export default function AdminDashboard() {
                                 type="button"
                                 onClick={async () => {
                                   try {
-                                    const groupId = g.id || g.groupId;
-                                    const detailRes = await getGroupById(
-                                      groupId,
-                                    ).catch(() => null);
+                                    const roomId =
+                                      g.id || g.groupId || g.roomId;
+
+                                    const detailRes = await api
+                                      .get(`/rooms/${roomId}`)
+                                      .catch(() => null);
+                                    const detail =
+                                      detailRes?.data || detailRes || {};
+
                                     setSelectedGroupDetail({
                                       ...g,
-                                      ...(detailRes || {}),
+                                      ...detail,
                                       members:
-                                        detailRes?.members || g.members || [],
+                                        detail.members || g.members || [],
+                                      semester:
+                                        activeSemesterDetailCode || g.semester,
                                     });
                                   } catch {
                                     setSelectedGroupDetail(g);
@@ -1976,7 +2104,6 @@ export default function AdminDashboard() {
                 </p>
                 <p className="font-extrabold text-[#E65100] mt-0.5 text-sm">
                   {(() => {
-                    // 1. Nếu group đã có sẵn thông tin moderator
                     if (selectedGroupDetail.moderator?.fullName) {
                       return selectedGroupDetail.moderator.fullName;
                     }
@@ -1984,7 +2111,6 @@ export default function AdminDashboard() {
                       return selectedGroupDetail.semesterModerator.fullName;
                     }
 
-                    // 2. Dùng mã học kỳ của nhóm để tra cứu trực tiếp trong mảng semesters (lấy từ API GET /api/v1/semesters ở trên)
                     const semCode = selectedGroupDetail.semester;
                     if (
                       semCode &&
@@ -1996,7 +2122,6 @@ export default function AdminDashboard() {
                           String(s.code || s).toUpperCase() ===
                           String(semCode).toUpperCase(),
                       );
-                      // Trích xuất đúng chuẩn cấu trúc moderator từ API semesters trả về
                       if (matchedSem?.moderator?.fullName) {
                         return matchedSem.moderator.fullName;
                       }
@@ -2451,7 +2576,7 @@ export default function AdminDashboard() {
             <div className="flex justify-end gap-3 border-t border-white/80 pt-4">
               <button
                 type="button"
-                onClick={() => setIsUserModalOpen(false)}
+                onClick={() => setLeaderModalOpen(false)}
                 className="rounded-xl bg-white border border-white px-5 py-2.5 text-xs font-bold shadow-sm cursor-pointer hover:bg-orange-50"
               >
                 Hủy
