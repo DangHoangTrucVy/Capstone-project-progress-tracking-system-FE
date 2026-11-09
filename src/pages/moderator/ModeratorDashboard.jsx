@@ -4,7 +4,9 @@ import {
   getSemesterStatistics,
   exportSemesterExcel,
   dissolveSubMinimumRooms,
+  getPendingFinalizeRequests,
 } from "../../services/moderatorService";
+import { decideFinalizeRequest } from "../../services/roomService";
 import { getSemesters } from "../../services/semesterService";
 import { getCurrentUser } from "../../services/authService";
 import api from "../../services/api";
@@ -53,11 +55,16 @@ export default function ModeratorDashboard() {
 
   const [controlFilterStatus, setControlFilterStatus] = useState("ALL");
 
+  // Modal danh sách phòng chờ duyệt chốt chuẩn Swagger
+  const [finalizeModalOpen, setFinalizeModalOpen] = useState(false);
+  const [pendingFinalizeList, setPendingFinalizeList] = useState([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+
   const [studentsModalOpen, setStudentsModalOpen] = useState(false);
   const [studentList, setStudentList] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
-  const [studentFilter, setStudentFilter] = useState("ALL"); // ALL | HAS_GROUP | NO_GROUP | INELIGIBLE
+  const [studentFilter, setStudentFilter] = useState("ALL");
 
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
@@ -128,14 +135,34 @@ export default function ModeratorDashboard() {
     setActiveMenu("group-control");
   };
 
-  const handleFinalizeBatch = async (batchNumber) => {
-    if (!window.confirm(`Xác nhận duyệt Chốt danh sách nhóm Đợt ${batchNumber}?`)) return;
+  // Mở modal danh sách phòng chờ duyệt chốt chuẩn Swagger
+  const handleOpenFinalizeModal = async () => {
+    setFinalizeModalOpen(true);
+    setLoadingPending(true);
     try {
-      await api.post(`/semesters/${selectedSemester}/finalize-batch`, { batch: batchNumber });
-      showToast(`Đã chốt nhóm thành công cho Đợt ${batchNumber}!`);
+      const res = await getPendingFinalizeRequests(selectedSemester).catch(() => []);
+      const list = Array.isArray(res) ? res : res.data || res.content || [];
+      setPendingFinalizeList(list);
+    } catch {
+      setPendingFinalizeList([]);
+    } finally {
+      setLoadingPending(false);
+    }
+  };
+
+  // Xử lý Duyệt hoặc Từ chối chốt phòng lẻ
+  const handleApproveRoomFinalize = async (roomId, approved) => {
+    try {
+      await decideFinalizeRequest(roomId, {
+        approved,
+        reason: approved ? "" : "Chưa đạt yêu cầu của Người điều phối",
+      });
+      showToast(approved ? "Đã duyệt chốt phòng thành Nhóm chính thức!" : "Đã từ chối báo chốt.");
+      // Tải lại danh sách chờ chốt và dữ liệu học kỳ
+      handleOpenFinalizeModal();
       loadSemesterData(selectedSemester);
     } catch (error) {
-      showToast(error.response?.data?.message || `Thao tác Chốt đợt ${batchNumber} thất bại.`, "error");
+      showToast(error.response?.data?.message || "Thực hiện thất bại.", "error");
     }
   };
 
@@ -328,16 +355,10 @@ export default function ModeratorDashboard() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleFinalizeBatch(1)}
+                      onClick={handleOpenFinalizeModal}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition"
                     >
-                      Chốt Nhóm Đợt 1
-                    </button>
-                    <button
-                      onClick={() => handleFinalizeBatch(2)}
-                      className="px-4 py-2 bg-[#E65100] hover:bg-[#D84315] text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition"
-                    >
-                      Chốt Nhóm Đợt 2 (Chốt Hết)
+                      📋 Duyệt Phòng Chờ Chốt
                     </button>
                     <button
                       onClick={handleExport}
@@ -512,6 +533,63 @@ export default function ModeratorDashboard() {
           )}
         </div>
       </main>
+
+      {/* MODAL DUYỆT PHÒNG CHỜ CHỐT CHUẨN SWAGGER */}
+      {finalizeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl max-h-[85vh] bg-white rounded-3xl p-6 shadow-2xl flex flex-col space-y-4 overflow-hidden text-xs">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="font-black text-sm text-[#2C2825]">Danh sách Phòng đang chờ duyệt Chốt</h3>
+                <p className="text-[11px] text-[#6B635B]">Các phòng đã gửi yêu cầu báo chốt lên Người điều phối</p>
+              </div>
+              <button onClick={() => setFinalizeModalOpen(false)} className="px-3 py-1 bg-gray-100 rounded-xl font-bold cursor-pointer">
+                ✕ Đóng
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {loadingPending ? (
+                <div className="text-center py-12 text-[#6B635B] font-bold">Đang tải danh sách chờ chốt...</div>
+              ) : pendingFinalizeList.length > 0 ? (
+                pendingFinalizeList.map((req) => {
+                  const rId = req.id || req.roomId;
+                  const rName = req.name || req.roomName || "Phòng đồ án";
+                  const membersCount = req.members?.length || req.memberCount || 0;
+                  return (
+                    <div key={rId} className="p-4 bg-[#FBF9F5] border border-[#E8E2D9] rounded-2xl flex justify-between items-center">
+                      <div>
+                        <p className="font-black text-sm text-[#E65100]">{rName}</p>
+                        <p className="text-[10px] text-[#6B635B]">
+                          Ngành: {req.majorCode || req.majorName || "---"} • Sĩ số: {membersCount} thành viên
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApproveRoomFinalize(rId, true)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer"
+                        >
+                          ✓ Duyệt
+                        </button>
+                        <button
+                          onClick={() => handleApproveRoomFinalize(rId, false)}
+                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold rounded-xl cursor-pointer"
+                        >
+                          ✕ Từ chối
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 text-[#6B635B] italic">
+                  Hiện không có phòng nào đang gửi yêu cầu chờ duyệt chốt.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DANH SÁCH SINH VIÊN KÈM LÝ DO KHÔNG ĐỦ ĐIỀU KIỆN */}
       {studentsModalOpen && (

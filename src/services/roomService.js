@@ -107,3 +107,25 @@ export const inviteStudentToRoom = async (roomId, studentCode) => {
 
 // Export thêm alias createRoom để tương thích với các component frontend
 export const createRoom = createRoomsForMajor;
+
+// ==========================================
+// BỔ SUNG CÁC HÀM XỬ LÝ LỜI MỜI VÀ ĐƠN (REQUESTS)
+// ==========================================
+
+// Chấp nhận lời mời / đơn ứng tuyển
+export const acceptRequest = async (requestId) => {
+  const response = await api.post(`/requests/${requestId}/accept`);
+  return response.data;
+};
+
+// Từ chối lời mời / đơn ứng tuyển
+export const rejectRequest = async (requestId, data) => {
+  const response = await api.post(`/requests/${requestId}/reject`, data);
+  return response.data;
+};
+
+// Rút lại đơn ứng tuyển đã gửi
+export const withdrawRequest = async (requestId) => {
+  const response = await api.delete(`/requests/${requestId}`);
+  return response.data;
+};

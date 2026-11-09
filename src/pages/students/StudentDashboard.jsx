@@ -319,7 +319,7 @@
 //                     : "hover:bg-[#FBF9F5] text-[#6B635B]"
 //                 }`}
 //               >
-                
+
 //                 <span>Tạo nhóm mới</span>
 //               </button>
 //               <button
@@ -549,7 +549,6 @@
 //   );
 // }
 
-
 import { useState, useEffect } from "react";
 import Overview from "./Overview";
 import MemberGroup from "./MemberGroup";
@@ -558,7 +557,10 @@ import GroupManagementPanel from "./GroupManagementPanel";
 import Profile from "../../auth/Profile";
 import NotificationBell from "../../components/NotificationBell";
 import { getCurrentUser } from "../../services/authService";
-import { getSemesterRooms, getMyRequestsAndInvites } from "../../services/roomService";
+import {
+  getSemesterRooms,
+  getMyRequestsAndInvites,
+} from "../../services/roomService";
 import { getSemesters } from "../../services/semesterService";
 
 export default function StudentDashboard() {
@@ -588,10 +590,14 @@ export default function StudentDashboard() {
       if (currentSem) {
         // Lấy tất cả Room trong kỳ để tìm Room của sinh viên hiện tại
         const roomsRes = await getSemesterRooms(currentSem).catch(() => []);
-        const roomList = Array.isArray(roomsRes) ? roomsRes : roomsRes.content || [];
-        
+        const roomList = Array.isArray(roomsRes)
+          ? roomsRes
+          : roomsRes.content || [];
+
         const foundRoom = roomList.find((r) =>
-          r.members?.some((m) => String(m.userId || m.id) === String(user.id || user.userId))
+          r.members?.some(
+            (m) => String(m.userId || m.id) === String(user.id || user.userId),
+          ),
         );
 
         if (foundRoom) {
@@ -627,8 +633,10 @@ export default function StudentDashboard() {
 
   const isLeader = Boolean(
     myRoom?.members?.find(
-      (m) => String(m.userId || m.id) === String(currentUser?.id || currentUser?.userId)
-    )?.isLeader || myRoom?.leaderId === currentUser?.id
+      (m) =>
+        String(m.userId || m.id) ===
+        String(currentUser?.id || currentUser?.userId),
+    )?.isLeader || myRoom?.leaderId === currentUser?.id,
   );
 
   return (
@@ -642,24 +650,32 @@ export default function StudentDashboard() {
             </div>
             <div>
               <h2 className="font-extrabold text-sm text-[#2C2825]">
-                Sinh viên Capstone
+                Hệ thống Ghép nhóm
               </h2>
-              <p className="text-[11px] text-[#6B635B]">Hệ thống Ghép nhóm V3.0</p>
+              <p className="text-[11px] text-[#6B635B]">
+                Hệ thống Quản lý Đồ án
+              </p>
             </div>
           </div>
 
           <div className="bg-[#FBF9F5] p-4 rounded-2xl border border-[#E8E2D9] space-y-2">
             <div className="flex justify-between items-center text-xs">
-              <span className="font-bold text-[#6B635B]">Trạng thái:</span>
-              <span className={`font-black text-xs ${myRoom ? "text-emerald-600" : "text-amber-600"}`}>
-                {myRoom ? (myRoom.groupCode ? `Nhóm: ${myRoom.groupCode}` : `Room: ${myRoom.name}`) : "Chưa có Room"}
+              <span className="font-bold text-[#6B635B]">Phòng:</span>
+              <span
+                className={`font-black text-xs ${myRoom ? "text-emerald-600" : "text-amber-600"}`}
+              >
+                {myRoom
+                  ? myRoom.groupCode
+                    ? ` ${myRoom.groupCode}`
+                    : ` ${(myRoom.name || "").replace(/^(Room|Phòng)\s*/i, "")}`
+                  : "Chưa vào phòng"}
               </span>
             </div>
             {myRoom && (
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-[#6B635B]">Vai trò:</span>
                 <span className="font-bold text-[#E65100]">
-                  {isLeader ? "👑 Trưởng nhóm" : "👤 Thành viên"}
+                  {isLeader ? "Trưởng nhóm" : "Thành viên"}
                 </span>
               </div>
             )}
@@ -671,47 +687,57 @@ export default function StudentDashboard() {
                 <button
                   onClick={() => setActiveTab("overview")}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl cursor-pointer ${
-                    activeTab === "overview" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#FBF9F5]"
+                    activeTab === "overview"
+                      ? "bg-[#E65100] text-white shadow-md"
+                      : "hover:bg-[#FBF9F5]"
                   }`}
                 >
                   <span>📊</span>
-                  <span>Tổng quan Room</span>
+                  <span>Tổng quan phòng</span>
                 </button>
                 <button
                   onClick={() => setActiveTab("members")}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl cursor-pointer ${
-                    activeTab === "members" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#FBF9F5]"
+                    activeTab === "members"
+                      ? "bg-[#E65100] text-white shadow-md"
+                      : "hover:bg-[#FBF9F5]"
                   }`}
                 >
                   <span>👥</span>
-                  <span>Thành viên trong Room</span>
+                  <span>Thành viên trong phòng</span>
                 </button>
-                <button
+                {/* <button
                   onClick={() => setActiveTab("management")}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl cursor-pointer ${
-                    activeTab === "management" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#FBF9F5]"
+                    activeTab === "management"
+                      ? "bg-[#E65100] text-white shadow-md"
+                      : "hover:bg-[#FBF9F5]"
                   }`}
                 >
                   <span>🔒</span>
                   <span>Quản lý & Báo chốt</span>
-                </button>
+                </button> */}
               </>
             ) : (
               <button
                 onClick={() => setActiveTab("search")}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl cursor-pointer ${
-                  activeTab === "search" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#FBF9F5]"
+                  activeTab === "search"
+                    ? "bg-[#E65100] text-white shadow-md"
+                    : "hover:bg-[#FBF9F5]"
                 }`}
               >
                 <span>🔍</span>
-                <span>Tìm & Vào Room</span>
+                <span>Tìm & Vào Phòng</span>
               </button>
             )}
 
             <button
               onClick={() => setActiveTab("profile")}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl cursor-pointer ${
-                activeTab === "profile" ? "bg-[#E65100] text-white shadow-md" : "hover:bg-[#FBF9F5]"
+                activeTab === "profile"
+                  ? "bg-[#E65100] text-white shadow-md"
+                  : "hover:bg-[#FBF9F5]"
               }`}
             >
               <span>⚙️</span>
@@ -726,8 +752,12 @@ export default function StudentDashboard() {
               {currentUser?.fullName?.slice(0, 2).toUpperCase() || "SV"}
             </div>
             <div className="overflow-hidden">
-              <h4 className="text-xs font-black truncate text-[#2C2825]">{currentUser?.fullName}</h4>
-              <p className="text-[10px] text-[#6B635B] truncate">{currentUser?.email}</p>
+              <h4 className="text-xs font-black truncate text-[#2C2825]">
+                {currentUser?.fullName}
+              </h4>
+              <p className="text-[10px] text-[#6B635B] truncate">
+                {currentUser?.email}
+              </p>
             </div>
           </div>
           <button
@@ -760,7 +790,10 @@ export default function StudentDashboard() {
                 </option>
               ))}
             </select>
-            <button onClick={fetchStudentData} className="text-[#E65100] font-bold hover:underline cursor-pointer">
+            <button
+              onClick={fetchStudentData}
+              className="text-[#E65100] font-bold hover:underline cursor-pointer"
+            >
               Làm mới
             </button>
             <NotificationBell />
@@ -769,16 +802,31 @@ export default function StudentDashboard() {
 
         <div className="p-8 max-w-7xl mx-auto w-full">
           {activeTab === "overview" && myRoom && (
-            <Overview roomData={myRoom} isLeader={isLeader} onRefresh={fetchStudentData} />
+            <Overview
+              roomData={myRoom}
+              isLeader={isLeader}
+              onRefresh={fetchStudentData}
+            />
           )}
           {activeTab === "members" && myRoom && (
-            <MemberGroup roomData={myRoom} isLeader={isLeader} onRefresh={fetchStudentData} />
+            <MemberGroup
+              roomData={myRoom}
+              isLeader={isLeader}
+              onRefresh={fetchStudentData}
+            />
           )}
           {activeTab === "management" && myRoom && (
-            <GroupManagementPanel roomData={myRoom} isLeader={isLeader} onRefresh={fetchStudentData} />
+            <GroupManagementPanel
+              roomData={myRoom}
+              isLeader={isLeader}
+              onRefresh={fetchStudentData}
+            />
           )}
           {activeTab === "search" && (
-            <RoomSearchAndJoin semester={selectedSemester} onJoined={fetchStudentData} />
+            <RoomSearchAndJoin
+              semester={selectedSemester}
+              onJoined={fetchStudentData}
+            />
           )}
           {activeTab === "profile" && <Profile />}
         </div>

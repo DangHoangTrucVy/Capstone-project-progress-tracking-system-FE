@@ -2204,7 +2204,7 @@ export default function AdminDashboard() {
                             <td className="p-3 text-right">
                               {isLeader ? (
                                 <span className="px-2.5 py-1 bg-purple-100 text-purple-900 font-bold rounded-lg text-[10px] border border-purple-200">
-                                  👑 Trưởng nhóm
+                                  Trưởng nhóm
                                 </span>
                               ) : (
                                 <span className="px-2.5 py-1 bg-white text-gray-800 font-bold rounded-lg text-[10px] border border-white">
