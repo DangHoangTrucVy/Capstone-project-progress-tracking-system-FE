@@ -50,8 +50,11 @@ export const getGroupApplications = async (groupId) =>
 export const applyToGroup = async (groupId, data) =>
   (await api.post(`/groups/${groupId}/applications`, data)).data;
 
-export const inviteToGroup = async (groupId, data) =>
-  (await api.post(`/groups/${groupId}/invitations`, data)).data;
+export const inviteToGroup = async (roomId, data) => {
+  // Đổi từ `/groups/${roomId}/invitations` thành `/rooms/${roomId}/invitations`
+  const response = await api.post(`/rooms/${roomId}/invitations`, data);
+  return response.data;
+};
 
 export const getGroupRequests = async (groupId) =>
   (await api.get(`/rooms/${groupId}/requests`)).data;
